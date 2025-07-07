@@ -1,0 +1,276 @@
+/* Clean minimal layout for Yimian Liu's homepage */
+
+html {
+    font-size: 16px;
+    letter-spacing: .33px;
+    scroll-behavior: smooth;
+}
+
+html, body {
+    min-width: 20rem;
+    overflow-x: hidden;
+    height: 100vh;
+}
+
+body {
+    color: #343a40;
+    background: #fff;
+    font-weight: 400;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    box-sizing: border-box;
+    font-family: 'Source Code Pro', monospace;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+body * {
+    box-sizing: inherit;
+}
+
+h1, h2, h3, h4, h5 {
+    font-weight: 400;
+}
+
+a {
+    text-decoration: none;
+    color: #05b;
+    /* Touch-friendly tap targets */
+    min-height: 44px;
+    display: inline-block;
+    padding: 0.2rem 0;
+}
+
+a:visited {
+    color: #8440f1;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* Layout */
+.container {
+    max-width: 600px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* Homepage specific styles */
+.homepage-header {
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
+.homepage-header h1 {
+    font-size: clamp(2rem, 4.5vw, 2.8rem);
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+}
+
+.homepage-content {
+    line-height: 1.6;
+    text-align: left;
+    max-width: 500px;
+}
+
+.homepage-content p {
+    margin-bottom: 1.2rem;
+    color: #666;
+    font-size: clamp(0.92rem, 2.2vw, 1.05rem);
+    font-weight: 400;
+}
+
+.homepage-content p:first-child {
+    font-size: clamp(1.05rem, 2.8vw, 1.2rem);
+    color: #555;
+    font-weight: 400;
+    margin-bottom: 1.5rem;
+}
+
+.homepage-content p:last-child {
+    margin-bottom: 0;
+    font-style: italic;
+    color: #777;
+    font-size: clamp(0.88rem, 2.1vw, 0.98rem);
+}
+
+/* Canvas background */
+#boids1 {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
+
+/* Enhanced Responsive Design */
+
+/* Large tablets and small desktops */
+@media screen and (max-width: 1024px) {
+    .container {
+        max-width: 90%;
+        padding: 1.5rem;
+    }
+}
+
+/* Tablets */
+@media screen and (max-width: 768px) {
+    html {
+        font-size: 15px;
+    }
+    
+    .container {
+        padding: 1rem;
+        max-width: 95%;
+    }
+    
+    .homepage-header {
+        margin-bottom: 1.5rem;
+    }
+    
+    .homepage-content p {
+        margin-bottom: 1.2rem;
+    }
+    
+    .homepage-content p:first-child {
+        margin-bottom: 1.5rem;
+    }
+    
+    body {
+        align-items: flex-start;
+        padding-top: 3rem;
+        padding-bottom: 2rem;
+    }
+}
+
+/* Large phones */
+@media screen and (max-width: 640px) {
+    html {
+        font-size: 14px;
+    }
+    
+    .container {
+        padding: 1rem;
+    }
+    
+    body {
+        padding-top: 2rem;
+        padding-bottom: 1.5rem;
+    }
+    
+    .homepage-content {
+        line-height: 1.6;
+    }
+}
+
+/* Small phones */
+@media screen and (max-width: 480px) {
+    html {
+        /* Use device font size for better accessibility */
+        font-size: 16px;
+    }
+    
+    .container {
+        padding: 1rem;
+        max-width: 100%;
+    }
+    
+    .homepage-header {
+        margin-bottom: 1rem;
+    }
+    
+    .homepage-content p {
+        margin-bottom: 1rem;
+        text-align: left;
+    }
+    
+    .homepage-content p:first-child {
+        margin-bottom: 1.25rem;
+    }
+    
+    .homepage-content p:last-child {
+        margin-top: 1rem;
+    }
+    
+    body {
+        padding-top: 1.5rem;
+        padding-bottom: 1rem;
+        align-items: flex-start;
+    }
+}
+
+/* Very small phones */
+@media screen and (max-width: 360px) {
+    .container {
+        padding: 0.75rem;
+    }
+    
+    .homepage-content p {
+        margin-bottom: 0.875rem;
+    }
+    
+    .homepage-header {
+        margin-bottom: 0.875rem;
+    }
+}
+
+/* Landscape phones */
+@media screen and (max-height: 500px) and (orientation: landscape) {
+    body {
+        align-items: flex-start;
+        padding-top: 1rem;
+        padding-bottom: 0.5rem;
+    }
+    
+    .container {
+        padding: 1rem;
+    }
+    
+    .homepage-header {
+        margin-bottom: 0.75rem;
+    }
+    
+    .homepage-content p {
+        margin-bottom: 0.75rem;
+    }
+    
+    .homepage-content p:first-child {
+        margin-bottom: 1rem;
+    }
+}
+
+/* High DPI displays */
+@media screen and (-webkit-min-device-pixel-ratio: 2), 
+       screen and (min-resolution: 192dpi) {
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+    
+    #boids1 {
+        /* Reduce or disable animation for users who prefer reduced motion */
+        opacity: 0.3;
+    }
+}
+
+ 
