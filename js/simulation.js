@@ -9,6 +9,10 @@ function isMobileDevice() {
 var NUM_BOIDS = isMobileDevice() ? 60 : 120;
 var REFRESH_INTERVAL_IN_MS = isMobileDevice() ? 18 : 12;
 
+// Predator performance settings
+var PREDATOR_MOBILE_RANGE = 60;  // Smaller range on mobile for better performance
+var PREDATOR_DESKTOP_RANGE = 80;
+
 function Simulation(name) {
 	var canvas = document.getElementById(name);
 	this.ctx = canvas.getContext('2d');
@@ -26,9 +30,14 @@ Simulation.prototype = {
 		var start_x = Math.floor(Math.random() * this.canvasWidth);
 		var start_y = Math.floor(Math.random() * this.canvasHeight);
 		for (var i = 0; i < NUM_BOIDS; i++) {
-			var boid = new Boid(start_y, start_x, this);
+			var boid = new Boid(start_x, start_y, this);
 			this.addBoid(boid);
 		}
+		
+		// Initialize predator in center of canvas
+		var predator_x = this.canvasWidth / 2;
+		var predator_y = this.canvasHeight / 2;
+		this.predator = new Predator(predator_x, predator_y, this);
 	},
 	addBoid: function (boid) {
 		this.boids.push(boid);
@@ -45,6 +54,18 @@ Simulation.prototype = {
 		for (var ob in this.obstacles) {
 			this.obstacles[ob].render(this.obstacles);
 		}
+		
+		// Update predator and handle predator-prey interactions
+		this.predator.update(this.boids);
+		
+		// Check for caught boids (remove them smoothly)
+		var caughtBoids = this.predator.checkForPrey(this.boids);
+		for (var i = caughtBoids.length - 1; i >= 0; i--) {
+			this.boids.splice(caughtBoids[i], 1);
+		}
+		
+		// Render predator
+		this.predator.render();
 	},
 	tick: function () {
 		for (var bi in this.boids) {

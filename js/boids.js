@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		var simulation = new Simulation(name);
 		simulation.initialize(use_obstacle);
 		simulation.run();
+		return simulation;
 	};
 
 	initialize_canvas_simulation('boids1', false);

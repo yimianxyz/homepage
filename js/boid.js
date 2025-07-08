@@ -9,6 +9,17 @@ var render_size = 10;
 var death_throws = 0;
 var avoidanceMultiplier = 2;
 
+// Predator avoidance parameters (from Cornell ECE 5730 implementation)
+// Dynamic range based on device capability
+function getBoidPredatorRange() {
+    return (typeof isMobileDevice === 'function' && isMobileDevice()) ? 
+           (typeof PREDATOR_MOBILE_RANGE !== 'undefined' ? PREDATOR_MOBILE_RANGE : 60) : 
+           (typeof PREDATOR_DESKTOP_RANGE !== 'undefined' ? PREDATOR_DESKTOP_RANGE : 80);
+}
+
+var PREDATOR_RANGE = getBoidPredatorRange();
+var PREDATOR_TURN_FACTOR = 0.3;
+
 function Boid(x, y, simulation) {
 	var randomAngle = Math.random() * 2 * Math.PI;
 	this.velocity = new Vector(Math.cos(randomAngle), Math.sin(randomAngle));
@@ -159,6 +170,31 @@ Boid.prototype = {
 		}
 	},
 
+	// Predator avoidance behavior (based on Cornell ECE 5730 implementation)
+	getPredatorAvoidanceVector: function(predator) {
+		if (!predator) {
+			return new Vector(0, 0);
+		}
+		
+		var distance = this.position.getDistance(predator.position) + EPSILON;
+		if (distance > 0 && distance < PREDATOR_RANGE) {
+			// Calculate avoidance vector away from predator
+			var avoidanceVector = this.position.subtract(predator.position);
+			avoidanceVector.iFastNormalize();
+			
+			// Stronger avoidance when predator is closer
+			var avoidanceStrength = (PREDATOR_RANGE - distance) / PREDATOR_RANGE;
+			avoidanceVector.iMultiplyBy(avoidanceStrength * PREDATOR_TURN_FACTOR);
+			
+			// Apply maximum force limit - subtle avoidance
+			avoidanceVector.iFastLimit(MAX_FORCE * 1.5); // Gentle avoidance, not too dramatic
+			
+			return avoidanceVector;
+		}
+		
+		return new Vector(0, 0);
+	},
+
 	flock: function (boids) {
 		var cohesionVector = this.getCohesionVector(boids);
 		var separationVector = this.getSeparationVector(boids);
@@ -171,6 +207,12 @@ Boid.prototype = {
 		this.acceleration.iAdd(cohesionVector);
 		this.acceleration.iAdd(separationVector);
 		this.acceleration.iAdd(alignmentVector);
+		
+		// Add predator avoidance if predator exists
+		if (this.simulation.predator) {
+			var predatorAvoidanceVector = this.getPredatorAvoidanceVector(this.simulation.predator);
+			this.acceleration.iAdd(predatorAvoidanceVector);
+		}
 	},
 
 	// Wrap-around boundary handling
