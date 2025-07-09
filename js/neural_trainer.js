@@ -763,6 +763,7 @@ function NeuralTrainer() {
     this.simulationSpeed = 1.0;
     this.showSimulation = true;
     this.neuralViz = null;
+    this.completionThreshold = 0; // Episode complete when this many boids remain
     
     // Performance tracking
     this.episodeStartTime = 0;
@@ -1193,6 +1194,13 @@ NeuralTrainer.prototype.applyUIParameters = function() {
             console.log('Applied max episodes:', this.maxEpisodes);
         }
         
+        // Apply completion threshold from UI
+        var completionThresholdInput = document.getElementById('completion-threshold');
+        if (completionThresholdInput) {
+            this.completionThreshold = parseInt(completionThresholdInput.value);
+            console.log('Applied completion threshold:', this.completionThreshold);
+        }
+        
         // Force immediate weight update to test if learning is working
         console.log('Predator created with parameters:', {
             learningRate: this.simulation.predator.learningRate,
@@ -1507,7 +1515,7 @@ NeuralTrainer.prototype.recordEpisodeCompletion = function(reason) {
     var timingData = this.calculateCompletionTime();
     var completionTime = timingData.equivalent;
     
-    if (reason === 'all_boids_eaten') {
+    if (reason === 'target_reached') {
         // Only count successful completions
         this.completionTimes.push(completionTime);
         
@@ -1523,7 +1531,11 @@ NeuralTrainer.prototype.recordEpisodeCompletion = function(reason) {
             return sum + time; 
         }, 0) / recentTimes.length;
         
-        console.log('✅ Episode', this.currentEpisode + 1, 'completed in', completionTime.toFixed(1) + 's');
+        var boidsRemaining = this.simulation.boids.length;
+        var completionMessage = boidsRemaining === 0 ? 'all boids eaten' : 
+                               boidsRemaining + ' boids remaining (threshold: ' + this.completionThreshold + ')';
+        
+        console.log('✅ Episode', this.currentEpisode + 1, 'completed in', completionTime.toFixed(1) + 's', '(' + completionMessage + ')');
         console.log('   📊 Best:', this.bestCompletionTime.toFixed(1) + 's', 'Avg (last 10):', this.averageCompletionTime.toFixed(1) + 's');
         
         // Show progress towards the goal
@@ -1582,7 +1594,14 @@ NeuralTrainer.prototype.updatePerformanceMetrics = function() {
     if (this.simulation && this.simulation.boids) {
         var remaining = this.simulation.boids.length;
         var total = this.totalBoidsAtStart || remaining;
-        document.getElementById('boids-remaining').textContent = remaining + '/' + total;
+        var displayText = remaining + '/' + total;
+        
+        // Add threshold indicator if it's set
+        if (this.completionThreshold > 0) {
+            displayText += ' (→' + this.completionThreshold + ')';
+        }
+        
+        document.getElementById('boids-remaining').textContent = displayText;
     } else {
         document.getElementById('boids-remaining').textContent = '--';
     }
@@ -1668,15 +1687,35 @@ NeuralTrainer.prototype.update = function() {
                 var episodeComplete = false;
                 var completionReason = '';
                 
-                if (this.simulation.boids.length === 0) {
+                if (this.simulation.boids.length <= this.completionThreshold) {
                     episodeComplete = true;
-                    completionReason = 'all_boids_eaten';
+                    completionReason = 'target_reached';
                 } else if (this.episodeFrame >= this.episodeLength) {
                     episodeComplete = true;
                     completionReason = 'timeout';
                 }
                 
                 if (episodeComplete) {
+                    // Give completion bonus if target was reached
+                    if (completionReason === 'target_reached' && this.simulation.predator) {
+                        var boidsRemaining = this.simulation.boids.length;
+                        var completionBonus = 25.0; // Base completion bonus
+                        
+                        // Extra bonus for getting closer to 0 boids remaining
+                        if (boidsRemaining === 0) {
+                            completionBonus += 25.0; // Total 50 for perfect completion
+                        } else if (boidsRemaining <= 2) {
+                            completionBonus += 15.0; // Total 40 for near-perfect
+                        } else if (boidsRemaining <= 5) {
+                            completionBonus += 10.0; // Total 35 for good completion
+                        }
+                        
+                        this.simulation.predator.updateWeights(completionBonus);
+                        this.simulation.predator.episodeReward += completionBonus;
+                        
+                        console.log('🎉 Completion bonus:', completionBonus.toFixed(1), 'for reaching threshold with', boidsRemaining, 'boids remaining');
+                    }
+                    
                     // Record performance metrics before moving to next episode
                     this.recordEpisodeCompletion(completionReason);
                     
