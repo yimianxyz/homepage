@@ -188,9 +188,11 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
         if (isNaN(normalizedPosX)) normalizedPosX = 0;
         if (isNaN(normalizedPosY)) normalizedPosY = 0;
         
-        // Normalize boid velocity (-1 to 1)
-        var normalizedVelX = boid.velocity.x / this.maxVelocity;
-        var normalizedVelY = boid.velocity.y / this.maxVelocity;
+        // Normalize boid velocity based on screen size
+        var screenVelNormX = this.simulation.canvasWidth / 100;  // Screen-relative velocity normalization
+        var screenVelNormY = this.simulation.canvasHeight / 100; // Screen-relative velocity normalization
+        var normalizedVelX = boid.velocity.x / screenVelNormX;
+        var normalizedVelY = boid.velocity.y / screenVelNormY;
         
         // Safety check for NaN velocities
         if (isNaN(normalizedVelX)) normalizedVelX = 0;
@@ -200,20 +202,22 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
         var baseIndex = i * 4;
         this.inputBuffer[baseIndex] = normalizedPosX;     // Position X (screen-normalized)
         this.inputBuffer[baseIndex + 1] = normalizedPosY; // Position Y (screen-normalized)
-        this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
-        this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
+        this.inputBuffer[baseIndex + 2] = normalizedVelX; // Velocity X (screen-normalized)
+        this.inputBuffer[baseIndex + 3] = normalizedVelY; // Velocity Y (screen-normalized)
     }
     
     // Add predator's current velocity (last 2 inputs)
-    var predatorVelX = this.velocity.x / this.maxVelocity;
-    var predatorVelY = this.velocity.y / this.maxVelocity;
+    var screenVelNormX = this.simulation.canvasWidth / 100;  // Screen-relative velocity normalization
+    var screenVelNormY = this.simulation.canvasHeight / 100; // Screen-relative velocity normalization
+    var predatorVelX = this.velocity.x / screenVelNormX;
+    var predatorVelY = this.velocity.y / screenVelNormY;
     
     // Safety check for NaN velocities
     if (isNaN(predatorVelX)) predatorVelX = 0;
     if (isNaN(predatorVelY)) predatorVelY = 0;
     
-    this.inputBuffer[20] = Math.max(-1, Math.min(1, predatorVelX));
-    this.inputBuffer[21] = Math.max(-1, Math.min(1, predatorVelY));
+    this.inputBuffer[20] = predatorVelX;
+    this.inputBuffer[21] = predatorVelY;
 };
 
 // Neural network forward pass (optimized for speed)

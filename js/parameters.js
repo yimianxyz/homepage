@@ -64,7 +64,7 @@ window.NEURAL_PARAMS = {
     maxVelocity: 6,
     
     // Version info for parameter management
-    version: "2.8.0",
+    version: "2.9.0",
     trained: false,
-    description: "Clean screen-normalized positions without artificial scaling - natural spatial representation"
+    description: "Complete screen-adaptive normalization for both positions and velocities - consistent spatial understanding across all screen sizes"
 };

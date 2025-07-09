@@ -382,9 +382,11 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
         if (isNaN(normalizedPosX)) normalizedPosX = 0;
         if (isNaN(normalizedPosY)) normalizedPosY = 0;
         
-        // Normalize boid velocity (-1 to 1)
-        var normalizedVelX = boid.velocity.x / this.maxVelocity;
-        var normalizedVelY = boid.velocity.y / this.maxVelocity;
+        // Normalize boid velocity based on screen size
+        var screenVelNormX = this.simulation.canvasWidth / 100;  // Screen-relative velocity normalization
+        var screenVelNormY = this.simulation.canvasHeight / 100; // Screen-relative velocity normalization
+        var normalizedVelX = boid.velocity.x / screenVelNormX;
+        var normalizedVelY = boid.velocity.y / screenVelNormY;
         
         if (isNaN(normalizedVelX)) normalizedVelX = 0;
         if (isNaN(normalizedVelY)) normalizedVelY = 0;
@@ -393,19 +395,21 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
         var baseIndex = i * 4;
         this.inputBuffer[baseIndex] = normalizedPosX;     // Position X (screen-normalized)
         this.inputBuffer[baseIndex + 1] = normalizedPosY; // Position Y (screen-normalized)
-        this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
-        this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
+        this.inputBuffer[baseIndex + 2] = normalizedVelX; // Velocity X (screen-normalized)
+        this.inputBuffer[baseIndex + 3] = normalizedVelY; // Velocity Y (screen-normalized)
     }
     
     // Add predator's current velocity (last 2 inputs)
-    var predatorVelX = this.velocity.x / this.maxVelocity;
-    var predatorVelY = this.velocity.y / this.maxVelocity;
+    var screenVelNormX = this.simulation.canvasWidth / 100;  // Screen-relative velocity normalization
+    var screenVelNormY = this.simulation.canvasHeight / 100; // Screen-relative velocity normalization
+    var predatorVelX = this.velocity.x / screenVelNormX;
+    var predatorVelY = this.velocity.y / screenVelNormY;
     
     if (isNaN(predatorVelX)) predatorVelX = 0;
     if (isNaN(predatorVelY)) predatorVelY = 0;
     
-    this.inputBuffer[20] = Math.max(-1, Math.min(1, predatorVelX));
-    this.inputBuffer[21] = Math.max(-1, Math.min(1, predatorVelY));
+    this.inputBuffer[20] = predatorVelX;
+    this.inputBuffer[21] = predatorVelY;
 };
 
 // Forward pass through neural network
@@ -1752,11 +1756,11 @@ NeuralTrainer.prototype.updateInputValuesDisplay = function(inputs) {
         var label = inputLabels[i] || 'Input ' + i;
         var color = '#212529';
         
-        // Color coding based on value (screen-normalized positions)
+        // Color coding based on value (screen-normalized positions and velocities)
         var isPosition = label.includes('pos_');
-        var threshold1 = isPosition ? 0.2 : 0.1;   // Near-zero threshold
-        var threshold2 = isPosition ? 0.5 : 0.3;   // Medium threshold  
-        var threshold3 = isPosition ? 1.0 : 0.7;   // High threshold
+        var threshold1 = isPosition ? 0.2 : 0.2;   // Near-zero threshold  
+        var threshold2 = isPosition ? 0.5 : 0.5;   // Medium threshold  
+        var threshold3 = isPosition ? 1.0 : 1.0;   // High threshold
         
         if (Math.abs(value) < threshold1) {
             color = '#6c757d'; // Gray for near-zero
