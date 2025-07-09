@@ -130,12 +130,34 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
     for (var i = 0; i < boids.length; i++) {
         var wrappedVector = this.calculateWrappedDistance(boids[i].position, this.position);
         var wrappedDistance = Math.sqrt(wrappedVector.x * wrappedVector.x + wrappedVector.y * wrappedVector.y);
-        nearestBoids.push({boid: boids[i], distance: wrappedDistance});
+        var boidSpeed = Math.sqrt(boids[i].velocity.x * boids[i].velocity.x + boids[i].velocity.y * boids[i].velocity.y);
+        nearestBoids.push({
+            boid: boids[i], 
+            distance: wrappedDistance,
+            speed: boidSpeed
+        });
     }
     
-    // Sort by wrapped distance and take closest 5
+    // Sort by wrapped distance and take closest available boids
     nearestBoids.sort(function(a, b) { return a.distance - b.distance; });
-    nearestBoids = nearestBoids.slice(0, 5);
+    
+    // If we have fewer than 5 boids, find the slowest one to replicate
+    var targetBoids = [];
+    var slowestBoid = null;
+    var minSpeed = Infinity;
+    
+    for (var i = 0; i < Math.min(5, nearestBoids.length); i++) {
+        targetBoids.push(nearestBoids[i]);
+        if (nearestBoids[i].speed < minSpeed) {
+            minSpeed = nearestBoids[i].speed;
+            slowestBoid = nearestBoids[i];
+        }
+    }
+    
+    // Fill remaining slots with the slowest boid (easiest target)
+    while (targetBoids.length < 5 && slowestBoid !== null) {
+        targetBoids.push(slowestBoid);
+    }
     
     // Clear input buffer
     for (var i = 0; i < this.inputSize; i++) {
@@ -143,8 +165,9 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
     }
     
     // Encode boid positions AND velocities (4 values per boid)
-    for (var i = 0; i < nearestBoids.length; i++) {
-        var boid = nearestBoids[i].boid;
+    for (var i = 0; i < targetBoids.length && i < 5; i++) {
+        var boidData = targetBoids[i];
+        var boid = boidData.boid;
         
         // Calculate shortest wrapped distance (considering screen edges)
         var relativePos = this.calculateWrappedDistance(boid.position, this.position);
