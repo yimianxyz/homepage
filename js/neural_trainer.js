@@ -630,9 +630,30 @@ NeuralTrainer.prototype.initializeUI = function() {
         self.episodeLength = parseInt(e.target.value);
     });
     
+    // Simulation speed slider
     document.getElementById('sim-speed').addEventListener('input', function(e) {
-        self.simulationSpeed = parseFloat(e.target.value);
-        document.getElementById('speed-display').textContent = self.simulationSpeed.toFixed(1) + 'x';
+        var speed = parseFloat(e.target.value);
+        self.updateSimulationSpeed(speed);
+        // Update number input to match slider
+        document.getElementById('speed-input').value = speed;
+    });
+    
+    // Simulation speed number input
+    document.getElementById('speed-input').addEventListener('input', function(e) {
+        var speed = parseFloat(e.target.value);
+        if (speed < 0.1) speed = 0.1; // Minimum speed
+        if (speed > 10000) speed = 10000; // Maximum speed
+        
+        self.updateSimulationSpeed(speed);
+        
+        // Update slider if speed is within slider range
+        var slider = document.getElementById('sim-speed');
+        if (speed <= parseFloat(slider.max)) {
+            slider.value = speed;
+        } else {
+            // If speed exceeds slider max, set slider to max
+            slider.value = slider.max;
+        }
     });
     
     document.getElementById('boid-count').addEventListener('input', function(e) {
@@ -719,6 +740,43 @@ NeuralTrainer.prototype.toggleSimulationVisibility = function() {
     }
     
     console.log('Simulation visibility:', this.showSimulation ? 'shown' : 'hidden');
+};
+
+NeuralTrainer.prototype.updateSimulationSpeed = function(speed) {
+    this.simulationSpeed = speed;
+    
+    // Update display with appropriate formatting and color coding
+    var displayElement = document.getElementById('speed-display');
+    var displayText;
+    
+    if (speed >= 100) {
+        displayText = speed.toFixed(0) + 'x'; // No decimals for very high speeds
+        displayElement.style.color = '#dc3545'; // Red for extreme speeds
+        displayElement.style.fontWeight = 'bold';
+    } else if (speed >= 50) {
+        displayText = speed.toFixed(1) + 'x'; // One decimal for high speeds
+        displayElement.style.color = '#fd7e14'; // Orange for high speeds
+        displayElement.style.fontWeight = 'bold';
+    } else if (speed >= 10) {
+        displayText = speed.toFixed(1) + 'x'; // One decimal for medium speeds
+        displayElement.style.color = '#ffc107'; // Yellow for medium speeds
+        displayElement.style.fontWeight = '500';
+    } else {
+        displayText = speed.toFixed(1) + 'x'; // One decimal for normal speeds
+        displayElement.style.color = '#495057'; // Normal color for normal speeds
+        displayElement.style.fontWeight = '500';
+    }
+    
+    displayElement.textContent = displayText;
+    
+    // Log performance warnings for extreme speeds
+    if (speed >= 500) {
+        console.warn('Extreme simulation speed (' + speed + 'x) - May cause performance issues or instability');
+    } else if (speed >= 100) {
+        console.log('High simulation speed (' + speed + 'x) - Monitor performance');
+    } else {
+        console.log('Simulation speed updated to:', speed + 'x');
+    }
 };
 
 NeuralTrainer.prototype.startTraining = function() {
@@ -813,10 +871,34 @@ NeuralTrainer.prototype.updateUI = function() {
 
 NeuralTrainer.prototype.update = function() {
     if (this.simulation) {
-        // Update simulation based on speed
+        // Update simulation based on speed - ALL simulation logic happens here
         for (var i = 0; i < this.simulationSpeed; i++) {
-            this.simulation.tick();
+            // Update boids (flocking calculation AND movement)
+            this.simulation.tick(); // Calculate flocking forces
             
+            // Apply boid movement (this was missing!)
+            for (var j = 0; j < this.simulation.boids.length; j++) {
+                this.simulation.boids[j].update(); // Apply forces and move boids
+            }
+            
+            // Update predator (neural network decision making and movement)
+            if (this.simulation.predator) {
+                this.simulation.predator.update(this.simulation.boids);
+                
+                // Handle predator-prey interactions
+                var caughtBoids = this.simulation.predator.checkForPrey(this.simulation.boids);
+                for (var j = caughtBoids.length - 1; j >= 0; j--) {
+                    this.simulation.boids.splice(caughtBoids[j], 1);
+                    
+                    // Trigger feeding behavior and learning
+                    if (this.simulation.predator.calculateReward) {
+                        var catchReward = this.simulation.predator.calculateReward(this.simulation.boids, true);
+                        this.simulation.predator.updateWeights(catchReward);
+                    }
+                }
+            }
+            
+            // Training episode management (only if training is active)
             if (this.isTraining) {
                 this.episodeFrame++;
                 
@@ -839,19 +921,9 @@ NeuralTrainer.prototype.update = function() {
                         document.getElementById('status-dot').className = 'status-dot running';
                         this.exportParameters();
                     }
-                }
-            }
-        }
-        
-        // Handle predator-prey interactions
-        if (this.simulation.predator) {
-            var caughtBoids = this.simulation.predator.checkForPrey(this.simulation.boids);
-            for (var i = caughtBoids.length - 1; i >= 0; i--) {
-                this.simulation.boids.splice(caughtBoids[i], 1);
-                
-                if (this.simulation.predator.calculateReward) {
-                    var catchReward = this.simulation.predator.calculateReward(this.simulation.boids, true);
-                    this.simulation.predator.updateWeights(catchReward);
+                    
+                    // Break out of speed loop when episode ends to avoid multiple episode transitions
+                    break;
                 }
             }
         }
@@ -859,33 +931,18 @@ NeuralTrainer.prototype.update = function() {
 };
 
 NeuralTrainer.prototype.render = function() {
-    if (this.simulation) {
-        // Only render visuals if simulation is visible
-        if (this.showSimulation) {
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            
-            // Render boids
-            for (var i = 0; i < this.simulation.boids.length; i++) {
-                this.simulation.boids[i].run(this.simulation.boids);
-            }
-            
-            // Render predator
-            if (this.simulation.predator) {
-                this.simulation.predator.render();
-            }
+    if (this.simulation && this.showSimulation) {
+        // Only handle visual rendering here - all simulation logic is in update()
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Render boids (visual only - no logic updates)
+        for (var i = 0; i < this.simulation.boids.length; i++) {
+            this.simulation.boids[i].render();
         }
         
-        // Always update predator logic (even when not visible)
+        // Render predator (visual only - no logic updates)
         if (this.simulation.predator) {
-            this.simulation.predator.update(this.simulation.boids);
-        }
-        
-        // Update boid logic (even when not visible)
-        if (!this.showSimulation) {
-            for (var i = 0; i < this.simulation.boids.length; i++) {
-                this.simulation.boids[i].flock(this.simulation.boids);
-                this.simulation.boids[i].update();
-            }
+            this.simulation.predator.render();
         }
     }
 };
