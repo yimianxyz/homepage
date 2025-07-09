@@ -12,5 +12,9 @@ document.addEventListener('DOMContentLoaded', function() {
 		return simulation;
 	};
 
-	initialize_canvas_simulation('boids1', false);
+	// Store simulation globally for debugging
+	window.simulation = initialize_canvas_simulation('boids1', false);
+	
+	// Confirm initialization
+	console.log('Boids simulation initialized with AI neural predator');
 }); 

@@ -35,9 +35,17 @@ function getHeight() {
 
 
 function resizeCanvas(width, height) {
-	var canvas = document.querySelector('canvas');
-	if (canvas) {
-		canvas.width = getWidth();
-		canvas.height = getHeight();
+	var canvases = document.querySelectorAll('canvas');
+	var newWidth = getWidth();
+	var newHeight = getHeight();
+	
+	for (var i = 0; i < canvases.length; i++) {
+		canvases[i].width = newWidth;
+		canvases[i].height = newHeight;
+	}
+	
+	// Also notify the neural visualization of the resize
+	if (typeof neuralViz !== 'undefined' && neuralViz && neuralViz.resize) {
+		neuralViz.resize();
 	}
 }; 
