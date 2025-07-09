@@ -1338,10 +1338,12 @@ NeuralTrainer.prototype.updateSimulationSpeed = function(speed) {
     displayElement.textContent = displayText;
     
     // Log performance warnings for extreme speeds
-    if (speed >= 500) {
-        console.warn('Extreme simulation speed (' + speed + 'x) - May cause performance issues or instability');
+    if (speed >= 1000) {
+        console.warn('Ultra-extreme simulation speed (' + speed + 'x) - Training only mode, disable visualization for stability');
+    } else if (speed >= 500) {
+        console.warn('Extreme simulation speed (' + speed + 'x) - May cause performance issues, recommend disabling visualization');
     } else if (speed >= 100) {
-        console.log('High simulation speed (' + speed + 'x) - Monitor performance');
+        console.log('High simulation speed (' + speed + 'x) - Monitor performance, consider disabling visualization');
     } else {
         console.log('Simulation speed updated to:', speed + 'x');
     }
