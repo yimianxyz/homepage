@@ -37,8 +37,8 @@ function TrainingNeuralPredator(x, y, simulation) {
     this.outputBuffer = new Array(this.outputSize);
     
     // Training parameters
-    this.learningRate = 0.001;
-    this.rewardMemory = 0.95;
+    this.learningRate = 0.01;  // Increased learning rate
+    this.rewardMemory = 0.9;   // Reduced memory for faster adaptation
     this.avgReward = 0;
     this.framesSinceLastFeed = 0;
     this.maxFramesSinceLastFeed = 600;
@@ -62,6 +62,84 @@ function TrainingNeuralPredator(x, y, simulation) {
 TrainingNeuralPredator.prototype = Object.create(Predator.prototype);
 TrainingNeuralPredator.prototype.constructor = TrainingNeuralPredator;
 
+// Helper function to deep clone parameters
+function cloneNeuralParams() {
+    if (typeof window.NEURAL_PARAMS === 'undefined') {
+        console.error('Neural parameters not loaded!');
+        return null;
+    }
+    
+    return {
+        inputSize: window.NEURAL_PARAMS.inputSize,
+        hiddenSize: window.NEURAL_PARAMS.hiddenSize,
+        outputSize: window.NEURAL_PARAMS.outputSize,
+        weightsIH: window.NEURAL_PARAMS.weightsIH.map(function(row) { return row.slice(); }),
+        weightsHO: window.NEURAL_PARAMS.weightsHO.map(function(row) { return row.slice(); }),
+        biasH: window.NEURAL_PARAMS.biasH.slice(),
+        biasO: window.NEURAL_PARAMS.biasO.slice(),
+        maxDistance: window.NEURAL_PARAMS.maxDistance,
+        maxVelocity: window.NEURAL_PARAMS.maxVelocity,
+        version: window.NEURAL_PARAMS.version,
+        trained: window.NEURAL_PARAMS.trained,
+        description: window.NEURAL_PARAMS.description
+    };
+}
+
+// Helper function to export parameters as JS code
+function exportNeuralParams(params) {
+    var code = '/**\n * Neural Network Parameters\n * \n * Pure data file containing trained weights and biases for the neural predator.\n * \n * Network Architecture: 12 inputs → 8 hidden → 2 outputs\n * - Inputs: positions & velocities of 5 nearest boids + predator state\n * - Hidden: 8 neurons with tanh activation\n * - Outputs: steering force (x, y)\n */\n\n';
+    
+    code += 'window.NEURAL_PARAMS = {\n';
+    code += '    // Network architecture\n';
+    code += '    inputSize: ' + params.inputSize + ',\n';
+    code += '    hiddenSize: ' + params.hiddenSize + ',\n';
+    code += '    outputSize: ' + params.outputSize + ',\n';
+    code += '    \n';
+    
+    code += '    // Input to hidden layer weights (' + params.hiddenSize + 'x' + params.inputSize + ' matrix)\n';
+    code += '    weightsIH: [\n';
+    for (var i = 0; i < params.weightsIH.length; i++) {
+        code += '        // Hidden neuron ' + (i + 1) + '\n';
+        code += '        [' + params.weightsIH[i].map(function(w) { return w.toFixed(3); }).join(', ') + ']';
+        if (i < params.weightsIH.length - 1) code += ',';
+        code += '\n';
+    }
+    code += '    ],\n';
+    code += '    \n';
+    
+    code += '    // Hidden to output layer weights (' + params.outputSize + 'x' + params.hiddenSize + ' matrix)\n';
+    code += '    weightsHO: [\n';
+    for (var i = 0; i < params.weightsHO.length; i++) {
+        code += '        // ' + (i === 0 ? 'X' : 'Y') + ' steering force output\n';
+        code += '        [' + params.weightsHO[i].map(function(w) { return w.toFixed(3); }).join(', ') + ']';
+        if (i < params.weightsHO.length - 1) code += ',';
+        code += '\n';
+    }
+    code += '    ],\n';
+    code += '    \n';
+    
+    code += '    // Hidden layer biases (' + params.hiddenSize + ' values)\n';
+    code += '    biasH: [' + params.biasH.map(function(b) { return b.toFixed(3); }).join(', ') + '],\n';
+    code += '    \n';
+    
+    code += '    // Output layer biases (' + params.outputSize + ' values)\n';
+    code += '    biasO: [' + params.biasO.map(function(b) { return b.toFixed(3); }).join(', ') + '],\n';
+    code += '    \n';
+    
+    code += '    // Normalization constants\n';
+    code += '    maxDistance: ' + params.maxDistance + ',\n';
+    code += '    maxVelocity: ' + params.maxVelocity + ',\n';
+    code += '    \n';
+    
+    code += '    // Version info for parameter management\n';
+    code += '    version: "' + params.version + '",\n';
+    code += '    trained: ' + params.trained + ',\n';
+    code += '    description: "' + params.description + '"\n';
+    code += '};';
+    
+    return code;
+}
+
 // Load parameters from parameters.js
 TrainingNeuralPredator.prototype.loadParameters = function() {
     if (typeof window.NEURAL_PARAMS === 'undefined') {
@@ -76,8 +154,8 @@ TrainingNeuralPredator.prototype.loadParameters = function() {
     this.maxVelocity = window.NEURAL_PARAMS.maxVelocity;
     
     // Deep copy parameters for training
-    this.weightsIH = window.NEURAL_PARAMS.weightsIH.map(row => row.slice());
-    this.weightsHO = window.NEURAL_PARAMS.weightsHO.map(row => row.slice());
+    this.weightsIH = window.NEURAL_PARAMS.weightsIH.map(function(row) { return row.slice(); });
+    this.weightsHO = window.NEURAL_PARAMS.weightsHO.map(function(row) { return row.slice(); });
     this.biasH = window.NEURAL_PARAMS.biasH.slice();
     this.biasO = window.NEURAL_PARAMS.biasO.slice();
 };
@@ -133,15 +211,15 @@ TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
     
     // Major reward for catching boids
     if (caughtBoid) {
-        reward += 10.0;
+        reward += 50.0; // Increased catch reward to match feeding reward
         this.framesSinceLastFeed = 0;
         this.boidsEaten++;
     } else {
         this.framesSinceLastFeed++;
-        reward -= 0.01; // Small penalty for inefficiency
+        reward -= 0.1; // Increased penalty for inefficiency
         
         if (this.framesSinceLastFeed > this.maxFramesSinceLastFeed) {
-            reward -= 0.05;
+            reward -= 0.5; // Increased penalty for too long without food
         }
     }
     
@@ -156,7 +234,7 @@ TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
         }
         
         if (nearestDistance < this.maxDistance) {
-            reward += (this.maxDistance - nearestDistance) / this.maxDistance * 0.1;
+            reward += (this.maxDistance - nearestDistance) / this.maxDistance * 1.0; // Increased proximity reward
         }
     }
     
@@ -288,14 +366,24 @@ TrainingNeuralPredator.prototype.updateWeights = function(reward) {
     
     var rewardError = reward - this.avgReward;
     
-    if (Math.abs(rewardError) < 0.001) {
-        return;
-    }
+    // Remove the threshold that was preventing learning
+    // Small reward errors are still valuable for learning
     
     var learningSignal = this.learningRate * rewardError;
     
     if (isNaN(learningSignal) || !isFinite(learningSignal)) {
         return;
+    }
+    
+    // Debug logging (only occasionally to avoid spam)
+    if (Math.random() < 0.01) {
+        console.log('Training update:', {
+            reward: reward.toFixed(4),
+            avgReward: this.avgReward.toFixed(4),
+            rewardError: rewardError.toFixed(4),
+            learningSignal: learningSignal.toFixed(6),
+            learningRate: this.learningRate.toFixed(4)
+        });
     }
     
     // Update output layer weights
@@ -420,7 +508,7 @@ TrainingNeuralPredator.prototype.feed = function() {
     this.currentSize = Math.min(this.currentSize + this.growthPerFeed, this.maxSize);
     this.lastFeedTime = Date.now();
     
-    var feedReward = 20.0;
+    var feedReward = 50.0; // Increased feeding reward for better learning signal
     this.updateWeights(feedReward);
     this.episodeReward += feedReward;
     this.framesSinceLastFeed = 0;
@@ -453,7 +541,7 @@ TrainingNeuralPredator.prototype.update = function(boids) {
         }
         
         if (nearestDistance < this.maxDistance * 0.5) {
-            var proximityReward = 0.05;
+            var proximityReward = 0.5; // Increased proximity reward
             this.updateWeights(proximityReward);
             this.episodeReward += proximityReward;
         }
@@ -488,8 +576,8 @@ TrainingNeuralPredator.prototype.exportParameters = function() {
         inputSize: this.inputSize,
         hiddenSize: this.hiddenSize,
         outputSize: this.outputSize,
-        weightsIH: this.weightsIH.map(row => row.slice()),
-        weightsHO: this.weightsHO.map(row => row.slice()),
+        weightsIH: this.weightsIH.map(function(row) { return row.slice(); }),
+        weightsHO: this.weightsHO.map(function(row) { return row.slice(); }),
         biasH: this.biasH.slice(),
         biasO: this.biasO.slice(),
         maxDistance: this.maxDistance,
@@ -499,7 +587,7 @@ TrainingNeuralPredator.prototype.exportParameters = function() {
         description: "Trained neural network parameters"
     };
     
-    return window.exportNeuralParams(params);
+    return exportNeuralParams(params);
 };
 
 // Render with training visualization
@@ -705,6 +793,9 @@ NeuralTrainer.prototype.initializeSimulation = function() {
     var predator_y = this.simulation.canvasHeight / 2;
     this.simulation.predator = new TrainingNeuralPredator(predator_x, predator_y, this.simulation);
     
+    // Apply UI parameters to the predator
+    this.applyUIParameters();
+    
     // Connect predator to neural visualization
     if (this.neuralViz && typeof connectNeuralViz === 'function') {
         connectNeuralViz(this.simulation.predator);
@@ -723,6 +814,39 @@ NeuralTrainer.prototype.initializeNeuralViz = function() {
         }
     } catch (error) {
         console.error('Neural visualization initialization error:', error);
+    }
+};
+
+// Apply UI parameters to the training predator
+NeuralTrainer.prototype.applyUIParameters = function() {
+    if (this.simulation && this.simulation.predator) {
+        // Apply learning rate from UI
+        var learningRateInput = document.getElementById('learning-rate');
+        if (learningRateInput) {
+            this.simulation.predator.learningRate = parseFloat(learningRateInput.value);
+            console.log('Applied learning rate:', this.simulation.predator.learningRate);
+        }
+        
+        // Apply episode length from UI
+        var episodeLengthInput = document.getElementById('episode-length');
+        if (episodeLengthInput) {
+            this.episodeLength = parseInt(episodeLengthInput.value);
+            console.log('Applied episode length:', this.episodeLength);
+        }
+        
+        // Apply max episodes from UI
+        var maxEpisodesInput = document.getElementById('max-episodes');
+        if (maxEpisodesInput) {
+            this.maxEpisodes = parseInt(maxEpisodesInput.value);
+            console.log('Applied max episodes:', this.maxEpisodes);
+        }
+        
+        // Force immediate weight update to test if learning is working
+        console.log('Predator created with parameters:', {
+            learningRate: this.simulation.predator.learningRate,
+            rewardMemory: this.simulation.predator.rewardMemory,
+            avgReward: this.simulation.predator.avgReward
+        });
     }
 };
 
@@ -784,12 +908,18 @@ NeuralTrainer.prototype.startTraining = function() {
     this.currentEpisode = 0;
     this.episodeFrame = 0;
     
+    // Apply UI parameters before starting training
+    this.applyUIParameters();
+    
     document.getElementById('start-training').disabled = true;
     document.getElementById('stop-training').disabled = false;
     document.getElementById('status-text').textContent = 'Training...';
     document.getElementById('status-dot').className = 'status-dot training';
     
-    console.log('Started training for', this.maxEpisodes, 'episodes');
+    console.log('Started training for', this.maxEpisodes, 'episodes with learning rate:', this.simulation.predator.learningRate);
+    
+    // Log initial weights to compare against final weights
+    this.logSampleWeights('Initial weights at training start');
 };
 
 NeuralTrainer.prototype.stopTraining = function() {
@@ -805,26 +935,123 @@ NeuralTrainer.prototype.stopTraining = function() {
 
 NeuralTrainer.prototype.resetNetwork = function() {
     if (this.simulation && this.simulation.predator) {
-        this.simulation.predator.loadParameters();
+        console.log('🔄 Resetting neural network to random parameters...');
+        
+        // Log weights before reset
+        this.logSampleWeights('BEFORE reset');
+        
+        // Reset episode statistics
         this.simulation.predator.resetEpisode();
         this.currentEpisode = 0;
         this.episodeFrame = 0;
         
-        document.getElementById('status-text').textContent = 'Reset';
+        // Randomize ALL network weights and biases
+        this.randomizeWeights();
+        
+        // Reset training state
+        this.simulation.predator.avgReward = 0;
+        this.simulation.predator.episodeReward = 0;
+        this.simulation.predator.episodeFrames = 0;
+        this.simulation.predator.framesSinceLastFeed = 0;
+        
+        document.getElementById('status-text').textContent = 'Reset (Random)';
         document.getElementById('status-dot').className = 'status-dot';
-        console.log('Network reset to initial parameters');
+        console.log('✓ Network reset with randomized parameters');
+        this.logSampleWeights('AFTER reset (randomized)');
+        
+        // Show a clear comparison message
+        console.log('🎯 Network has been reset! All weights are now random. Start training to see them change.');
+    }
+};
+
+// Randomize network weights to reset the neural network
+NeuralTrainer.prototype.randomizeWeights = function() {
+    if (this.simulation && this.simulation.predator) {
+        var predator = this.simulation.predator;
+        
+        console.log('Randomizing all neural network weights and biases...');
+        
+        // Randomize input-to-hidden weights
+        var ihCount = 0;
+        for (var h = 0; h < predator.hiddenSize; h++) {
+            for (var i = 0; i < predator.inputSize; i++) {
+                predator.weightsIH[h][i] = (Math.random() - 0.5) * 2.0;
+                ihCount++;
+            }
+        }
+        
+        // Randomize hidden-to-output weights
+        var hoCount = 0;
+        for (var o = 0; o < predator.outputSize; o++) {
+            for (var h = 0; h < predator.hiddenSize; h++) {
+                predator.weightsHO[o][h] = (Math.random() - 0.5) * 2.0;
+                hoCount++;
+            }
+        }
+        
+        // Randomize hidden layer biases
+        for (var h = 0; h < predator.hiddenSize; h++) {
+            predator.biasH[h] = (Math.random() - 0.5) * 2.0;
+        }
+        
+        // Randomize output layer biases
+        for (var o = 0; o < predator.outputSize; o++) {
+            predator.biasO[o] = (Math.random() - 0.5) * 2.0;
+        }
+        
+        console.log('Randomized weights:', {
+            'Input-to-Hidden': ihCount + ' weights',
+            'Hidden-to-Output': hoCount + ' weights', 
+            'Hidden biases': predator.hiddenSize + ' values',
+            'Output biases': predator.outputSize + ' values'
+        });
+        
+        console.log('All neural network parameters have been randomized (range: -1.0 to +1.0)');
     }
 };
 
 NeuralTrainer.prototype.loadParameters = function() {
     if (this.simulation && this.simulation.predator) {
+        console.log('Loading original parameters from parameters.js...');
+        this.logSampleWeights('Before loading parameters');
+        
         this.simulation.predator.loadParameters();
-        console.log('Parameters reloaded from parameters.js');
+        
+        // Reset training state when loading original parameters
+        this.simulation.predator.avgReward = 0;
+        this.simulation.predator.episodeReward = 0;
+        this.simulation.predator.episodeFrames = 0;
+        this.simulation.predator.framesSinceLastFeed = 0;
+        
+        document.getElementById('status-text').textContent = 'Loaded Original';
+        document.getElementById('status-dot').className = 'status-dot';
+        console.log('✓ Parameters reloaded from parameters.js');
+        this.logSampleWeights('After loading parameters');
     }
 };
 
 NeuralTrainer.prototype.restartSimulation = function() {
+    // During training, preserve the predator and its learned weights
+    var preservedPredator = null;
+    if (this.isTraining && this.simulation && this.simulation.predator) {
+        preservedPredator = this.simulation.predator;
+        console.log('Preserving predator weights during episode restart');
+    }
+    
     this.initializeSimulation();
+    
+    // Restore the preserved predator if we were training
+    if (preservedPredator) {
+        this.simulation.predator = preservedPredator;
+        // Reset predator position but keep learned weights
+        this.simulation.predator.position.x = this.simulation.canvasWidth / 2;
+        this.simulation.predator.position.y = this.simulation.canvasHeight / 2;
+        this.simulation.predator.velocity.x = (Math.random() - 0.5) * 2;
+        this.simulation.predator.velocity.y = (Math.random() - 0.5) * 2;
+        this.simulation.predator.currentSize = this.simulation.predator.baseSize;
+        console.log('Predator weights preserved during training');
+    }
+    
     this.episodeFrame = 0;
     console.log('Simulation restarted');
 };
@@ -840,9 +1067,26 @@ NeuralTrainer.prototype.setBoidCount = function(count) {
 
 NeuralTrainer.prototype.exportParameters = function() {
     if (this.simulation && this.simulation.predator) {
+        // Log sample weights to verify they changed
+        this.logSampleWeights('Before export');
+        
         var exportedCode = this.simulation.predator.exportParameters();
         document.getElementById('export-output').value = exportedCode;
         console.log('Parameters exported');
+    }
+};
+
+// Log sample weights for debugging
+NeuralTrainer.prototype.logSampleWeights = function(label) {
+    if (this.simulation && this.simulation.predator) {
+        var predator = this.simulation.predator;
+        console.log(label + ' - Sample weights:');
+        console.log('  weightsIH[0][0]:', predator.weightsIH[0][0].toFixed(6));
+        console.log('  weightsIH[0][1]:', predator.weightsIH[0][1].toFixed(6));
+        console.log('  weightsHO[0][0]:', predator.weightsHO[0][0].toFixed(6));
+        console.log('  weightsHO[0][1]:', predator.weightsHO[0][1].toFixed(6));
+        console.log('  biasH[0]:', predator.biasH[0].toFixed(6));
+        console.log('  biasO[0]:', predator.biasO[0].toFixed(6));
     }
 };
 
@@ -891,6 +1135,9 @@ NeuralTrainer.prototype.update = function() {
                     this.simulation.boids.splice(caughtBoids[j], 1);
                     
                     // Trigger feeding behavior and learning
+                    this.simulation.predator.feed(); // This will give the feeding reward
+                    
+                    // Also give catch reward through the normal reward system
                     if (this.simulation.predator.calculateReward) {
                         var catchReward = this.simulation.predator.calculateReward(this.simulation.boids, true);
                         this.simulation.predator.updateWeights(catchReward);

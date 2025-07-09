@@ -64,8 +64,8 @@ NeuralPredator.prototype.loadParameters = function() {
     this.maxVelocity = window.NEURAL_PARAMS.maxVelocity;
     
     // Load weights and biases (deep copy to prevent modification)
-    this.weightsIH = window.NEURAL_PARAMS.weightsIH.map(row => row.slice());
-    this.weightsHO = window.NEURAL_PARAMS.weightsHO.map(row => row.slice());
+    this.weightsIH = window.NEURAL_PARAMS.weightsIH.map(function(row) { return row.slice(); });
+    this.weightsHO = window.NEURAL_PARAMS.weightsHO.map(function(row) { return row.slice(); });
     this.biasH = window.NEURAL_PARAMS.biasH.slice();
     this.biasO = window.NEURAL_PARAMS.biasO.slice();
     

@@ -1,9 +1,7 @@
 /**
  * Neural Network Parameters
  * 
- * This file contains the trained weights and biases for the neural predator.
- * These parameters are loaded by both the prediction system (index.html) and
- * the training system (training.html).
+ * Pure data file containing trained weights and biases for the neural predator.
  * 
  * Network Architecture: 12 inputs → 8 hidden → 2 outputs
  * - Inputs: positions & velocities of 5 nearest boids + predator state
@@ -11,7 +9,6 @@
  * - Outputs: steering force (x, y)
  */
 
-// Global neural network parameters
 window.NEURAL_PARAMS = {
     // Network architecture
     inputSize: 12,
@@ -60,28 +57,4 @@ window.NEURAL_PARAMS = {
     version: "1.0.0",
     trained: true,
     description: "Trained neural network parameters"
-};
-
-// Helper function to deep clone parameters (for training)
-window.cloneNeuralParams = function() {
-    return {
-        inputSize: window.NEURAL_PARAMS.inputSize,
-        hiddenSize: window.NEURAL_PARAMS.hiddenSize,
-        outputSize: window.NEURAL_PARAMS.outputSize,
-        weightsIH: window.NEURAL_PARAMS.weightsIH.map(row => row.slice()),
-        weightsHO: window.NEURAL_PARAMS.weightsHO.map(row => row.slice()),
-        biasH: window.NEURAL_PARAMS.biasH.slice(),
-        biasO: window.NEURAL_PARAMS.biasO.slice(),
-        maxDistance: window.NEURAL_PARAMS.maxDistance,
-        maxVelocity: window.NEURAL_PARAMS.maxVelocity,
-        version: window.NEURAL_PARAMS.version,
-        trained: window.NEURAL_PARAMS.trained,
-        description: window.NEURAL_PARAMS.description
-    };
-};
-
-// Helper function to export parameters as JS code
-window.exportNeuralParams = function(params) {
-    // ... (same export function as this one)
-    return "Parameter export function - copy from working file";
 };
