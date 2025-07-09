@@ -178,9 +178,11 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
             relativePos.y = 0;
         }
         
-        // Normalize relative position and multiply by 10 for better neural network resolution
-        var normalizedPosX = (relativePos.x / this.maxDistance) * 10;
-        var normalizedPosY = (relativePos.y / this.maxDistance) * 10;
+        // Normalize relative position based on actual screen size
+        var screenNormX = this.simulation.canvasWidth / 2;  // Half screen width for normalization
+        var screenNormY = this.simulation.canvasHeight / 2; // Half screen height for normalization
+        var normalizedPosX = relativePos.x / screenNormX;
+        var normalizedPosY = relativePos.y / screenNormY;
         
         // Safety check for NaN normalized values
         if (isNaN(normalizedPosX)) normalizedPosX = 0;
@@ -196,8 +198,8 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
         
         // Store position and velocity for each boid (4 values per boid)
         var baseIndex = i * 4;
-        this.inputBuffer[baseIndex] = Math.max(-10, Math.min(10, normalizedPosX));   // Position X (scaled)
-        this.inputBuffer[baseIndex + 1] = Math.max(-10, Math.min(10, normalizedPosY)); // Position Y (scaled)
+        this.inputBuffer[baseIndex] = normalizedPosX;     // Position X (screen-normalized)
+        this.inputBuffer[baseIndex + 1] = normalizedPosY; // Position Y (screen-normalized)
         this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
         this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
     }
