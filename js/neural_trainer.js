@@ -373,9 +373,9 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
             relativePos.y = 0;
         }
         
-        // Normalize relative position (-1 to 1)
-        var normalizedPosX = relativePos.x / this.maxDistance;
-        var normalizedPosY = relativePos.y / this.maxDistance;
+        // Normalize relative position and multiply by 10 for better neural network resolution
+        var normalizedPosX = (relativePos.x / this.maxDistance) * 10;
+        var normalizedPosY = (relativePos.y / this.maxDistance) * 10;
         
         if (isNaN(normalizedPosX)) normalizedPosX = 0;
         if (isNaN(normalizedPosY)) normalizedPosY = 0;
@@ -389,8 +389,8 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
         
         // Store position and velocity for each boid (4 values per boid)
         var baseIndex = i * 4;
-        this.inputBuffer[baseIndex] = Math.max(-1, Math.min(1, normalizedPosX));     // Position X
-        this.inputBuffer[baseIndex + 1] = Math.max(-1, Math.min(1, normalizedPosY)); // Position Y
+        this.inputBuffer[baseIndex] = Math.max(-10, Math.min(10, normalizedPosX));   // Position X (scaled)
+        this.inputBuffer[baseIndex + 1] = Math.max(-10, Math.min(10, normalizedPosY)); // Position Y (scaled)
         this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
         this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
     }
@@ -1727,11 +1727,11 @@ NeuralTrainer.prototype.updateInputValuesDisplay = function(inputs) {
     
     // Group inputs by type for better readability
     var inputLabels = [
-        'Boid 1: pos_x', 'Boid 1: pos_y', 'Boid 1: vel_x', 'Boid 1: vel_y',
-        'Boid 2: pos_x', 'Boid 2: pos_y', 'Boid 2: vel_x', 'Boid 2: vel_y',
-        'Boid 3: pos_x', 'Boid 3: pos_y', 'Boid 3: vel_x', 'Boid 3: vel_y',
-        'Boid 4: pos_x', 'Boid 4: pos_y', 'Boid 4: vel_x', 'Boid 4: vel_y',
-        'Boid 5: pos_x', 'Boid 5: pos_y', 'Boid 5: vel_x', 'Boid 5: vel_y',
+        'Boid 1: pos_x (×10)', 'Boid 1: pos_y (×10)', 'Boid 1: vel_x', 'Boid 1: vel_y',
+        'Boid 2: pos_x (×10)', 'Boid 2: pos_y (×10)', 'Boid 2: vel_x', 'Boid 2: vel_y',
+        'Boid 3: pos_x (×10)', 'Boid 3: pos_y (×10)', 'Boid 3: vel_x', 'Boid 3: vel_y',
+        'Boid 4: pos_x (×10)', 'Boid 4: pos_y (×10)', 'Boid 4: vel_x', 'Boid 4: vel_y',
+        'Boid 5: pos_x (×10)', 'Boid 5: pos_y (×10)', 'Boid 5: vel_x', 'Boid 5: vel_y',
         'Pred: vel_x', 'Pred: vel_y'
     ];
     
@@ -1740,12 +1740,17 @@ NeuralTrainer.prototype.updateInputValuesDisplay = function(inputs) {
         var label = inputLabels[i] || 'Input ' + i;
         var color = '#212529';
         
-        // Color coding based on value
-        if (Math.abs(value) < 0.1) {
+        // Color coding based on value (accounting for 10x position scaling)
+        var isPosition = label.includes('pos_');
+        var threshold1 = isPosition ? 1.0 : 0.1;   // Near-zero threshold
+        var threshold2 = isPosition ? 3.0 : 0.3;   // Medium threshold  
+        var threshold3 = isPosition ? 7.0 : 0.7;   // High threshold
+        
+        if (Math.abs(value) < threshold1) {
             color = '#6c757d'; // Gray for near-zero
-        } else if (Math.abs(value) > 0.7) {
+        } else if (Math.abs(value) > threshold3) {
             color = '#dc3545'; // Red for high values
-        } else if (Math.abs(value) > 0.3) {
+        } else if (Math.abs(value) > threshold2) {
             color = '#fd7e14'; // Orange for medium values
         }
         

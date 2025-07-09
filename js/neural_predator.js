@@ -178,9 +178,9 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
             relativePos.y = 0;
         }
         
-        // Normalize relative position (-1 to 1)
-        var normalizedPosX = relativePos.x / this.maxDistance;
-        var normalizedPosY = relativePos.y / this.maxDistance;
+        // Normalize relative position and multiply by 10 for better neural network resolution
+        var normalizedPosX = (relativePos.x / this.maxDistance) * 10;
+        var normalizedPosY = (relativePos.y / this.maxDistance) * 10;
         
         // Safety check for NaN normalized values
         if (isNaN(normalizedPosX)) normalizedPosX = 0;
@@ -196,8 +196,8 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
         
         // Store position and velocity for each boid (4 values per boid)
         var baseIndex = i * 4;
-        this.inputBuffer[baseIndex] = Math.max(-1, Math.min(1, normalizedPosX));     // Position X
-        this.inputBuffer[baseIndex + 1] = Math.max(-1, Math.min(1, normalizedPosY)); // Position Y
+        this.inputBuffer[baseIndex] = Math.max(-10, Math.min(10, normalizedPosX));   // Position X (scaled)
+        this.inputBuffer[baseIndex + 1] = Math.max(-10, Math.min(10, normalizedPosY)); // Position Y (scaled)
         this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
         this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
     }

@@ -64,7 +64,7 @@ window.NEURAL_PARAMS = {
     maxVelocity: 6,
     
     // Version info for parameter management
-    version: "2.5.0",
+    version: "2.6.0",
     trained: false,
-    description: "Universal screen coverage (5000px) - supports 4K, ultrawide, and all modern displays"
+    description: "Enhanced position resolution (10x scaling) for improved spatial discrimination and learning"
 };
