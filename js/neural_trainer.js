@@ -765,6 +765,11 @@ function NeuralTrainer() {
     this.neuralViz = null;
     this.completionThreshold = 0; // Episode complete when this many boids remain
     
+    // Neural network visualization
+    this.showNeuralViz = true;
+    this.neuralVizFrequency = 10; // Update every N frames
+    this.neuralVizFrame = 0;
+    
     // Performance tracking
     this.episodeStartTime = 0;
     this.episodeStartFrames = 0;
@@ -819,6 +824,17 @@ NeuralTrainer.prototype.initializeUI = function() {
     // Simulation visibility toggle
     document.getElementById('viz-toggle').addEventListener('click', function(e) {
         self.toggleSimulationVisibility();
+    });
+    
+    // Neural visualization toggle
+    document.getElementById('neural-viz-toggle').addEventListener('click', function(e) {
+        self.toggleNeuralVisualization();
+    });
+    
+    // Neural visualization frequency
+    document.getElementById('neural-viz-frequency').addEventListener('change', function(e) {
+        self.neuralVizFrequency = parseInt(e.target.value);
+        console.log('Neural viz frequency set to:', self.neuralVizFrequency);
     });
     
     // Settings
@@ -921,7 +937,10 @@ NeuralTrainer.prototype.initializeSimulation = function() {
     this.applyUIParameters();
     
     // Connect predator to neural visualization
-    if (this.neuralViz && typeof connectNeuralViz === 'function') {
+    if (this.neuralViz && this.neuralViz.setPredator) {
+        this.neuralViz.setPredator(this.simulation.predator);
+        console.log('Predator connected to neural visualization');
+    } else if (typeof connectNeuralViz === 'function') {
         connectNeuralViz(this.simulation.predator);
     }
     
@@ -932,12 +951,19 @@ NeuralTrainer.prototype.initializeNeuralViz = function() {
     try {
         if (typeof NeuralVisualization !== 'undefined') {
             this.neuralViz = new NeuralVisualization('neural-viz-canvas');
-            console.log('Neural visualization initialized');
+            if (this.neuralViz && this.neuralViz.canvas) {
+                console.log('Neural visualization initialized');
+            } else {
+                console.warn('Neural visualization canvas not found');
+                this.neuralViz = null;
+            }
         } else {
             console.warn('Neural visualization not available');
+            this.neuralViz = null;
         }
     } catch (error) {
         console.error('Neural visualization initialization error:', error);
+        this.neuralViz = null;
     }
 };
 
@@ -1226,6 +1252,40 @@ NeuralTrainer.prototype.toggleSimulationVisibility = function() {
     console.log('Simulation visibility:', this.showSimulation ? 'shown' : 'hidden');
 };
 
+NeuralTrainer.prototype.toggleNeuralVisualization = function() {
+    this.showNeuralViz = !this.showNeuralViz;
+    var toggle = document.getElementById('neural-viz-toggle');
+    var neuralCanvas = document.getElementById('neural-viz-canvas');
+    
+    if (this.showNeuralViz) {
+        toggle.classList.add('active');
+        if (neuralCanvas) {
+            neuralCanvas.style.opacity = '0.15';
+        }
+        // Reconnect predator to neural visualization when enabled
+        if (this.neuralViz && this.neuralViz.setPredator && this.simulation && this.simulation.predator) {
+            this.neuralViz.setPredator(this.simulation.predator);
+        }
+    } else {
+        toggle.classList.remove('active');
+        if (neuralCanvas) {
+            neuralCanvas.style.opacity = '0';
+        }
+        // Disconnect predator from neural visualization when disabled
+        if (this.neuralViz && this.neuralViz.setPredator) {
+            this.neuralViz.setPredator(null);
+        }
+        // Clear neural data display
+        document.getElementById('avg-input').textContent = '--';
+        document.getElementById('avg-hidden').textContent = '--';
+        document.getElementById('output-x').textContent = '--';
+        document.getElementById('output-y').textContent = '--';
+        document.getElementById('input-values').innerHTML = '<div style="color: #6c757d;">Neural visualization disabled</div>';
+    }
+    
+    console.log('Neural visualization:', this.showNeuralViz ? 'enabled' : 'disabled');
+};
+
 NeuralTrainer.prototype.updateSimulationSpeed = function(speed) {
     this.simulationSpeed = speed;
     
@@ -1446,6 +1506,11 @@ NeuralTrainer.prototype.restartSimulation = function() {
         this.simulation.predator.velocity.y = (Math.random() - 0.5) * 2;
         this.simulation.predator.currentSize = this.simulation.predator.baseSize;
         console.log('Predator weights preserved during training');
+        
+        // Reconnect to neural visualization
+        if (this.neuralViz && this.neuralViz.setPredator && this.showNeuralViz) {
+            this.neuralViz.setPredator(this.simulation.predator);
+        }
     }
     
     this.episodeFrame = 0;
@@ -1573,11 +1638,105 @@ NeuralTrainer.prototype.updateUI = function() {
         // Update performance metrics
         this.updatePerformanceMetrics();
         
+        // Update neural network visualization
+        this.updateNeuralVisualization();
+        
         if (this.isTraining) {
             var progress = (this.currentEpisode / this.maxEpisodes) * 100;
             document.getElementById('training-progress').style.width = progress + '%';
         }
     }
+};
+
+// Update neural network visualization display
+NeuralTrainer.prototype.updateNeuralVisualization = function() {
+    if (!this.showNeuralViz || !this.simulation || !this.simulation.predator) {
+        return;
+    }
+    
+    // Only update at specified frequency for performance
+    this.neuralVizFrame++;
+    if (this.neuralVizFrame % this.neuralVizFrequency !== 0) {
+        return;
+    }
+    
+    var predator = this.simulation.predator;
+    
+    // Update neural network state display
+    if (predator.lastInput && predator.hiddenActivations && predator.lastOutput) {
+        // Calculate average input activation
+        var avgInput = 0;
+        for (var i = 0; i < predator.lastInput.length; i++) {
+            avgInput += Math.abs(predator.lastInput[i]);
+        }
+        avgInput /= predator.lastInput.length;
+        
+        // Calculate average hidden activation
+        var avgHidden = 0;
+        for (var i = 0; i < predator.hiddenActivations.length; i++) {
+            avgHidden += Math.abs(predator.hiddenActivations[i]);
+        }
+        avgHidden /= predator.hiddenActivations.length;
+        
+        // Update UI
+        document.getElementById('avg-input').textContent = avgInput.toFixed(3);
+        document.getElementById('avg-hidden').textContent = avgHidden.toFixed(3);
+        document.getElementById('output-x').textContent = predator.lastOutput[0].toFixed(2);
+        document.getElementById('output-y').textContent = predator.lastOutput[1].toFixed(2);
+        
+        // Update detailed input values (only if neural viz is enabled)
+        if (this.showNeuralViz) {
+            this.updateInputValuesDisplay(predator.lastInput);
+        }
+    }
+    
+    // Neural visualization updates automatically once predator is connected
+    // No need to call update methods - it handles itself through animation loop
+};
+
+// Update the detailed input values display
+NeuralTrainer.prototype.updateInputValuesDisplay = function(inputs) {
+    var inputContainer = document.getElementById('input-values');
+    if (!inputContainer || !inputs) return;
+    
+    var html = '';
+    
+    // Group inputs by type for better readability
+    var inputLabels = [
+        'Boid 1: pos_x', 'Boid 1: pos_y', 'Boid 1: vel_x', 'Boid 1: vel_y',
+        'Boid 2: pos_x', 'Boid 2: pos_y', 'Boid 2: vel_x', 'Boid 2: vel_y',
+        'Boid 3: pos_x', 'Boid 3: pos_y', 'Boid 3: vel_x', 'Boid 3: vel_y',
+        'Boid 4: pos_x', 'Boid 4: pos_y', 'Boid 4: vel_x', 'Boid 4: vel_y',
+        'Boid 5: pos_x', 'Boid 5: pos_y', 'Boid 5: vel_x', 'Boid 5: vel_y',
+        'Pred: vel_x', 'Pred: vel_y'
+    ];
+    
+    for (var i = 0; i < inputs.length; i++) {
+        var value = inputs[i];
+        var label = inputLabels[i] || 'Input ' + i;
+        var color = '#212529';
+        
+        // Color coding based on value
+        if (Math.abs(value) < 0.1) {
+            color = '#6c757d'; // Gray for near-zero
+        } else if (Math.abs(value) > 0.7) {
+            color = '#dc3545'; // Red for high values
+        } else if (Math.abs(value) > 0.3) {
+            color = '#fd7e14'; // Orange for medium values
+        }
+        
+        html += '<div style="display: flex; justify-content: space-between; margin-bottom: 2px;">';
+        html += '<span style="color: ' + color + ';">' + label + ':</span>';
+        html += '<span style="color: ' + color + '; font-weight: bold;">' + value.toFixed(3) + '</span>';
+        html += '</div>';
+        
+        // Add separator between boids
+        if (i % 4 === 3 && i < inputs.length - 3) {
+            html += '<hr style="margin: 5px 0; border: none; border-top: 1px solid #dee2e6;">';
+        }
+    }
+    
+    inputContainer.innerHTML = html;
 };
 
 // Update performance metrics in the UI
