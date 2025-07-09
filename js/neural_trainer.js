@@ -794,6 +794,9 @@ function NeuralTrainer() {
     this.neuralVizFrequency = 10; // Update every N frames
     this.neuralVizFrame = 0;
     
+    // Fractional speed handling for speeds < 1
+    this.simulationFrameAccumulator = 0;
+    
     // Performance tracking
     this.episodeStartTime = 0;
     this.episodeStartFrames = 0;
@@ -1344,6 +1347,8 @@ NeuralTrainer.prototype.updateSimulationSpeed = function(speed) {
         console.warn('Extreme simulation speed (' + speed + 'x) - May cause performance issues, recommend disabling visualization');
     } else if (speed >= 100) {
         console.log('High simulation speed (' + speed + 'x) - Monitor performance, consider disabling visualization');
+    } else if (speed < 1) {
+        console.log('Slow motion speed (' + speed + 'x) - Using frame accumulation for smooth slow motion');
     } else {
         console.log('Simulation speed updated to:', speed + 'x');
     }
@@ -1353,6 +1358,9 @@ NeuralTrainer.prototype.startTraining = function() {
     this.isTraining = true;
     this.currentEpisode = 0;
     this.episodeFrame = 0;
+    
+    // Reset simulation speed accumulator
+    this.simulationFrameAccumulator = 0;
     
     // Apply UI parameters before starting training
     this.applyUIParameters();
@@ -1839,12 +1847,30 @@ NeuralTrainer.prototype.updatePerformanceMetrics = function() {
 
 NeuralTrainer.prototype.update = function() {
     if (this.simulation) {
-        // Update simulation based on speed - ALL simulation logic happens here
-        for (var i = 0; i < this.simulationSpeed; i++) {
+        // Handle both fast (>= 1x) and slow (< 1x) simulation speeds
+        this.simulationFrameAccumulator += this.simulationSpeed;
+        
+        // Run simulation steps based on accumulated time
+        var simulationStepsToRun = 0;
+        
+        if (this.simulationSpeed >= 1) {
+            // For speeds >= 1x, run multiple steps per frame
+            simulationStepsToRun = Math.floor(this.simulationFrameAccumulator);
+            this.simulationFrameAccumulator = 0; // Reset accumulator for high speeds
+        } else {
+            // For speeds < 1x, use frame accumulation
+            while (this.simulationFrameAccumulator >= 1) {
+                simulationStepsToRun++;
+                this.simulationFrameAccumulator -= 1;
+            }
+        }
+        
+        // Run the calculated number of simulation steps
+        for (var i = 0; i < simulationStepsToRun; i++) {
             // Update boids (flocking calculation AND movement)
             this.simulation.tick(); // Calculate flocking forces
             
-            // Apply boid movement (this was missing!)
+            // Apply boid movement
             for (var j = 0; j < this.simulation.boids.length; j++) {
                 this.simulation.boids[j].update(); // Apply forces and move boids
             }
