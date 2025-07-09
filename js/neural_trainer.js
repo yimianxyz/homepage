@@ -87,7 +87,7 @@ function cloneNeuralParams() {
 
 // Helper function to export parameters as JS code
 function exportNeuralParams(params) {
-    var code = '/**\n * Neural Network Parameters\n * \n * Pure data file containing trained weights and biases for the neural predator.\n * \n * Network Architecture: 12 inputs → 8 hidden → 2 outputs\n * - Inputs: positions & velocities of 5 nearest boids + predator state\n * - Hidden: 8 neurons with tanh activation\n * - Outputs: steering force (x, y)\n */\n\n';
+    var code = '/**\n * Neural Network Parameters\n * \n * Pure data file containing trained weights and biases for the neural predator.\n * \n * Network Architecture: 22 inputs → 12 hidden → 2 outputs\n * - Inputs: positions & velocities of 5 nearest boids + predator velocity\n * - Hidden: 12 neurons with tanh activation\n * - Outputs: steering force (x, y)\n */\n\n';
     
     code += 'window.NEURAL_PARAMS = {\n';
     code += '    // Network architecture\n';
@@ -258,7 +258,7 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
         this.inputBuffer[i] = 0;
     }
     
-    // Encode boid positions
+    // Encode boid positions AND velocities (4 values per boid)
     for (var i = 0; i < nearestBoids.length; i++) {
         var boid = nearestBoids[i].boid;
         var relativePos = boid.position.subtract(this.position);
@@ -268,25 +268,37 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
             relativePos.y = 0;
         }
         
-        var normalizedX = relativePos.x / this.maxDistance;
-        var normalizedY = relativePos.y / this.maxDistance;
+        // Normalize relative position (-1 to 1)
+        var normalizedPosX = relativePos.x / this.maxDistance;
+        var normalizedPosY = relativePos.y / this.maxDistance;
         
-        if (isNaN(normalizedX)) normalizedX = 0;
-        if (isNaN(normalizedY)) normalizedY = 0;
+        if (isNaN(normalizedPosX)) normalizedPosX = 0;
+        if (isNaN(normalizedPosY)) normalizedPosY = 0;
         
-        this.inputBuffer[i * 2] = Math.max(-1, Math.min(1, normalizedX));
-        this.inputBuffer[i * 2 + 1] = Math.max(-1, Math.min(1, normalizedY));
+        // Normalize boid velocity (-1 to 1)
+        var normalizedVelX = boid.velocity.x / this.maxVelocity;
+        var normalizedVelY = boid.velocity.y / this.maxVelocity;
+        
+        if (isNaN(normalizedVelX)) normalizedVelX = 0;
+        if (isNaN(normalizedVelY)) normalizedVelY = 0;
+        
+        // Store position and velocity for each boid (4 values per boid)
+        var baseIndex = i * 4;
+        this.inputBuffer[baseIndex] = Math.max(-1, Math.min(1, normalizedPosX));     // Position X
+        this.inputBuffer[baseIndex + 1] = Math.max(-1, Math.min(1, normalizedPosY)); // Position Y
+        this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
+        this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
     }
     
-    // Add predator velocity
-    var velocityX = this.velocity.x / this.maxVelocity;
-    var velocityY = this.velocity.y / this.maxVelocity;
+    // Add predator's current velocity (last 2 inputs)
+    var predatorVelX = this.velocity.x / this.maxVelocity;
+    var predatorVelY = this.velocity.y / this.maxVelocity;
     
-    if (isNaN(velocityX)) velocityX = 0;
-    if (isNaN(velocityY)) velocityY = 0;
+    if (isNaN(predatorVelX)) predatorVelX = 0;
+    if (isNaN(predatorVelY)) predatorVelY = 0;
     
-    this.inputBuffer[10] = Math.max(-1, Math.min(1, velocityX));
-    this.inputBuffer[11] = Math.max(-1, Math.min(1, velocityY));
+    this.inputBuffer[20] = Math.max(-1, Math.min(1, predatorVelX));
+    this.inputBuffer[21] = Math.max(-1, Math.min(1, predatorVelY));
 };
 
 // Forward pass through neural network

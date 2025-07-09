@@ -4,10 +4,11 @@
  * This is the main predator implementation that extends the base Predator class
  * with intelligent neural network behavior for prediction only.
  * 
- * Network Architecture: 12 inputs → 8 hidden → 2 outputs
- * - Inputs: positions & velocities of 5 nearest boids + predator state  
+ * Network Architecture: 22 inputs → 12 hidden → 2 outputs
+ * - Inputs: positions & velocities of 5 nearest boids + predator velocity
  * - Outputs: steering force (x, y)
- * - Optimized for real-time web performance with <0.2ms forward pass
+ * - Enhanced with boid velocity data for predictive hunting
+ * - Optimized for real-time web performance with <0.3ms forward pass
  * 
  * Prediction Features:
  * - Loads pre-trained weights from parameters.js
@@ -90,7 +91,6 @@ NeuralPredator.prototype.fastTanh = function(x) {
 NeuralPredator.prototype.prepareInputs = function(boids) {
     // Find 5 nearest boids
     var nearestBoids = [];
-    var distances = [];
     
     for (var i = 0; i < boids.length && i < 5; i++) {
         var distance = this.position.getDistance(boids[i].position);
@@ -106,7 +106,7 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
         this.inputBuffer[i] = 0;
     }
     
-    // Encode boid positions (relative and normalized)
+    // Encode boid positions AND velocities (4 values per boid)
     for (var i = 0; i < nearestBoids.length; i++) {
         var boid = nearestBoids[i].boid;
         var relativePos = boid.position.subtract(this.position);
@@ -117,28 +117,40 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
             relativePos.y = 0;
         }
         
-        // Normalize position (-1 to 1)
-        var normalizedX = relativePos.x / this.maxDistance;
-        var normalizedY = relativePos.y / this.maxDistance;
+        // Normalize relative position (-1 to 1)
+        var normalizedPosX = relativePos.x / this.maxDistance;
+        var normalizedPosY = relativePos.y / this.maxDistance;
         
         // Safety check for NaN normalized values
-        if (isNaN(normalizedX)) normalizedX = 0;
-        if (isNaN(normalizedY)) normalizedY = 0;
+        if (isNaN(normalizedPosX)) normalizedPosX = 0;
+        if (isNaN(normalizedPosY)) normalizedPosY = 0;
         
-        this.inputBuffer[i * 2] = Math.max(-1, Math.min(1, normalizedX));
-        this.inputBuffer[i * 2 + 1] = Math.max(-1, Math.min(1, normalizedY));
+        // Normalize boid velocity (-1 to 1)
+        var normalizedVelX = boid.velocity.x / this.maxVelocity;
+        var normalizedVelY = boid.velocity.y / this.maxVelocity;
+        
+        // Safety check for NaN velocities
+        if (isNaN(normalizedVelX)) normalizedVelX = 0;
+        if (isNaN(normalizedVelY)) normalizedVelY = 0;
+        
+        // Store position and velocity for each boid (4 values per boid)
+        var baseIndex = i * 4;
+        this.inputBuffer[baseIndex] = Math.max(-1, Math.min(1, normalizedPosX));     // Position X
+        this.inputBuffer[baseIndex + 1] = Math.max(-1, Math.min(1, normalizedPosY)); // Position Y
+        this.inputBuffer[baseIndex + 2] = Math.max(-1, Math.min(1, normalizedVelX)); // Velocity X
+        this.inputBuffer[baseIndex + 3] = Math.max(-1, Math.min(1, normalizedVelY)); // Velocity Y
     }
     
-    // Add predator's current velocity
-    var velocityX = this.velocity.x / this.maxVelocity;
-    var velocityY = this.velocity.y / this.maxVelocity;
+    // Add predator's current velocity (last 2 inputs)
+    var predatorVelX = this.velocity.x / this.maxVelocity;
+    var predatorVelY = this.velocity.y / this.maxVelocity;
     
     // Safety check for NaN velocities
-    if (isNaN(velocityX)) velocityX = 0;
-    if (isNaN(velocityY)) velocityY = 0;
+    if (isNaN(predatorVelX)) predatorVelX = 0;
+    if (isNaN(predatorVelY)) predatorVelY = 0;
     
-    this.inputBuffer[10] = Math.max(-1, Math.min(1, velocityX));
-    this.inputBuffer[11] = Math.max(-1, Math.min(1, velocityY));
+    this.inputBuffer[20] = Math.max(-1, Math.min(1, predatorVelX));
+    this.inputBuffer[21] = Math.max(-1, Math.min(1, predatorVelY));
 };
 
 // Neural network forward pass (optimized for speed)
