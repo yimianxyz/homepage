@@ -43,6 +43,11 @@ function TrainingNeuralPredator(x, y, simulation) {
     this.framesSinceLastFeed = 0;
     this.maxFramesSinceLastFeed = 600;
     
+    // Edge usage tracking for penalty
+    this.lastPosition = new Vector(x, y);
+    this.edgeUsageFrames = 0;  // Count frames since last edge usage
+    this.edgePenaltyThreshold = 30; // Minimum frames between edge usage to avoid penalty
+    
     // Learning buffers for gradient calculation
     this.lastInputs = new Array(this.inputSize);
     this.lastHidden = new Array(this.hiddenSize);
@@ -205,6 +210,64 @@ TrainingNeuralPredator.prototype.fastTanhDerivative = function(x) {
     return derivative;
 };
 
+// Calculate shortest distance considering wraparound (toroidal world)
+TrainingNeuralPredator.prototype.calculateWrappedDistance = function(targetPos, sourcePos) {
+    var canvasWidth = this.simulation.canvasWidth;
+    var canvasHeight = this.simulation.canvasHeight;
+    
+    // Calculate direct distances
+    var directX = targetPos.x - sourcePos.x;
+    var directY = targetPos.y - sourcePos.y;
+    
+    // Calculate wrapped distances
+    var wrappedX, wrappedY;
+    
+    if (directX > 0) {
+        // Target is to the right, check if going left through wrap is shorter
+        wrappedX = directX - canvasWidth;
+    } else {
+        // Target is to the left, check if going right through wrap is shorter  
+        wrappedX = directX + canvasWidth;
+    }
+    
+    if (directY > 0) {
+        // Target is below, check if going up through wrap is shorter
+        wrappedY = directY - canvasHeight;
+    } else {
+        // Target is above, check if going down through wrap is shorter
+        wrappedY = directY + canvasHeight;
+    }
+    
+    // Choose shortest distance in each dimension
+    var shortestX = Math.abs(directX) < Math.abs(wrappedX) ? directX : wrappedX;
+    var shortestY = Math.abs(directY) < Math.abs(wrappedY) ? directY : wrappedY;
+    
+    return new Vector(shortestX, shortestY);
+};
+
+// Detect if predator used wraparound (crossed screen edge)
+TrainingNeuralPredator.prototype.detectEdgeUsage = function() {
+    var canvasWidth = this.simulation.canvasWidth;
+    var canvasHeight = this.simulation.canvasHeight;
+    
+    // Calculate movement from last frame
+    var deltaX = this.position.x - this.lastPosition.x;
+    var deltaY = this.position.y - this.lastPosition.y;
+    
+    // If movement is larger than half screen size, wraparound likely occurred
+    var edgeUsed = false;
+    
+    if (Math.abs(deltaX) > canvasWidth * 0.5) {
+        edgeUsed = true;
+    }
+    
+    if (Math.abs(deltaY) > canvasHeight * 0.5) {
+        edgeUsed = true;
+    }
+    
+    return edgeUsed;
+};
+
 // Calculate reward based on current state
 TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
     var reward = 0;
@@ -223,19 +286,34 @@ TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
         }
     }
     
-    // Reward for being near boids
+    // Reward for being near boids (using wrapped distance)
     if (boids.length > 0) {
         var nearestDistance = Infinity;
         for (var i = 0; i < boids.length; i++) {
-            var distance = this.position.getDistance(boids[i].position);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
+            var wrappedVector = this.calculateWrappedDistance(boids[i].position, this.position);
+            var wrappedDistance = Math.sqrt(wrappedVector.x * wrappedVector.x + wrappedVector.y * wrappedVector.y);
+            if (wrappedDistance < nearestDistance) {
+                nearestDistance = wrappedDistance;
             }
         }
         
         if (nearestDistance < this.maxDistance) {
             reward += (this.maxDistance - nearestDistance) / this.maxDistance * 1.0; // Increased proximity reward
         }
+    }
+    
+    // Penalty for frequent edge usage (wraparound abuse)
+    if (this.detectEdgeUsage()) {
+        if (this.edgeUsageFrames < this.edgePenaltyThreshold) {
+            // Heavy penalty for frequent edge usage
+            var penaltyStrength = (this.edgePenaltyThreshold - this.edgeUsageFrames) / this.edgePenaltyThreshold;
+            var edgePenalty = penaltyStrength * 5.0; // Scale penalty based on frequency
+            reward -= edgePenalty;
+            console.log('Edge usage penalty applied:', edgePenalty.toFixed(2), 'frames since last:', this.edgeUsageFrames);
+        }
+        this.edgeUsageFrames = 0; // Reset counter
+    } else {
+        this.edgeUsageFrames++; // Increment frames since last edge usage
     }
     
     return reward;
@@ -245,9 +323,10 @@ TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
 TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
     var nearestBoids = [];
     
-    for (var i = 0; i < boids.length && i < 5; i++) {
-        var distance = this.position.getDistance(boids[i].position);
-        nearestBoids.push({boid: boids[i], distance: distance});
+    for (var i = 0; i < boids.length; i++) {
+        var wrappedVector = this.calculateWrappedDistance(boids[i].position, this.position);
+        var wrappedDistance = Math.sqrt(wrappedVector.x * wrappedVector.x + wrappedVector.y * wrappedVector.y);
+        nearestBoids.push({boid: boids[i], distance: wrappedDistance});
     }
     
     nearestBoids.sort(function(a, b) { return a.distance - b.distance; });
@@ -261,7 +340,9 @@ TrainingNeuralPredator.prototype.prepareInputs = function(boids) {
     // Encode boid positions AND velocities (4 values per boid)
     for (var i = 0; i < nearestBoids.length; i++) {
         var boid = nearestBoids[i].boid;
-        var relativePos = boid.position.subtract(this.position);
+        
+        // Calculate shortest wrapped distance (considering screen edges)
+        var relativePos = this.calculateWrappedDistance(boid.position, this.position);
         
         if (isNaN(relativePos.x) || isNaN(relativePos.y)) {
             relativePos.x = 0;
@@ -528,6 +609,10 @@ TrainingNeuralPredator.prototype.feed = function() {
 
 // Override update method with learning
 TrainingNeuralPredator.prototype.update = function(boids) {
+    // Store position before movement for edge usage detection
+    this.lastPosition.x = this.position.x;
+    this.lastPosition.y = this.position.y;
+    
     var steeringForce = this.getAutonomousForce(boids);
     this.acceleration.iAdd(steeringForce);
     
@@ -546,9 +631,10 @@ TrainingNeuralPredator.prototype.update = function(boids) {
     if (boids.length > 0) {
         var nearestDistance = Infinity;
         for (var i = 0; i < boids.length; i++) {
-            var distance = this.position.getDistance(boids[i].position);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
+            var wrappedVector = this.calculateWrappedDistance(boids[i].position, this.position);
+            var wrappedDistance = Math.sqrt(wrappedVector.x * wrappedVector.x + wrappedVector.y * wrappedVector.y);
+            if (wrappedDistance < nearestDistance) {
+                nearestDistance = wrappedDistance;
             }
         }
         
@@ -580,6 +666,13 @@ TrainingNeuralPredator.prototype.resetEpisode = function() {
     this.boidsEaten = 0;
     this.framesSinceLastFeed = 0;
     this.currentSize = this.baseSize;
+    
+    // Reset edge usage tracking
+    this.edgeUsageFrames = 0;
+    if (this.position) {
+        this.lastPosition.x = this.position.x;
+        this.lastPosition.y = this.position.y;
+    }
 };
 
 // Export current parameters
@@ -738,6 +831,12 @@ NeuralTrainer.prototype.initializeUI = function() {
         self.episodeLength = parseInt(e.target.value);
     });
     
+    document.getElementById('edge-penalty').addEventListener('input', function(e) {
+        if (self.simulation && self.simulation.predator) {
+            self.simulation.predator.edgePenaltyThreshold = parseInt(e.target.value);
+        }
+    });
+    
     // Simulation speed slider
     document.getElementById('sim-speed').addEventListener('input', function(e) {
         var speed = parseFloat(e.target.value);
@@ -852,6 +951,13 @@ NeuralTrainer.prototype.applyUIParameters = function() {
         if (episodeLengthInput) {
             this.episodeLength = parseInt(episodeLengthInput.value);
             console.log('Applied episode length:', this.episodeLength);
+        }
+        
+        // Apply edge penalty threshold from UI
+        var edgePenaltyInput = document.getElementById('edge-penalty');
+        if (edgePenaltyInput) {
+            this.simulation.predator.edgePenaltyThreshold = parseInt(edgePenaltyInput.value);
+            console.log('Applied edge penalty threshold:', this.simulation.predator.edgePenaltyThreshold);
         }
         
         // Apply max episodes from UI

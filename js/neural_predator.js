@@ -87,17 +87,53 @@ NeuralPredator.prototype.fastTanh = function(x) {
     return x * (27 + x2) / (27 + 9 * x2);
 };
 
-// Prepare neural network inputs from current game state
-NeuralPredator.prototype.prepareInputs = function(boids) {
-    // Find 5 nearest boids
-    var nearestBoids = [];
+// Calculate shortest distance considering wraparound (toroidal world)
+NeuralPredator.prototype.calculateWrappedDistance = function(targetPos, sourcePos) {
+    var canvasWidth = this.simulation.canvasWidth;
+    var canvasHeight = this.simulation.canvasHeight;
     
-    for (var i = 0; i < boids.length && i < 5; i++) {
-        var distance = this.position.getDistance(boids[i].position);
-        nearestBoids.push({boid: boids[i], distance: distance});
+    // Calculate direct distances
+    var directX = targetPos.x - sourcePos.x;
+    var directY = targetPos.y - sourcePos.y;
+    
+    // Calculate wrapped distances
+    var wrappedX, wrappedY;
+    
+    if (directX > 0) {
+        // Target is to the right, check if going left through wrap is shorter
+        wrappedX = directX - canvasWidth;
+    } else {
+        // Target is to the left, check if going right through wrap is shorter  
+        wrappedX = directX + canvasWidth;
     }
     
-    // Sort by distance and take closest 5
+    if (directY > 0) {
+        // Target is below, check if going up through wrap is shorter
+        wrappedY = directY - canvasHeight;
+    } else {
+        // Target is above, check if going down through wrap is shorter
+        wrappedY = directY + canvasHeight;
+    }
+    
+    // Choose shortest distance in each dimension
+    var shortestX = Math.abs(directX) < Math.abs(wrappedX) ? directX : wrappedX;
+    var shortestY = Math.abs(directY) < Math.abs(wrappedY) ? directY : wrappedY;
+    
+    return new Vector(shortestX, shortestY);
+};
+
+// Prepare neural network inputs from current game state
+NeuralPredator.prototype.prepareInputs = function(boids) {
+    // Find 5 nearest boids using wrapped distance
+    var nearestBoids = [];
+    
+    for (var i = 0; i < boids.length; i++) {
+        var wrappedVector = this.calculateWrappedDistance(boids[i].position, this.position);
+        var wrappedDistance = Math.sqrt(wrappedVector.x * wrappedVector.x + wrappedVector.y * wrappedVector.y);
+        nearestBoids.push({boid: boids[i], distance: wrappedDistance});
+    }
+    
+    // Sort by wrapped distance and take closest 5
     nearestBoids.sort(function(a, b) { return a.distance - b.distance; });
     nearestBoids = nearestBoids.slice(0, 5);
     
@@ -109,7 +145,9 @@ NeuralPredator.prototype.prepareInputs = function(boids) {
     // Encode boid positions AND velocities (4 values per boid)
     for (var i = 0; i < nearestBoids.length; i++) {
         var boid = nearestBoids[i].boid;
-        var relativePos = boid.position.subtract(this.position);
+        
+        // Calculate shortest wrapped distance (considering screen edges)
+        var relativePos = this.calculateWrappedDistance(boid.position, this.position);
         
         // Safety check for NaN positions
         if (isNaN(relativePos.x) || isNaN(relativePos.y)) {

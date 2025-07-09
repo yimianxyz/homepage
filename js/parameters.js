@@ -7,6 +7,8 @@
  * - Inputs: positions & velocities of 5 nearest boids + predator velocity
  * - Hidden: 12 neurons with tanh activation
  * - Outputs: steering force (x, y)
+ * - Uses toroidal distance calculation for wraparound-aware hunting
+ * - Includes edge usage penalty to discourage wraparound abuse
  */
 
 window.NEURAL_PARAMS = {
@@ -62,7 +64,7 @@ window.NEURAL_PARAMS = {
     maxVelocity: 6,
     
     // Version info for parameter management
-    version: "2.0.0",
+    version: "2.2.0",
     trained: false,
-    description: "Enhanced network with boid velocity inputs for predictive hunting"
+    description: "Enhanced network with boid velocities, toroidal distance, and edge usage penalty for balanced hunting"
 };
