@@ -772,9 +772,13 @@ function NeuralTrainer() {
     this.averageCompletionTime = 0;
     this.totalBoidsAtStart = 0;
     
+    // Chart for performance visualization
+    this.performanceChart = null;
+    
     this.initializeUI();
     this.initializeSimulation();
     this.initializeNeuralViz();
+    this.initializeChart();
     this.startRenderLoop();
 }
 
@@ -936,6 +940,228 @@ NeuralTrainer.prototype.initializeNeuralViz = function() {
     }
 };
 
+// Initialize performance chart
+NeuralTrainer.prototype.initializeChart = function() {
+    try {
+        if (typeof Chart !== 'undefined') {
+            var ctx = document.getElementById('performance-chart').getContext('2d');
+            this.performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [], // Episode numbers
+                    datasets: [{
+                        label: 'Completion Time (seconds)',
+                        data: [], // Completion times
+                        borderColor: '#007bff',
+                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 3,
+                        pointHoverRadius: 5
+                    }, {
+                        label: 'Best Time',
+                        data: [], // Best time running history
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                        borderDash: [5, 5]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Episode'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Time (seconds)'
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    var label = context.dataset.label + ': ';
+                                    if (context.dataset.label === 'Outliers') {
+                                        // For outliers, show the actual value, not the displayed position
+                                        var actualValue = context.chart.trainer.completionTimes[context.dataIndex];
+                                        label += actualValue.toFixed(1) + 's (outlier)';
+                                    } else {
+                                        label += context.parsed.y.toFixed(1) + 's';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    },
+                    animation: {
+                        duration: 300
+                    }
+                }
+            });
+            
+            // Store reference to trainer for tooltip access
+            this.performanceChart.trainer = this;
+            
+            console.log('Performance chart initialized');
+        } else {
+            console.warn('Chart.js not available');
+        }
+    } catch (error) {
+        console.error('Chart initialization error:', error);
+    }
+};
+
+// Calculate robust Y-axis bounds that minimize outlier impact
+NeuralTrainer.prototype.calculateChartBounds = function() {
+    if (this.completionTimes.length === 0) {
+        return { min: 0, max: 100 };
+    }
+    
+    // Sort completion times to find percentiles
+    var sortedTimes = this.completionTimes.slice().sort(function(a, b) { return a - b; });
+    var length = sortedTimes.length;
+    
+    // Calculate key percentiles
+    var q1Index = Math.floor(length * 0.25);
+    var q3Index = Math.floor(length * 0.75);
+    var p95Index = Math.floor(length * 0.95);
+    
+    var q1 = sortedTimes[q1Index] || sortedTimes[0];
+    var q3 = sortedTimes[q3Index] || sortedTimes[length - 1];
+    var p95 = sortedTimes[p95Index] || sortedTimes[length - 1];
+    var median = sortedTimes[Math.floor(length / 2)];
+    
+    // Calculate interquartile range for outlier detection
+    var iqr = q3 - q1;
+    var outlierThreshold = q3 + 1.5 * iqr;
+    
+    // Use 95th percentile as upper bound, but ensure it's reasonable
+    var upperBound = Math.max(p95, median * 2); // At least 2x median
+    
+    // If 95th percentile is much higher than normal range, use a more conservative bound
+    if (upperBound > outlierThreshold && length > 5) {
+        upperBound = Math.max(outlierThreshold, median * 1.5);
+    }
+    
+    // Add some margin for visual comfort
+    var margin = upperBound * 0.1;
+    var yMax = upperBound + margin;
+    
+    // Ensure minimum range for very consistent performance
+    if (yMax < 10) {
+        yMax = 10;
+    }
+    
+    return {
+        min: 0,
+        max: yMax,
+        outlierThreshold: outlierThreshold
+    };
+};
+
+// Update performance chart with new data
+NeuralTrainer.prototype.updateChart = function() {
+    if (this.performanceChart && this.completionTimes.length > 0) {
+        var chart = this.performanceChart;
+        var labels = [];
+        var bestTimes = [];
+        var runningBest = Infinity;
+        
+        // Create labels (episode numbers) and calculate running best times
+        for (var i = 0; i < this.completionTimes.length; i++) {
+            labels.push(i + 1);
+            if (this.completionTimes[i] < runningBest) {
+                runningBest = this.completionTimes[i];
+            }
+            bestTimes.push(runningBest);
+        }
+        
+        // Calculate smart Y-axis bounds
+        var bounds = this.calculateChartBounds();
+        
+        // Separate normal data from outliers for visual treatment
+        var normalData = [];
+        var outlierData = [];
+        var outlierCount = 0;
+        
+        for (var i = 0; i < this.completionTimes.length; i++) {
+            var time = this.completionTimes[i];
+            if (time > bounds.outlierThreshold) {
+                // Outlier: show at the top of visible range but mark differently
+                normalData.push(null);
+                outlierData.push(bounds.max * 0.95); // Show near top of chart
+                outlierCount++;
+            } else {
+                // Normal data
+                normalData.push(time);
+                outlierData.push(null);
+            }
+        }
+        
+        // Log outlier handling for user awareness
+        if (outlierCount > 0 && this.completionTimes.length > 5) {
+            console.log('📊 Chart: Detected', outlierCount, 'outlier(s) out of', this.completionTimes.length, 'episodes');
+            console.log('   Chart Y-axis capped at', bounds.max.toFixed(1) + 's for better readability');
+        }
+        
+        // Update chart data
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = normalData; // Normal completion times
+        chart.data.datasets[1].data = bestTimes; // Running best times
+        
+        // Add outlier dataset if needed
+        if (chart.data.datasets.length < 3) {
+            chart.data.datasets.push({
+                label: 'Outliers',
+                data: outlierData,
+                borderColor: '#dc3545',
+                backgroundColor: '#dc3545',
+                borderWidth: 0,
+                fill: false,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointStyle: 'triangle',
+                showLine: false
+            });
+        } else {
+            chart.data.datasets[2].data = outlierData;
+        }
+        
+        // Update Y-axis scale
+        chart.options.scales.y.max = bounds.max;
+        
+        // Update chart
+        chart.update('none'); // Use 'none' for faster updates during training
+    }
+};
+
 // Apply UI parameters to the training predator
 NeuralTrainer.prototype.applyUIParameters = function() {
     if (this.simulation && this.simulation.predator) {
@@ -1042,6 +1268,17 @@ NeuralTrainer.prototype.startTraining = function() {
     this.bestCompletionTime = Infinity;
     this.averageCompletionTime = 0;
     
+            // Clear the chart
+        if (this.performanceChart) {
+            this.performanceChart.data.labels = [];
+            this.performanceChart.data.datasets[0].data = [];
+            this.performanceChart.data.datasets[1].data = [];
+            if (this.performanceChart.data.datasets.length > 2) {
+                this.performanceChart.data.datasets[2].data = [];
+            }
+            this.performanceChart.update('none');
+        }
+    
     // Start episode timing
     this.startEpisodeTimer();
     
@@ -1095,6 +1332,17 @@ NeuralTrainer.prototype.resetNetwork = function() {
         this.bestCompletionTime = Infinity;
         this.averageCompletionTime = 0;
         this.episodeStartTime = 0;
+        
+        // Clear the chart
+        if (this.performanceChart) {
+            this.performanceChart.data.labels = [];
+            this.performanceChart.data.datasets[0].data = [];
+            this.performanceChart.data.datasets[1].data = [];
+            if (this.performanceChart.data.datasets.length > 2) {
+                this.performanceChart.data.datasets[2].data = [];
+            }
+            this.performanceChart.update('none');
+        }
         
         console.log('✓ Network reset with randomized parameters');
         this.logSampleWeights('AFTER reset (randomized)');
@@ -1286,6 +1534,9 @@ NeuralTrainer.prototype.recordEpisodeCompletion = function(reason) {
                 console.log('   📈 Improvement from first episode:', '+' + improvement.toFixed(1) + '%');
             }
         }
+        
+        // Update the performance chart
+        this.updateChart();
     } else {
         console.log('⏱️ Episode', this.currentEpisode + 1, 'ended by timeout after', completionTime.toFixed(1) + 's');
     }

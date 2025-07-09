@@ -16,6 +16,7 @@
     <script src="js/neural_trainer.js"></script>
     <script src="js/simulation.js"></script>
     <script src="js/canvas_init.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* Base styles matching index.html */
         html, body {
@@ -409,6 +410,22 @@
             color: #495057;
             font-weight: 500;
         }
+        
+        /* Chart Container */
+        .chart-container {
+            position: relative;
+            height: 200px;
+            margin-top: 15px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            overflow: hidden;
+        }
+        
+        .chart-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
     </style>
 </head>
 <body>
@@ -482,6 +499,15 @@
                                 </div>
                             </div>
                         </div>
+                        
+                        <!-- Performance Chart -->
+                        <div style="margin-top: 15px;">
+                            <h4 style="margin: 0 0 15px 0; color: #495057; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">Training Progress</h4>
+                            <div class="chart-container">
+                                <canvas id="performance-chart"></canvas>
+                            </div>
+                        </div>
+                        
                         <div class="progress-bar">
                             <div class="progress-fill" id="training-progress"></div>
                         </div>
