@@ -20,7 +20,7 @@ function Simulation(name) {
 }
 
 Simulation.prototype = {
-	initialize: function (use_obstacle) {
+	initialize: function (use_obstacle, skipPredator) {
 		this.obstacles = [];
 		this.boids = [];
 		var start_x = Math.floor(Math.random() * this.canvasWidth);
@@ -30,14 +30,16 @@ Simulation.prototype = {
 			this.addBoid(boid);
 		}
 		
-		// Initialize neural predator in center of canvas
-		var predator_x = this.canvasWidth / 2;
-		var predator_y = this.canvasHeight / 2;
-		this.predator = new NeuralPredator(predator_x, predator_y, this);
-		
-		// Connect predator to neural visualization
-		if (typeof connectNeuralViz === 'function') {
-			connectNeuralViz(this.predator);
+		// Initialize neural predator in center of canvas (unless skipped for training)
+		if (!skipPredator) {
+			var predator_x = this.canvasWidth / 2;
+			var predator_y = this.canvasHeight / 2;
+			this.predator = new NeuralPredator(predator_x, predator_y, this);
+			
+			// Connect predator to neural visualization
+			if (typeof connectNeuralViz === 'function') {
+				connectNeuralViz(this.predator);
+			}
 		}
 	},
 	addBoid: function (boid) {
@@ -63,33 +65,10 @@ Simulation.prototype = {
 		var caughtBoids = this.predator.checkForPrey(this.boids);
 		for (var i = caughtBoids.length - 1; i >= 0; i--) {
 			this.boids.splice(caughtBoids[i], 1);
-			
-			// If using neural predator, provide additional learning signal for successful catch
-			if (this.predator.calculateReward) {
-				var catchReward = this.predator.calculateReward(this.boids, true);
-				this.predator.updateWeights(catchReward);
-			}
 		}
 		
 		// Render predator
 		this.predator.render();
-		
-		// Optional: Log learning progress every few seconds (for debugging)
-		if (this.predator.getLearningStats && !this.lastStatsLog) {
-			this.lastStatsLog = Date.now();
-			this.statsLogInterval = 15000; // Log every 15 seconds
-		}
-		if (this.predator.getLearningStats && Date.now() - this.lastStatsLog > this.statsLogInterval) {
-			var stats = this.predator.getLearningStats();
-			console.log('Neural Predator Learning Stats:', {
-				avgReward: stats.avgReward.toFixed(3),
-				efficiency: (stats.framesSinceLastFeed / 60).toFixed(1) + 's since last feed',
-				size: stats.currentSize.toFixed(1),
-				learningIntensity: stats.learningIntensity.toFixed(3),
-				boidsRemaining: this.boids.length
-			});
-			this.lastStatsLog = Date.now();
-		}
 	},
 	tick: function () {
 		for (var bi in this.boids) {
