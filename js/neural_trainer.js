@@ -659,6 +659,14 @@ function NeuralTrainer() {
     this.showSimulation = true;
     this.neuralViz = null;
     
+    // Performance tracking
+    this.episodeStartTime = 0;
+    this.episodeStartFrames = 0;
+    this.completionTimes = []; // Store completion times for each episode
+    this.bestCompletionTime = Infinity;
+    this.averageCompletionTime = 0;
+    this.totalBoidsAtStart = 0;
+    
     this.initializeUI();
     this.initializeSimulation();
     this.initializeNeuralViz();
@@ -911,6 +919,14 @@ NeuralTrainer.prototype.startTraining = function() {
     // Apply UI parameters before starting training
     this.applyUIParameters();
     
+    // Reset performance tracking
+    this.completionTimes = [];
+    this.bestCompletionTime = Infinity;
+    this.averageCompletionTime = 0;
+    
+    // Start episode timing
+    this.startEpisodeTimer();
+    
     document.getElementById('start-training').disabled = true;
     document.getElementById('stop-training').disabled = false;
     document.getElementById('status-text').textContent = 'Training...';
@@ -956,6 +972,12 @@ NeuralTrainer.prototype.resetNetwork = function() {
         
         document.getElementById('status-text').textContent = 'Reset (Random)';
         document.getElementById('status-dot').className = 'status-dot';
+        // Reset performance metrics
+        this.completionTimes = [];
+        this.bestCompletionTime = Infinity;
+        this.averageCompletionTime = 0;
+        this.episodeStartTime = 0;
+        
         console.log('✓ Network reset with randomized parameters');
         this.logSampleWeights('AFTER reset (randomized)');
         
@@ -1090,6 +1112,67 @@ NeuralTrainer.prototype.logSampleWeights = function(label) {
     }
 };
 
+// Start episode timer for performance tracking
+NeuralTrainer.prototype.startEpisodeTimer = function() {
+    this.episodeStartTime = Date.now();
+    this.episodeStartFrames = this.episodeFrame;
+    if (this.simulation && this.simulation.boids) {
+        this.totalBoidsAtStart = this.simulation.boids.length;
+    }
+    console.log('Episode', this.currentEpisode + 1, 'started with', this.totalBoidsAtStart, 'boids');
+};
+
+// Calculate completion time (real-time equivalent)
+NeuralTrainer.prototype.calculateCompletionTime = function() {
+    var realTimeElapsed = (Date.now() - this.episodeStartTime) / 1000; // seconds
+    var frameTimeElapsed = (this.episodeFrame - this.episodeStartFrames) / 60; // assuming 60 FPS base
+    
+    // Calculate real-time equivalent (accounting for simulation speed)
+    var realTimeEquivalent = frameTimeElapsed;
+    
+    return {
+        realTime: realTimeElapsed,
+        equivalent: realTimeEquivalent
+    };
+};
+
+// Record episode completion and update metrics
+NeuralTrainer.prototype.recordEpisodeCompletion = function(reason) {
+    var timingData = this.calculateCompletionTime();
+    var completionTime = timingData.equivalent;
+    
+    if (reason === 'all_boids_eaten') {
+        // Only count successful completions
+        this.completionTimes.push(completionTime);
+        
+        // Update best time
+        if (completionTime < this.bestCompletionTime) {
+            this.bestCompletionTime = completionTime;
+            console.log('🎯 NEW BEST TIME!', completionTime.toFixed(1) + 's');
+        }
+        
+        // Calculate average time (last 10 episodes)
+        var recentTimes = this.completionTimes.slice(-10);
+        this.averageCompletionTime = recentTimes.reduce(function(sum, time) { 
+            return sum + time; 
+        }, 0) / recentTimes.length;
+        
+        console.log('✅ Episode', this.currentEpisode + 1, 'completed in', completionTime.toFixed(1) + 's');
+        console.log('   📊 Best:', this.bestCompletionTime.toFixed(1) + 's', 'Avg (last 10):', this.averageCompletionTime.toFixed(1) + 's');
+        
+        // Show progress towards the goal
+        if (this.completionTimes.length >= 2) {
+            var firstTime = this.completionTimes[0];
+            var improvement = ((firstTime - completionTime) / firstTime) * 100;
+            if (improvement > 0) {
+                console.log('   📈 Improvement from first episode:', '+' + improvement.toFixed(1) + '%');
+            }
+        }
+    } else {
+        console.log('⏱️ Episode', this.currentEpisode + 1, 'ended by timeout after', completionTime.toFixed(1) + 's');
+    }
+};
+
 NeuralTrainer.prototype.copyToClipboard = function() {
     var textarea = document.getElementById('export-output');
     textarea.select();
@@ -1106,10 +1189,73 @@ NeuralTrainer.prototype.updateUI = function() {
         document.getElementById('boids-caught').textContent = stats.boidsEaten;
         document.getElementById('efficiency').textContent = stats.efficiency.toFixed(1) + '%';
         
+        // Update performance metrics
+        this.updatePerformanceMetrics();
+        
         if (this.isTraining) {
             var progress = (this.currentEpisode / this.maxEpisodes) * 100;
             document.getElementById('training-progress').style.width = progress + '%';
         }
+    }
+};
+
+// Update performance metrics in the UI
+NeuralTrainer.prototype.updatePerformanceMetrics = function() {
+    // Current episode time
+    if (this.isTraining && this.episodeStartTime > 0) {
+        var currentTime = this.calculateCompletionTime().equivalent;
+        document.getElementById('current-time').textContent = currentTime.toFixed(1) + 's';
+    } else {
+        document.getElementById('current-time').textContent = '--';
+    }
+    
+    // Boids remaining in current episode
+    if (this.simulation && this.simulation.boids) {
+        var remaining = this.simulation.boids.length;
+        var total = this.totalBoidsAtStart || remaining;
+        document.getElementById('boids-remaining').textContent = remaining + '/' + total;
+    } else {
+        document.getElementById('boids-remaining').textContent = '--';
+    }
+    
+    // Best time
+    if (this.bestCompletionTime !== Infinity) {
+        var bestTimeElement = document.getElementById('best-time');
+        bestTimeElement.textContent = this.bestCompletionTime.toFixed(1) + 's';
+        bestTimeElement.style.color = '#28a745'; // Green for best time
+        bestTimeElement.style.fontWeight = 'bold';
+    } else {
+        var bestTimeElement = document.getElementById('best-time');
+        bestTimeElement.textContent = '--';
+        bestTimeElement.style.color = '#495057'; // Default color
+        bestTimeElement.style.fontWeight = '600';
+    }
+    
+    // Average time
+    if (this.averageCompletionTime > 0) {
+        document.getElementById('avg-time').textContent = this.averageCompletionTime.toFixed(1) + 's';
+    } else {
+        document.getElementById('avg-time').textContent = '--';
+    }
+    
+    // Improvement percentage
+    if (this.completionTimes.length >= 2) {
+        var firstTime = this.completionTimes[0];
+        var currentAvg = this.averageCompletionTime;
+        var improvement = ((firstTime - currentAvg) / firstTime) * 100;
+        
+        var improvementElement = document.getElementById('improvement');
+        if (improvement > 0) {
+            improvementElement.textContent = '+' + improvement.toFixed(1) + '%';
+            improvementElement.style.color = '#28a745'; // Green for improvement
+        } else {
+            improvementElement.textContent = improvement.toFixed(1) + '%';
+            improvementElement.style.color = '#dc3545'; // Red for regression
+        }
+    } else {
+        var improvementElement = document.getElementById('improvement');
+        improvementElement.textContent = '--';
+        improvementElement.style.color = '#495057'; // Default color
     }
 };
 
@@ -1150,7 +1296,21 @@ NeuralTrainer.prototype.update = function() {
                 this.episodeFrame++;
                 
                 // Check if episode is complete
-                if (this.episodeFrame >= this.episodeLength || this.simulation.boids.length === 0) {
+                var episodeComplete = false;
+                var completionReason = '';
+                
+                if (this.simulation.boids.length === 0) {
+                    episodeComplete = true;
+                    completionReason = 'all_boids_eaten';
+                } else if (this.episodeFrame >= this.episodeLength) {
+                    episodeComplete = true;
+                    completionReason = 'timeout';
+                }
+                
+                if (episodeComplete) {
+                    // Record performance metrics before moving to next episode
+                    this.recordEpisodeCompletion(completionReason);
+                    
                     this.currentEpisode++;
                     this.episodeFrame = 0;
                     
@@ -1158,15 +1318,17 @@ NeuralTrainer.prototype.update = function() {
                         this.simulation.predator.resetEpisode();
                     }
                     
-                    // Restart simulation for next episode
-                    this.restartSimulation();
-                    
                     // Check if training is complete
                     if (this.currentEpisode >= this.maxEpisodes) {
                         this.stopTraining();
                         document.getElementById('status-text').textContent = 'Complete';
                         document.getElementById('status-dot').className = 'status-dot running';
                         this.exportParameters();
+                    } else {
+                        // Restart simulation for next episode
+                        this.restartSimulation();
+                        // Start timing for new episode
+                        this.startEpisodeTimer();
                     }
                     
                     // Break out of speed loop when episode ends to avoid multiple episode transitions
