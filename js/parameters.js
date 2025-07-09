@@ -60,11 +60,11 @@ window.NEURAL_PARAMS = {
     biasO: [0.000, 0.000],
     
     // Normalization constants
-    maxDistance: 100,
+    maxDistance: 5000,  // Covers all modern screens including 4K and ultrawide displays
     maxVelocity: 6,
     
     // Version info for parameter management
-    version: "2.2.0",
+    version: "2.5.0",
     trained: false,
-    description: "Enhanced network with boid velocities, toroidal distance, and edge usage penalty for balanced hunting"
+    description: "Universal screen coverage (5000px) - supports 4K, ultrawide, and all modern displays"
 };
