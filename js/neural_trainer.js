@@ -7,6 +7,7 @@
  * 
  * Features:
  * - Policy gradient learning with numerical stability
+ * - Screen-size consistent input/output normalization and predator speed scaling
  * - Real-time training visualization
  * - Parameter export to parameters.js format
  * - Training progress tracking and statistics
@@ -413,7 +414,17 @@ TrainingNeuralPredator.prototype.forward = function() {
         if (isNaN(sum)) {
             sum = 0;
         }
-        this.outputBuffer[o] = this.fastTanh(sum) * PREDATOR_MAX_FORCE;
+        // Apply screen-size scaling separately for X and Y to match input normalization
+        var rawOutput = this.fastTanh(sum) * PREDATOR_MAX_FORCE;
+        if (o === 0) {
+            // X force: scale by width (matches input X normalization)
+            var screenForceScaleX = this.simulation.canvasWidth / 1000;
+            this.outputBuffer[o] = rawOutput * screenForceScaleX;
+        } else {
+            // Y force: scale by height (matches input Y normalization)
+            var screenForceScaleY = this.simulation.canvasHeight / 1000;
+            this.outputBuffer[o] = rawOutput * screenForceScaleY;
+        }
         
         if (isNaN(this.outputBuffer[o])) {
             this.outputBuffer[o] = 0;

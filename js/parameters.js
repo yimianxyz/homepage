@@ -4,11 +4,11 @@
  * Pure data file containing trained weights and biases for the neural predator.
  * 
  * Network Architecture: 22 inputs → 12 hidden → 2 outputs
- * - Inputs: positions & velocities of 5 nearest boids + predator velocity
+ * - Inputs: positions & velocities of 5 nearest boids + predator velocity (screen-size normalized)
  * - Hidden: 12 neurons with tanh activation
- * - Outputs: steering force (x, y)
+ * - Outputs: steering force (x, y) with separate X/Y screen-size scaling for consistent relative effects
  * - Uses toroidal distance calculation for wraparound-aware hunting
- * - Designed for device-independent training with fixed predator size for consistency
+ * - Designed for device-independent training with consistent input/output normalization and screen-scaled speed
  */
 
 window.NEURAL_PARAMS = {

@@ -2,16 +2,25 @@
  * Base Predator Class
  * 
  * This file contains the base predator functionality that is extended by NeuralPredator.
- * It provides core mechanics like movement, feeding, and boundary handling with fixed size for training consistency.
+ * It provides core mechanics like movement, feeding, and boundary handling with device-independent speed and size for training consistency.
  * 
  * The actual predator behavior is implemented in neural_predator.js which uses
  * a neural network for intelligent hunting and learning.
  */
 
 // Base Predator Configuration (Extended by NeuralPredator)
-var PREDATOR_MAX_SPEED = 2.5;
+var PREDATOR_BASE_MAX_SPEED = 2.5; // Base speed for reference screen size
 var PREDATOR_MAX_FORCE = 0.05;
 var PREDATOR_SIZE = 17; // Fixed middle size for consistent training behavior
+
+// Device-independent speed scaling
+function getPredatorMaxSpeed(canvasWidth, canvasHeight) {
+    // Scale speed based on screen size to maintain consistent relative movement
+    var referenceScreenSize = 1000; // Reference screen dimension
+    var currentScreenSize = (canvasWidth + canvasHeight) / 2; // Average screen dimension
+    var speedScale = currentScreenSize / referenceScreenSize;
+    return PREDATOR_BASE_MAX_SPEED * speedScale;
+}
 
 /**
  * Base Predator Class
@@ -37,7 +46,8 @@ Predator.prototype = {
     // Basic steering behavior - seek a target position
     seek: function(targetPosition) {
         var desiredVector = targetPosition.subtract(this.position);
-        desiredVector.iFastSetMagnitude(PREDATOR_MAX_SPEED);
+        var maxSpeed = getPredatorMaxSpeed(this.simulation.canvasWidth, this.simulation.canvasHeight);
+        desiredVector.iFastSetMagnitude(maxSpeed);
         var steeringVector = desiredVector.subtract(this.velocity);
         steeringVector.iFastLimit(PREDATOR_MAX_FORCE);
         return steeringVector;
@@ -101,7 +111,8 @@ Predator.prototype = {
         
         // Update velocity and position
         this.velocity.iAdd(this.acceleration);
-        this.velocity.iFastLimit(PREDATOR_MAX_SPEED);
+        var maxSpeed = getPredatorMaxSpeed(this.simulation.canvasWidth, this.simulation.canvasHeight);
+        this.velocity.iFastLimit(maxSpeed);
         this.position.iAdd(this.velocity);
         
         // Handle boundaries

@@ -5,8 +5,9 @@
  * with intelligent neural network behavior for prediction only.
  * 
  * Network Architecture: 22 inputs → 12 hidden → 2 outputs
- * - Inputs: positions & velocities of 5 nearest boids + predator velocity
- * - Outputs: steering force (x, y)
+ * - Inputs: positions & velocities of 5 nearest boids + predator velocity (screen-size normalized)
+ * - Outputs: steering force (x, y) with separate X/Y screen-size scaling for consistent behavior  
+ * - Movement: Device-independent speed scaling for consistent relative movement across all screen sizes
  * - Enhanced with boid velocity data for predictive hunting
  * - Optimized for real-time web performance with <0.3ms forward pass
  * 
@@ -258,7 +259,17 @@ NeuralPredator.prototype.forward = function() {
         if (isNaN(sum)) {
             sum = 0;
         }
-        this.outputBuffer[o] = this.fastTanh(sum) * PREDATOR_MAX_FORCE;
+        // Apply screen-size scaling separately for X and Y to match input normalization
+        var rawOutput = this.fastTanh(sum) * PREDATOR_MAX_FORCE;
+        if (o === 0) {
+            // X force: scale by width (matches input X normalization)
+            var screenForceScaleX = this.simulation.canvasWidth / 1000;
+            this.outputBuffer[o] = rawOutput * screenForceScaleX;
+        } else {
+            // Y force: scale by height (matches input Y normalization)
+            var screenForceScaleY = this.simulation.canvasHeight / 1000;
+            this.outputBuffer[o] = rawOutput * screenForceScaleY;
+        }
         
         // Safety check for final output
         if (isNaN(this.outputBuffer[o])) {
@@ -325,7 +336,8 @@ NeuralPredator.prototype.update = function(boids) {
 // Enhanced seeking with neural network refinement
 NeuralPredator.prototype.seek = function(targetPosition) {
     var desiredVector = targetPosition.subtract(this.position);
-    desiredVector.iFastSetMagnitude(PREDATOR_MAX_SPEED * 0.8); // Slightly slower patrol
+    var maxSpeed = getPredatorMaxSpeed(this.simulation.canvasWidth, this.simulation.canvasHeight);
+    desiredVector.iFastSetMagnitude(maxSpeed * 0.8); // Slightly slower patrol
     var steeringVector = desiredVector.subtract(this.velocity);
     steeringVector.iFastLimit(PREDATOR_MAX_FORCE * 0.6); // Gentler patrol steering
     return steeringVector;

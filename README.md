@@ -24,7 +24,7 @@ A clean, minimalist personal homepage with sophisticated boids flocking and pred
 
 ### Predator-Prey System
 - **Autonomous predator** - Hunts nearby boids within detection range (75px)
-- **Consistent size** - Fixed predator size for reliable training behavior
+- **Device-independent behavior** - Fixed predator size and screen-scaled speed for consistent training across all devices
 - **Finite population** - No artificial respawning; ecosystem evolves naturally
 - **Subtle interactions** - Gentle boid avoidance creates organic movement patterns
 
@@ -65,13 +65,14 @@ The background features an autonomous flocking simulation with four core behavio
 4. **Predator Avoidance**: Subtle fleeing behavior when predator approaches (distance-based intensity)
 
 ### Neural Predator AI System
-- **Neural Network**: 12 inputs → 8 hidden → 2 outputs for intelligent hunting behavior
+- **Neural Network**: 22 inputs → 12 hidden → 2 outputs for intelligent hunting behavior
+- **Screen-Size Consistency**: Inputs, outputs, and predator speed all scale independently for consistent behavior across all devices and aspect ratios
 - **Online Learning**: Real-time adaptation using policy gradient methods with numerical stability
-- **Hunting Intelligence**: Neural network analyzes positions of 5 nearest boids plus predator state
+- **Hunting Intelligence**: Neural network analyzes positions and velocities of 5 nearest boids plus predator state
 - **Patrol Behavior**: Random movement when no prey detected, target changes every 5 seconds
 - **Growth Mechanics**: Dynamic size scaling with visual intensity reflecting learning activity
 - **Robust Learning**: NaN-resistant calculations with automatic weight recovery
-- **Performance**: <0.2ms forward pass, 60fps compatible on all devices
+- **Performance**: <0.3ms forward pass with screen-size scaling, 60fps compatible on all devices
 
 ### Vector Mathematics Optimizations
 - **Fast Magnitude**: `speed ≈ max(|vx|, |vy|) * 0.96 + min(|vx|, |vy|) * 0.398`
@@ -126,7 +127,7 @@ Edit these sections in `index.html`:
 Adjust parameters in `js/predator.js` and `js/simulation.js`:
 ```javascript
 // Predator behavior
-var PREDATOR_MAX_SPEED = 2.5;        // Predator movement speed
+var PREDATOR_BASE_MAX_SPEED = 2.5;   // Base predator speed (device-independent scaling)
 var PREDATOR_RANGE = 75;              // Detection range (consistent across devices)
 var PREDATOR_SIZE = 17;               // Fixed predator size for training consistency
 
