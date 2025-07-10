@@ -43,10 +43,7 @@ function TrainingNeuralPredator(x, y, simulation) {
     this.framesSinceLastFeed = 0;
     this.maxFramesSinceLastFeed = 600;
     
-    // Edge usage tracking for penalty
-    this.lastPosition = new Vector(x, y);
-    this.edgeUsageFrames = 0;  // Count frames since last edge usage
-    this.edgePenaltyThreshold = 30; // Minimum frames between edge usage to avoid penalty
+    // Position tracking removed (edge penalty system removed)
     
     // Learning buffers for gradient calculation
     this.lastInputs = new Array(this.inputSize);
@@ -245,28 +242,8 @@ TrainingNeuralPredator.prototype.calculateWrappedDistance = function(targetPos, 
     return new Vector(shortestX, shortestY);
 };
 
-// Detect if predator used wraparound (crossed screen edge)
-TrainingNeuralPredator.prototype.detectEdgeUsage = function() {
-    var canvasWidth = this.simulation.canvasWidth;
-    var canvasHeight = this.simulation.canvasHeight;
-    
-    // Calculate movement from last frame
-    var deltaX = this.position.x - this.lastPosition.x;
-    var deltaY = this.position.y - this.lastPosition.y;
-    
-    // If movement is larger than half screen size, wraparound likely occurred
-    var edgeUsed = false;
-    
-    if (Math.abs(deltaX) > canvasWidth * 0.5) {
-        edgeUsed = true;
-    }
-    
-    if (Math.abs(deltaY) > canvasHeight * 0.5) {
-        edgeUsed = true;
-    }
-    
-    return edgeUsed;
-};
+// Note: Edge penalty system removed to prevent device-dependent training interference
+// The neural network should learn general hunting strategies that work across all screen sizes
 
 // Calculate reward based on current state
 TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
@@ -302,19 +279,8 @@ TrainingNeuralPredator.prototype.calculateReward = function(boids, caughtBoid) {
         }
     }
     
-    // Penalty for frequent edge usage (wraparound abuse)
-    if (this.detectEdgeUsage()) {
-        if (this.edgeUsageFrames < this.edgePenaltyThreshold) {
-            // Heavy penalty for frequent edge usage
-            var penaltyStrength = (this.edgePenaltyThreshold - this.edgeUsageFrames) / this.edgePenaltyThreshold;
-            var edgePenalty = penaltyStrength * 5.0; // Scale penalty based on frequency
-            reward -= edgePenalty;
-            console.log('Edge usage penalty applied:', edgePenalty.toFixed(2), 'frames since last:', this.edgeUsageFrames);
-        }
-        this.edgeUsageFrames = 0; // Reset counter
-    } else {
-        this.edgeUsageFrames++; // Increment frames since last edge usage
-    }
+    // Note: Edge penalty removed to prevent device-dependent training interference
+    // The neural network should learn optimal hunting strategies across all screen sizes
     
     return reward;
 };
@@ -639,10 +605,6 @@ TrainingNeuralPredator.prototype.feed = function() {
 
 // Override update method with learning
 TrainingNeuralPredator.prototype.update = function(boids) {
-    // Store position before movement for edge usage detection
-    this.lastPosition.x = this.position.x;
-    this.lastPosition.y = this.position.y;
-    
     var steeringForce = this.getAutonomousForce(boids);
     this.acceleration.iAdd(steeringForce);
     
@@ -697,12 +659,7 @@ TrainingNeuralPredator.prototype.resetEpisode = function() {
     this.framesSinceLastFeed = 0;
     this.currentSize = this.baseSize;
     
-    // Reset edge usage tracking
-    this.edgeUsageFrames = 0;
-    if (this.position) {
-        this.lastPosition.x = this.position.x;
-        this.lastPosition.y = this.position.y;
-    }
+    // Position tracking no longer needed (edge penalty removed)
 };
 
 // Export current parameters
@@ -885,11 +842,7 @@ NeuralTrainer.prototype.initializeUI = function() {
         self.episodeLength = parseInt(e.target.value);
     });
     
-    document.getElementById('edge-penalty').addEventListener('input', function(e) {
-        if (self.simulation && self.simulation.predator) {
-            self.simulation.predator.edgePenaltyThreshold = parseInt(e.target.value);
-        }
-    });
+    // Edge penalty control removed - was causing device-dependent training interference
     
     // Simulation speed slider
     document.getElementById('sim-speed').addEventListener('input', function(e) {
@@ -1239,12 +1192,7 @@ NeuralTrainer.prototype.applyUIParameters = function() {
             console.log('Applied episode length:', this.episodeLength);
         }
         
-        // Apply edge penalty threshold from UI
-        var edgePenaltyInput = document.getElementById('edge-penalty');
-        if (edgePenaltyInput) {
-            this.simulation.predator.edgePenaltyThreshold = parseInt(edgePenaltyInput.value);
-            console.log('Applied edge penalty threshold:', this.simulation.predator.edgePenaltyThreshold);
-        }
+        // Edge penalty removed - was causing device-dependent training interference
         
         // Apply max episodes from UI
         var maxEpisodesInput = document.getElementById('max-episodes');

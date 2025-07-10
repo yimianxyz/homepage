@@ -557,10 +557,7 @@
                             <label>Episode Length:</label>
                             <input type="number" id="episode-length" value="1800" min="100" max="5000">
                         </div>
-                        <div class="control-row">
-                            <label>Edge Penalty:</label>
-                            <input type="number" id="edge-penalty" value="30" min="5" max="120" step="5" title="Minimum frames between edge usage to avoid penalty">
-                        </div>
+                        <!-- Edge penalty control removed - was causing device-dependent training interference -->
                         <div class="control-row">
                             <label>Completion Threshold:</label>
                             <input type="number" id="completion-threshold" value="0" min="0" max="20" step="1" title="Episode complete when this many boids remain. Use 3-5 for faster training, 0 for perfect completion.">
