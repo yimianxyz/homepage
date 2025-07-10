@@ -23,10 +23,10 @@ A clean, minimalist personal homepage with sophisticated boids flocking and pred
 ## Ecosystem Dynamics
 
 ### Predator-Prey System
-- **Autonomous predator** - Hunts nearby boids within detection range (75px)
+- **Autonomous predator** - Hunts nearby boids within detection range (80px avoidance)
 - **Device-independent behavior** - Fixed predator size and screen-scaled speed for consistent training across all devices
 - **Finite population** - No artificial respawning; ecosystem evolves naturally
-- **Subtle interactions** - Gentle boid avoidance creates organic movement patterns
+- **Challenging avoidance** - 80px predator avoidance range requires sophisticated hunting strategies
 
 ### Behavioral Mechanics
 - **Hunting behavior** - Predator seeks nearest boid within range, patrols when none found
@@ -129,7 +129,7 @@ Adjust parameters in `js/predator.js` and `js/simulation.js`:
 ```javascript
 // Predator behavior
 var PREDATOR_BASE_MAX_SPEED = 2.5;   // Base predator speed (device-independent scaling)
-var PREDATOR_RANGE = 75;              // Detection range (consistent across devices)
+var PREDATOR_RANGE = 80;              // Avoidance range (consistent across devices)
 var PREDATOR_SIZE = 17;               // Fixed predator size for training consistency
 
 // Population
@@ -179,7 +179,7 @@ Modify breakpoints in `styles.css`:
 ### Mobile  
 - 60 boids + 1 predator at 56fps (18ms intervals)
 - Optimized canvas rendering with alpha-max-beta-min approximation
-- Consistent predator range (75px) across all devices for better training
+- Consistent predator avoidance range (80px) across all devices for better training
 - Efficient ecosystem calculations
 
 ## Deployment

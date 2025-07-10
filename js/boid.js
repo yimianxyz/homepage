@@ -11,7 +11,7 @@ var avoidanceMultiplier = 2;
 
 // Predator avoidance parameters (from Cornell ECE 5730 implementation)
 // Fixed range for all devices to ensure consistent training behavior
-var PREDATOR_RANGE = 75; // Device-independent value for consistent neural network training
+var PREDATOR_RANGE = 80; // Device-independent value for consistent neural network training (larger range = more challenging hunting)
 var PREDATOR_TURN_FACTOR = 0.3;
 
 function Boid(x, y, simulation) {
