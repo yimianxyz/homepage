@@ -8,7 +8,7 @@
  * - Hidden: 12 neurons with tanh activation
  * - Outputs: steering force (x, y)
  * - Uses toroidal distance calculation for wraparound-aware hunting
- * - Designed for device-independent training across all screen sizes
+ * - Designed for device-independent training with fixed predator size for consistency
  */
 
 window.NEURAL_PARAMS = {

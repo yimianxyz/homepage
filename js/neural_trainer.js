@@ -594,7 +594,7 @@ TrainingNeuralPredator.prototype.getAutonomousForce = function(boids) {
 
 // Override feed method with learning
 TrainingNeuralPredator.prototype.feed = function() {
-    this.currentSize = Math.min(this.currentSize + this.growthPerFeed, this.maxSize);
+    // Size remains constant for consistent training behavior
     this.lastFeedTime = Date.now();
     
     var feedReward = 50.0; // Increased feeding reward for better learning signal
@@ -657,7 +657,7 @@ TrainingNeuralPredator.prototype.resetEpisode = function() {
     this.episodeFrames = 0;
     this.boidsEaten = 0;
     this.framesSinceLastFeed = 0;
-    this.currentSize = this.baseSize;
+    // Size remains constant (no reset needed)
     
     // Position tracking no longer needed (edge penalty removed)
 };
@@ -705,8 +705,8 @@ TrainingNeuralPredator.prototype.render = function() {
     inverseVector1 = inverseVector1.divideBy(4);
     inverseVector2 = inverseVector2.divideBy(4);
     
-    var sizeRatio = this.currentSize / this.baseSize;
-    var intensity = 0.4 + (sizeRatio - 1) * 0.3;
+    // Fixed intensity for consistent training behavior (no size-based variation)
+    var intensity = 0.5;
     
     ctx.beginPath();
     ctx.moveTo(this.position.x, this.position.y);
@@ -1492,7 +1492,7 @@ NeuralTrainer.prototype.restartSimulation = function() {
         this.simulation.predator.position.y = this.simulation.canvasHeight / 2;
         this.simulation.predator.velocity.x = (Math.random() - 0.5) * 2;
         this.simulation.predator.velocity.y = (Math.random() - 0.5) * 2;
-        this.simulation.predator.currentSize = this.simulation.predator.baseSize;
+        // Size remains constant (no reset needed)
         console.log('Predator weights preserved during training');
         
         // Reconnect to neural visualization

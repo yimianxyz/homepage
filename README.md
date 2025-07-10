@@ -24,16 +24,15 @@ A clean, minimalist personal homepage with sophisticated boids flocking and pred
 
 ### Predator-Prey System
 - **Autonomous predator** - Hunts nearby boids within detection range (75px)
-- **Dynamic growth** - Predator grows larger when consuming boids (+1.2px per boid)
-- **Natural decay** - Size gradually returns to normal over time
+- **Consistent size** - Fixed predator size for reliable training behavior
 - **Finite population** - No artificial respawning; ecosystem evolves naturally
 - **Subtle interactions** - Gentle boid avoidance creates organic movement patterns
 
 ### Behavioral Mechanics
 - **Hunting behavior** - Predator seeks nearest boid within range, patrols when none found
 - **Feeding cooldown** - 100ms between catches for smooth animation
-- **Size scaling** - Catch radius and visual appearance scale with predator size
-- **Growth limits** - Maximum 80% size increase (12px → ~21px) prevents dominance
+- **Fixed mechanics** - Consistent catch radius and appearance for reliable training
+- **Training optimized** - Fixed 17px size eliminates size-dependent variables
 
 ## Performance Optimizations
 
@@ -129,7 +128,7 @@ Adjust parameters in `js/predator.js` and `js/simulation.js`:
 // Predator behavior
 var PREDATOR_MAX_SPEED = 2.5;        // Predator movement speed
 var PREDATOR_RANGE = 75;              // Detection range (consistent across devices)
-var PREDATOR_SIZE = 12;               // Base predator size
+var PREDATOR_SIZE = 17;               // Fixed predator size for training consistency
 
 // Population
 var NUM_BOIDS = isMobileDevice() ? 60 : 120;

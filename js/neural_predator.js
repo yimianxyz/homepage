@@ -14,7 +14,7 @@
  * - Loads pre-trained weights from parameters.js
  * - Fast forward pass for real-time hunting behavior
  * - No online learning - stable and consistent behavior
- * - Elegant visual design with size scaling
+ * - Consistent visual design with fixed size for training reliability
  */
 function NeuralPredator(x, y, simulation) {
     // Inherit from basic predator
@@ -297,8 +297,7 @@ NeuralPredator.prototype.getAutonomousForce = function(boids) {
 
 // Override feed method (prediction only - no learning)
 NeuralPredator.prototype.feed = function() {
-    // Call parent feed method
-    this.currentSize = Math.min(this.currentSize + this.growthPerFeed, this.maxSize);
+    // Call parent feed method (fixed size for training consistency)
     this.lastFeedTime = Date.now();
 };
 
@@ -360,9 +359,8 @@ NeuralPredator.prototype.render = function() {
     inverseVector1 = inverseVector1.divideBy(4);
     inverseVector2 = inverseVector2.divideBy(4);
     
-    // Enhanced visibility while maintaining elegance
-    var sizeRatio = this.currentSize / this.baseSize;
-    var intensity = 0.4 + (sizeRatio - 1) * 0.3; // Size-based intensity
+    // Enhanced visibility with fixed intensity for training consistency
+    var intensity = 0.5; // Fixed intensity (no size-based variation)
     
     ctx.beginPath();
     ctx.moveTo(this.position.x, this.position.y);

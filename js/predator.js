@@ -2,7 +2,7 @@
  * Base Predator Class
  * 
  * This file contains the base predator functionality that is extended by NeuralPredator.
- * It provides core mechanics like movement, feeding, growth, and boundary handling.
+ * It provides core mechanics like movement, feeding, and boundary handling with fixed size for training consistency.
  * 
  * The actual predator behavior is implemented in neural_predator.js which uses
  * a neural network for intelligent hunting and learning.
@@ -11,7 +11,7 @@
 // Base Predator Configuration (Extended by NeuralPredator)
 var PREDATOR_MAX_SPEED = 2.5;
 var PREDATOR_MAX_FORCE = 0.05;
-var PREDATOR_SIZE = 12;
+var PREDATOR_SIZE = 17; // Fixed middle size for consistent training behavior
 
 /**
  * Base Predator Class
@@ -25,12 +25,9 @@ function Predator(x, y, simulation) {
     this.acceleration = new Vector(0, 0);
     this.simulation = simulation;
     
-    // Growth and feeding mechanics
+    // Fixed size for consistent training behavior
     this.baseSize = PREDATOR_SIZE;
-    this.currentSize = this.baseSize;
-    this.maxSize = this.baseSize * 1.8; // Maximum growth
-    this.growthPerFeed = 1.2; // How much to grow per boid eaten
-    this.decayRate = 0.002; // How fast size decays back to normal
+    this.currentSize = PREDATOR_SIZE; // Fixed size, no growth/decay for training consistency
     this.lastFeedTime = 0;
     this.feedCooldown = 100; // Minimum time between feeding (ms)
 }
@@ -86,17 +83,15 @@ Predator.prototype = {
         return caughtBoids;
     },
     
-    // Handle feeding - grow predator
+    // Handle feeding - fixed size for training consistency
     feed: function() {
-        this.currentSize = Math.min(this.currentSize + this.growthPerFeed, this.maxSize);
+        // Size remains constant for consistent training behavior
         this.lastFeedTime = Date.now();
     },
     
-    // Gradually decay size back to normal
+    // Size decay disabled for training consistency
     decaySize: function() {
-        if (this.currentSize > this.baseSize) {
-            this.currentSize = Math.max(this.currentSize - this.decayRate, this.baseSize);
-        }
+        // Size remains constant for consistent training behavior
     },
 
     // Base update method - extended by subclasses for behavior
