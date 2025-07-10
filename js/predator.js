@@ -2,7 +2,7 @@
  * Base Predator Class
  * 
  * This file contains the base predator functionality that is extended by NeuralPredator.
- * It provides core mechanics like movement, feeding, and boundary handling with device-independent speed and size for training consistency.
+ * It provides core mechanics like movement, feeding, and boundary handling with device-independent speed, fixed size, no cooldowns, and multi-catch capability for training consistency.
  * 
  * The actual predator behavior is implemented in neural_predator.js which uses
  * a neural network for intelligent hunting and learning.
@@ -37,8 +37,6 @@ function Predator(x, y, simulation) {
     // Fixed size for consistent training behavior
     this.baseSize = PREDATOR_SIZE;
     this.currentSize = PREDATOR_SIZE; // Fixed size, no growth/decay for training consistency
-    this.lastFeedTime = 0;
-    this.feedCooldown = 100; // Minimum time between feeding (ms)
 }
 
 Predator.prototype = {
@@ -73,11 +71,6 @@ Predator.prototype = {
     
     // Check for boid collisions and handle feeding
     checkForPrey: function(boids) {
-        var currentTime = Date.now();
-        if (currentTime - this.lastFeedTime < this.feedCooldown) {
-            return []; // Still digesting
-        }
-        
         var caughtBoids = [];
         var catchRadius = this.currentSize * 0.7; // Catch radius scales with size
         
@@ -85,9 +78,12 @@ Predator.prototype = {
             var distance = this.position.getDistance(boids[i].position);
             if (distance < catchRadius) {
                 caughtBoids.push(i);
-                this.feed();
-                break; // Only catch one boid at a time for smooth animation
             }
+        }
+        
+        // Feed once for each boid caught (rewards good positioning)
+        for (var i = 0; i < caughtBoids.length; i++) {
+            this.feed();
         }
         
         return caughtBoids;
@@ -96,7 +92,7 @@ Predator.prototype = {
     // Handle feeding - fixed size for training consistency
     feed: function() {
         // Size remains constant for consistent training behavior
-        this.lastFeedTime = Date.now();
+        // No cooldown - predator can catch boids immediately when in range
     },
     
     // Size decay disabled for training consistency

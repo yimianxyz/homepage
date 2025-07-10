@@ -15,7 +15,7 @@
  * - Loads pre-trained weights from parameters.js
  * - Fast forward pass for real-time hunting behavior
  * - No online learning - stable and consistent behavior
- * - Consistent visual design with fixed size for training reliability
+ * - Simplified mechanics with no cooldowns and multi-catch capability for easier learning
  */
 function NeuralPredator(x, y, simulation) {
     // Inherit from basic predator
@@ -309,7 +309,7 @@ NeuralPredator.prototype.getAutonomousForce = function(boids) {
 // Override feed method (prediction only - no learning)
 NeuralPredator.prototype.feed = function() {
     // Call parent feed method (fixed size for training consistency)
-    this.lastFeedTime = Date.now();
+    // No cooldown - predator can catch boids immediately when in range
 };
 
 // Enhanced update method with neural behavior (prediction only)

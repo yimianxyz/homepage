@@ -30,7 +30,8 @@ A clean, minimalist personal homepage with sophisticated boids flocking and pred
 
 ### Behavioral Mechanics
 - **Hunting behavior** - Predator seeks nearest boid within range, patrols when none found
-- **Feeding cooldown** - 100ms between catches for smooth animation
+- **Immediate feeding** - No cooldown, can catch multiple boids simultaneously for simpler learning
+- **Strategic positioning rewarded** - Better positioning that catches multiple boids gives higher rewards
 - **Fixed mechanics** - Consistent catch radius and appearance for reliable training
 - **Training optimized** - Fixed 17px size eliminates size-dependent variables
 

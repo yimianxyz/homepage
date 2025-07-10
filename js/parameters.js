@@ -8,6 +8,7 @@
  * - Hidden: 12 neurons with tanh activation
  * - Outputs: steering force (x, y) with separate X/Y screen-size scaling for consistent relative effects
  * - Uses toroidal distance calculation for wraparound-aware hunting
+ * - Simplified mechanics with no cooldowns and multi-catch capability for easier neural network learning
  * - Designed for device-independent training with consistent input/output normalization and screen-scaled speed
  */
 

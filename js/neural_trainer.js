@@ -8,6 +8,7 @@
  * Features:
  * - Policy gradient learning with numerical stability
  * - Screen-size consistent input/output normalization and predator speed scaling
+ * - Simplified mechanics with no cooldowns and multi-catch capability for easier learning
  * - Real-time training visualization
  * - Parameter export to parameters.js format
  * - Training progress tracking and statistics
@@ -606,7 +607,7 @@ TrainingNeuralPredator.prototype.getAutonomousForce = function(boids) {
 // Override feed method with learning
 TrainingNeuralPredator.prototype.feed = function() {
     // Size remains constant for consistent training behavior
-    this.lastFeedTime = Date.now();
+    // No cooldown - predator can catch boids immediately when in range
     
     var feedReward = 50.0; // Increased feeding reward for better learning signal
     this.updateWeights(feedReward);
