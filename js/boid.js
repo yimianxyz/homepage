@@ -10,14 +10,8 @@ var death_throws = 0;
 var avoidanceMultiplier = 2;
 
 // Predator avoidance parameters (from Cornell ECE 5730 implementation)
-// Dynamic range based on device capability
-function getBoidPredatorRange() {
-    return (typeof isMobileDevice === 'function' && isMobileDevice()) ? 
-           (typeof PREDATOR_MOBILE_RANGE !== 'undefined' ? PREDATOR_MOBILE_RANGE : 60) : 
-           (typeof PREDATOR_DESKTOP_RANGE !== 'undefined' ? PREDATOR_DESKTOP_RANGE : 80);
-}
-
-var PREDATOR_RANGE = getBoidPredatorRange();
+// Fixed range for all devices to ensure consistent training behavior
+var PREDATOR_RANGE = 75; // Device-independent value for consistent neural network training
 var PREDATOR_TURN_FACTOR = 0.3;
 
 function Boid(x, y, simulation) {

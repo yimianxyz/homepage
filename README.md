@@ -23,7 +23,7 @@ A clean, minimalist personal homepage with sophisticated boids flocking and pred
 ## Ecosystem Dynamics
 
 ### Predator-Prey System
-- **Autonomous predator** - Hunts nearby boids within detection range (60-80px)
+- **Autonomous predator** - Hunts nearby boids within detection range (75px)
 - **Dynamic growth** - Predator grows larger when consuming boids (+1.2px per boid)
 - **Natural decay** - Size gradually returns to normal over time
 - **Finite population** - No artificial respawning; ecosystem evolves naturally
@@ -128,7 +128,7 @@ Adjust parameters in `js/predator.js` and `js/simulation.js`:
 ```javascript
 // Predator behavior
 var PREDATOR_MAX_SPEED = 2.5;        // Predator movement speed
-var PREDATOR_RANGE = 60-80;           // Detection range (device-dependent)
+var PREDATOR_RANGE = 75;              // Detection range (consistent across devices)
 var PREDATOR_SIZE = 12;               // Base predator size
 
 // Population
@@ -178,7 +178,7 @@ Modify breakpoints in `styles.css`:
 ### Mobile  
 - 60 boids + 1 predator at 56fps (18ms intervals)
 - Optimized canvas rendering with alpha-max-beta-min approximation
-- Reduced predator range (60px vs 80px) for better performance
+- Consistent predator range (75px) across all devices for better training
 - Efficient ecosystem calculations
 
 ## Deployment
