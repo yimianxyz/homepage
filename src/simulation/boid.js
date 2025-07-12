@@ -1,18 +1,14 @@
-var MAX_SPEED = 6;
-var MAX_FORCE = 0.1;
-var DESIRED_SEPARATION = 40;
-var OBSTACLE_DESIRED_SEPARATION = 200;
-var NEIGHBOR_DISTANCE = 60;
-var BORDER_OFFSET = 10;
-var EPSILON = 0.0000001;
-var render_size = 10;
-var death_throws = 0;
-var avoidanceMultiplier = 2;
+var MAX_SPEED = window.SIMULATION_CONSTANTS.BOID_MAX_SPEED;
+var MAX_FORCE = window.SIMULATION_CONSTANTS.BOID_MAX_FORCE;
+var DESIRED_SEPARATION = window.SIMULATION_CONSTANTS.BOID_DESIRED_SEPARATION;
+var NEIGHBOR_DISTANCE = window.SIMULATION_CONSTANTS.BOID_NEIGHBOR_DISTANCE;
+var BORDER_OFFSET = window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET;
+var EPSILON = window.SIMULATION_CONSTANTS.EPSILON;
+var render_size = window.SIMULATION_CONSTANTS.BOID_RENDER_SIZE;
 
-// Predator avoidance parameters (from Cornell ECE 5730 implementation)
-// Fixed range for all devices to ensure consistent training behavior
-var PREDATOR_RANGE = 80; // Device-independent value for consistent neural network training (larger range = more challenging hunting)
-var PREDATOR_TURN_FACTOR = 0.3;
+// Predator avoidance parameters
+var PREDATOR_RANGE = window.SIMULATION_CONSTANTS.PREDATOR_RANGE;
+var PREDATOR_TURN_FACTOR = window.SIMULATION_CONSTANTS.PREDATOR_TURN_FACTOR;
 
 function Boid(x, y, simulation) {
 	var randomAngle = Math.random() * 2 * Math.PI;
@@ -21,8 +17,6 @@ function Boid(x, y, simulation) {
 	this.acceleration = new Vector(0, 0);
 	this.simulation = simulation;
 	this.render_size = render_size;
-	this.death_throws = death_throws;
-	this.sabateur = false;
 }
 
 Boid.prototype = {
@@ -42,21 +36,15 @@ Boid.prototype = {
 		this.simulation.ctx.lineTo(this.position.x, this.position.y);
 		this.simulation.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
 		this.simulation.ctx.stroke();
-		if (this.sabateur) {
-			this.simulation.ctx.fillStyle = 'rgba(22, 236, 22, 0.8)';
-		} else if (this.death_throws == 0) {
-			this.simulation.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-		} else {
-			this.simulation.ctx.fillStyle = 'rgba(22, 72, 236, 0.8)';
-		}
+		this.simulation.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
 		this.simulation.ctx.fill();
 	},
 
 	getCohesionVector: function (boids) {
 		var totalPosition = new Vector(0, 0);
 		var neighborCount = 0;
-		for (var bi in boids) {
-			var boid = boids[bi];
+		for (var i = 0; i < boids.length; i++) {
+			var boid = boids[i];
 			if (this == boid) {
 				continue;
 			}
@@ -88,8 +76,8 @@ Boid.prototype = {
 		var steeringVector = new Vector(0, 0);
 		var neighborCount = 0;
 
-		for (var bi in boids) {
-			var boid = boids[bi];
+		for (var i = 0; i < boids.length; i++) {
+			var boid = boids[i];
 			if (this == boid) {
 				continue;
 			}
@@ -106,42 +94,21 @@ Boid.prototype = {
 
 		if (neighborCount > 0) {
 			var averageSteeringVector = steeringVector.divideBy(neighborCount);
-		} else {
-			var averageSteeringVector = new Vector(0, 0);
-		}
-
-		for (var ob in this.simulation.obstacles) {
-			var obstacle = this.simulation.obstacles[ob];
-			var distance = this.position.getDistance(obstacle.position) + EPSILON;
-			if (distance > 0 && distance < OBSTACLE_DESIRED_SEPARATION) {
-				var deltaVector = this.position.subtract(obstacle.position);
-				deltaVector.iFastNormalize();
-				deltaVector.iDivideBy(distance);
-				steeringVector.iAdd(deltaVector);
-				if (this.sabateur) {
-					deltaVector.iMultiplyBy(-obstacle.repulsion);
-				} else {
-					deltaVector.iMultiplyBy(obstacle.repulsion);
-				}
-				averageSteeringVector.iAdd(deltaVector);
-			}
-		}
-
-		if (averageSteeringVector.getFastMagnitude() > 0) {
 			averageSteeringVector.iFastSetMagnitude(MAX_SPEED);
 			averageSteeringVector.iSubtract(this.velocity);
 			averageSteeringVector.iFastLimit(MAX_FORCE);
+			return averageSteeringVector;
+		} else {
+			return new Vector(0, 0);
 		}
-
-		return averageSteeringVector;
 	},
 
 	getAlignmentVector: function (boids) {
 		var perceivedFlockVelocity = new Vector(0, 0);
 		var neighborCount = 0;
 
-		for (var bi in boids) {
-			var boid = boids[bi];
+		for (var i = 0; i < boids.length; i++) {
+			var boid = boids[i];
 			if (this == boid) {
 				continue;
 			}
@@ -164,7 +131,6 @@ Boid.prototype = {
 		}
 	},
 
-	// Predator avoidance behavior (based on Cornell ECE 5730 implementation)
 	getPredatorAvoidanceVector: function(predator) {
 		if (!predator) {
 			return new Vector(0, 0);
@@ -172,16 +138,12 @@ Boid.prototype = {
 		
 		var distance = this.position.getDistance(predator.position) + EPSILON;
 		if (distance > 0 && distance < PREDATOR_RANGE) {
-			// Calculate avoidance vector away from predator
 			var avoidanceVector = this.position.subtract(predator.position);
 			avoidanceVector.iFastNormalize();
 			
-			// Stronger avoidance when predator is closer
 			var avoidanceStrength = (PREDATOR_RANGE - distance) / PREDATOR_RANGE;
 			avoidanceVector.iMultiplyBy(avoidanceStrength * PREDATOR_TURN_FACTOR);
-			
-			// Apply maximum force limit - subtle avoidance
-			avoidanceVector.iFastLimit(MAX_FORCE * 1.5); // Gentle avoidance, not too dramatic
+			avoidanceVector.iFastLimit(MAX_FORCE * 1.5);
 			
 			return avoidanceVector;
 		}
@@ -202,14 +164,12 @@ Boid.prototype = {
 		this.acceleration.iAdd(separationVector);
 		this.acceleration.iAdd(alignmentVector);
 		
-		// Add predator avoidance if predator exists
 		if (this.simulation.predator) {
 			var predatorAvoidanceVector = this.getPredatorAvoidanceVector(this.simulation.predator);
 			this.acceleration.iAdd(predatorAvoidanceVector);
 		}
 	},
 
-	// Wrap-around boundary handling
 	bound: function () {
 		if (this.position.x > this.simulation.canvasWidth + BORDER_OFFSET) {
 			this.position.x = -BORDER_OFFSET;
@@ -226,30 +186,16 @@ Boid.prototype = {
 	},
 
 	update: function () {
-		if (this.death_throws == 0) {
-			this.velocity.iAdd(this.acceleration);
-			this.velocity.iFastLimit(MAX_SPEED);
-			this.position.iAdd(this.velocity);
-			this.bound();
-			this.acceleration.iMultiplyBy(0);
-		}
+		this.velocity.iAdd(this.acceleration);
+		this.velocity.iFastLimit(MAX_SPEED);
+		this.position.iAdd(this.velocity);
+		this.bound();
+		this.acceleration.iMultiplyBy(0);
 	},
 
 	run: function (boids) {
 		this.flock(boids);
 		this.update();
 		this.render();
-	},
-
-	set_death_throws: function () {
-		this.death_throws = 50;
-	},
-
-	decrease_death_throws: function () {
-		this.death_throws = this.death_throws - 1;
-	},
-
-	set_sabateur: function (b) {
-		this.sabateur = b;
-	},
+	}
 }; 

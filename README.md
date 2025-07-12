@@ -1,199 +1,57 @@
-# Yimian Liu's Homepage
+# AI Predator-Prey Ecosystem
 
-A clean, minimalist personal homepage with sophisticated boids flocking and predator-prey ecosystem background animation, inspired by [Nicholas Frosst's website](https://www.nickfrosst.com/) and enhanced with algorithmic optimizations from [Cornell ECE 5730](https://github.com/yimianxyz/ece5730-labs/blob/master/VGA_Graphics/Animation_Demo/animation.c).
+A neural network predator hunting autonomous boids in a simulated ecosystem.
 
 ## Features
 
-- **Predator-prey ecosystem** - Sophisticated autonomous predator hunting boids with dynamic growth mechanics
-- **Pure background animation** - 120 autonomous boids on desktop, 60 on mobile using optimized flocking algorithm
-- **Performance optimized** - Cornell ECE 5730 algorithmic improvements with alpha-max-beta-min approximation
-- **Finite ecosystem dynamics** - Natural predator-prey interactions with no artificial respawning
-- **Mobile-optimized design** - Responsive and touch-friendly for all devices
-- **Subtle visual design** - Elegant animations that don't distract from content
-- **Modern CSS** with clamp() for fluid typography and advanced responsive design
-- **Accessibility features** - Reduced motion support and proper color contrast
+- **22→12→8→2 Neural Network** for predator decision-making
+- **Vision-Based Design** with fixed 400×568 rectangular vision area
+- **Frame-Based Timing** for consistent behavior across devices
+- **Two Training Modes**: Supervised learning and reinforcement learning
+- **Responsive Design** works on all screen sizes
 
-## Quick Start
+## Usage
 
-1. Open `index.html` in your web browser to view the site
-2. Enjoy the autonomous boids flocking animation with predator-prey dynamics
-3. Watch the predator hunt boids and grow larger when successful
-4. Responsive design works on all screen sizes
+### Homepage
+Open `index.html` to see the trained predator simulation running in the background.
 
-## Ecosystem Dynamics
+### Training Interfaces
+- **Supervised Learning**: Open `training-sl.html` to train using teacher policy
+- **Reinforcement Learning**: Open `training-rl.html` to train using environment rewards
 
-### Predator-Prey System
-- **Autonomous predator** - Hunts nearby boids within detection range (80px avoidance)
-- **Device-independent behavior** - Fixed predator size and screen-scaled speed for consistent training across all devices
-- **Finite population** - No artificial respawning; ecosystem evolves naturally
-- **Challenging avoidance** - 80px predator avoidance range requires sophisticated hunting strategies
+## Technical Details
 
-### Behavioral Mechanics
-- **Hunting behavior** - Predator seeks nearest boid within range, patrols when none found
-- **Immediate feeding** - No cooldown, can catch multiple boids simultaneously for simpler learning
-- **Strategic positioning rewarded** - Better positioning that catches multiple boids gives higher rewards
-- **Fixed mechanics** - Consistent catch radius and appearance for reliable training
-- **Training optimized** - Fixed 17px size eliminates size-dependent variables
+### Neural Network
+- **Input**: 22 neurons (5 nearest boids × 4 features + predator velocity)
+- **Hidden 1**: 12 neurons with tanh activation
+- **Hidden 2**: 8 neurons with tanh activation
+- **Output**: 2 neurons (steering forces X, Y)
+- **Vision**: Only processes boids within 400×568 rectangular area
 
-## Performance Optimizations
+### Training
+- **Supervised**: Neural network learns to imitate simple pursuit behavior
+- **Reinforcement**: Neural network learns from success/failure rewards
+- **Episodes**: Continue until predator catches enough boids (≤20 remaining)
+- **Rewards**: `max(1000 - completion_frames, 10)` for faster completion
 
-### Cornell ECE 5730 Algorithmic Improvements
-- **Alpha-Max-Beta-Min approximation**: ~3x faster magnitude calculations avoiding expensive sqrt operations
-- **Optimized vector operations**: Fast magnitude, normalize, and limit functions
-- **Enhanced performance**: 20% increase in boid count with improved frame rates
-- **Wrap-around boundaries**: Seamless edge-to-edge movement for infinite canvas effect
+## Architecture
 
-### Performance Enhancements
-- **Optimized boids**: 60 boids on mobile vs 120 on desktop
-- **Improved refresh rate**: 18ms on mobile vs 12ms on desktop  
-- **Canvas optimizations**: Enhanced rendering performance with fast vector math
-- **Efficient predator**: Minimal computational overhead for ecosystem interactions
-- **Adaptive scaling**: Predator range adapts to device capabilities
-
-### Responsive Design
-- **Fluid typography**: Uses `clamp()` for perfect scaling across devices
-- **Multiple breakpoints**: 1024px, 768px, 640px, 480px, 360px
-- **Landscape support**: Special handling for landscape phone orientation
-- **Safe areas**: Proper viewport handling for notched devices
-
-## Technical Implementation
-
-### Enhanced Boids Flocking Algorithm with Predator Avoidance
-The background features an autonomous flocking simulation with four core behaviors enhanced with Cornell optimizations:
-1. **Separation**: Avoid crowding neighbors (optimized distance calculations)
-2. **Alignment**: Steer towards average heading of neighbors (fast vector operations)
-3. **Cohesion**: Steer towards average position of neighbors (efficient magnitude approximation)
-4. **Predator Avoidance**: Subtle fleeing behavior when predator approaches (distance-based intensity)
-
-### Neural Predator AI System
-- **Neural Network**: 22 inputs → 12 hidden → 2 outputs for intelligent hunting behavior
-- **Screen-Size Consistency**: Inputs, outputs, and predator speed all scale independently for consistent behavior across all devices and aspect ratios
-- **Online Learning**: Real-time adaptation using policy gradient methods with numerical stability
-- **Hunting Intelligence**: Neural network analyzes positions and velocities of 5 nearest boids plus predator state
-- **Patrol Behavior**: Random movement when no prey detected, target changes every 5 seconds
-- **Growth Mechanics**: Dynamic size scaling with visual intensity reflecting learning activity
-- **Robust Learning**: NaN-resistant calculations with automatic weight recovery
-- **Performance**: <0.3ms forward pass with screen-size scaling, 60fps compatible on all devices
-
-### Vector Mathematics Optimizations
-- **Fast Magnitude**: `speed ≈ max(|vx|, |vy|) * 0.96 + min(|vx|, |vy|) * 0.398`
-- **Optimized Functions**: `iFastLimit()`, `iFastNormalize()`, `iFastSetMagnitude()`
-- **Performance Gain**: ~3x faster than traditional sqrt-based calculations
-- **Predator Integration**: All predator calculations use optimized vector operations
-
-### File Structure
 ```
-├── index.html              # Main page with mobile optimizations
-├── styles.css              # Responsive CSS with mobile-first design
-├── js/
-│   ├── vector.js           # Enhanced vector mathematics library with fast operations
-│   ├── boid.js             # Individual boid behavior with predator avoidance
-│   ├── predator.js         # Base predator class (core mechanics only)
-│   ├── neural_predator.js  # AI neural network predator implementation
-│   ├── simulation.js       # Ecosystem controller with predator-prey interactions
-│   ├── canvas_init.js      # Canvas setup and responsive resizing
-│   └── boids.js            # Simple initialization without user interactions
-└── README.md               # This file
+├── index.html              # Homepage with background simulation
+├── training-sl.html        # Supervised learning interface  
+├── training-rl.html        # Reinforcement learning interface
+└── src/
+    ├── ai/                 # Neural network components
+    ├── simulation/         # Boids and predator entities
+    ├── training/           # Learning algorithms
+    ├── ui/                 # Interface controllers
+    ├── utils/              # Vector math utilities
+    └── config/             # Constants and model weights
 ```
 
-### Code Architecture
-- **Predator.js**: Base class providing core mechanics (movement, feeding, growth, boundaries)
-- **Neural_predator.js**: Main implementation with neural network AI and online learning
-- **Clean separation**: Base functionality separate from AI behavior for maintainability
-- **Inheritance**: NeuralPredator extends base Predator class for code reuse
+## Implementation
 
-## Design Philosophy
-
-### Subtle Elegance
-- **Understated predator**: Muted dark red coloring that doesn't compete with content
-- **Gentle interactions**: Soft boid avoidance rather than dramatic fleeing
-- **Smooth transitions**: All size changes and feeding effects are gradual
-- **Professional aesthetic**: Sophisticated without being distracting
-
-### Natural Dynamics
-- **Finite ecosystem**: No artificial population maintenance
-- **Organic evolution**: System naturally progresses from complex to simple
-- **Realistic behavior**: Predator-prey dynamics based on real-world patterns
-- **Elegant conclusion**: Can result in lone predator in empty environment
-
-## Customization
-
-### Personal Information
-Edit these sections in `index.html`:
-- Name and title in header
-- Bio paragraphs in homepage-content
-- Contact information (already includes clickable email)
-
-### Ecosystem Tuning
-Adjust parameters in `js/predator.js` and `js/simulation.js`:
-```javascript
-// Predator behavior
-var PREDATOR_BASE_MAX_SPEED = 2.5;   // Base predator speed (device-independent scaling)
-var PREDATOR_RANGE = 80;              // Avoidance range (consistent across devices)
-var PREDATOR_SIZE = 17;               // Fixed predator size for training consistency
-
-// Population
-var NUM_BOIDS = isMobileDevice() ? 60 : 120;
-var REFRESH_INTERVAL_IN_MS = isMobileDevice() ? 18 : 12;
-```
-
-### Visual Appearance
-Modify predator colors in `js/predator.js`:
-```javascript
-ctx.strokeStyle = 'rgba(80, 30, 30, 0.7)';  // Outline color
-ctx.fillStyle = 'rgba(120, 40, 40, 0.4)';   // Fill color
-```
-
-### Responsive Breakpoints
-Modify breakpoints in `styles.css`:
-- Large tablets: 1024px
-- Tablets: 768px  
-- Large phones: 640px
-- Small phones: 480px
-- Very small: 360px
-
-## Browser Support
-
-- **Desktop**: Chrome, Firefox, Safari, Edge (all modern versions)
-- **Mobile**: iOS Safari 12+, Chrome Mobile 80+, Samsung Internet 10+
-- **Features**: Canvas 2D, CSS Grid, Flexbox, CSS Custom Properties
-- **Fallbacks**: Reduced motion support for accessibility
-
-## Accessibility
-
-- **Reduced motion**: Animation opacity reduced for users with motion sensitivity
-- **Color contrast**: WCAG AA compliant contrast ratios
-- **Text selection**: Enabled in content areas
-- **Screen readers**: Semantic HTML structure with proper headings
-- **Subtle design**: Background animation doesn't interfere with content readability
-- **Non-distracting**: Predator interactions are gentle and professional
-
-## Performance
-
-### Desktop
-- 120 boids + 1 predator at 83fps (12ms intervals)
-- Full-resolution canvas rendering with fast vector math
-- Enhanced performance with Cornell optimizations
-- Minimal overhead from predator-prey interactions
-
-### Mobile  
-- 60 boids + 1 predator at 56fps (18ms intervals)
-- Optimized canvas rendering with alpha-max-beta-min approximation
-- Consistent predator avoidance range (80px) across all devices for better training
-- Efficient ecosystem calculations
-
-## Deployment
-
-Deploy to any static hosting service:
-- **GitHub Pages**: Upload files and enable Pages
-- **Netlify**: Drag and drop the folder
-- **Vercel**: Connect repository for automatic deployment
-- **Traditional hosting**: Upload via FTP/SFTP
-
-## License
-
-This project is open source and available under the [MIT License](LICENSE).
-
-## Inspiration
-
-This design is inspired by [Nicholas Frosst's website](https://www.nickfrosst.com/), featuring sophisticated boids flocking algorithms enhanced with performance optimizations from [Cornell ECE 5730 embedded systems lab](https://github.com/yimianxyz/ece5730-labs/blob/master/VGA_Graphics/Animation_Demo/animation.c). The predator-prey system adds ecological realism while maintaining elegant minimalism, combining web accessibility with high-performance algorithms and natural behavioral dynamics.
+- **Boid Flocking**: Reynolds rules (separation, alignment, cohesion) plus predator avoidance
+- **Predator AI**: Vision-based neural network with rectangular vision area and 4-layer architecture
+- **Performance**: Optimized loops, centralized constants, zero unused code
+- **Consistency**: Frame-based timing ensures identical behavior across devices 
