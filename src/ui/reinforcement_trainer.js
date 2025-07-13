@@ -1,4 +1,4 @@
-// Simple Reinforcement Learning Trainer
+// Reinforcement Learning Trainer - Transformer Architecture
 function SimpleRLTrainer() {
     // Call parent constructor
     BaseTrainer.call(this);
@@ -33,19 +33,64 @@ SimpleRLTrainer.prototype.stopTraining = function() {
 SimpleRLTrainer.prototype.onNetworkReset = function() {
     this.reinforcementLearning.reset();
     this.episodeActive = false;
+    
+    // Reset transformer encoder parameters
+    if (this.simulation && this.simulation.predator && this.simulation.predator.transformerEncoder) {
+        this.simulation.predator.transformerEncoder.reset();
+        console.log("Reset transformer encoder parameters");
+    }
 };
 
-// Override network load to include RL specific cleanup
+// Override network load to load transformer parameters from model.js
 SimpleRLTrainer.prototype.onNetworkLoad = function() {
     this.reinforcementLearning.reset();
     this.episodeActive = false;
+    
+    // Try to load transformer parameters
+    if (this.simulation && this.simulation.predator && this.simulation.predator.transformerEncoder) {
+        var loadResult = this.simulation.predator.transformerEncoder.loadParameters();
+        if (loadResult.success) {
+            console.log("✅ " + loadResult.message);
+            this.showLoadSuccessMessage("Transformer model loaded successfully!");
+        } else {
+            console.warn("⚠️ " + loadResult.message + " - " + loadResult.fallbackReason);
+            this.showLoadWarningMessage("Failed to load transformer model: " + loadResult.fallbackReason);
+        }
+    }
+};
+
+// Show load success message
+SimpleRLTrainer.prototype.showLoadSuccessMessage = function(message) {
+    var messageDiv = document.createElement('div');
+    messageDiv.style.cssText = 'background: #d4edda; border: 1px solid #c3e6cb; color: #155724; padding: 10px; margin: 10px 0; border-radius: 4px; font-size: 12px;';
+    messageDiv.textContent = '✅ ' + message;
+    
+    var controlHeader = document.querySelector('.control-header');
+    if (controlHeader && controlHeader.nextSibling) {
+        controlHeader.parentNode.insertBefore(messageDiv, controlHeader.nextSibling);
+        setTimeout(function() { messageDiv.remove(); }, 3000);
+    }
+};
+
+// Show load warning message
+SimpleRLTrainer.prototype.showLoadWarningMessage = function(message) {
+    var messageDiv = document.createElement('div');
+    messageDiv.style.cssText = 'background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 10px; margin: 10px 0; border-radius: 4px; font-size: 12px;';
+    messageDiv.textContent = '⚠️ ' + message;
+    
+    var controlHeader = document.querySelector('.control-header');
+    if (controlHeader && controlHeader.nextSibling) {
+        controlHeader.parentNode.insertBefore(messageDiv, controlHeader.nextSibling);
+        setTimeout(function() { messageDiv.remove(); }, 5000);
+    }
 };
 
 // Override training step with reinforcement learning specific logic
 SimpleRLTrainer.prototype.updateTrainingStep = function() {
     if (!this.isTraining) return;
     
-    var inputs = this.inputProcessor.processInputs(
+    // Get structured inputs using new transformer-ready format
+    var structuredInputs = this.inputProcessor.processInputs(
         this.simulation.boids,
         { x: this.simulation.predator.position.x, y: this.simulation.predator.position.y },
         { x: this.simulation.predator.velocity.x, y: this.simulation.predator.velocity.y },
@@ -53,10 +98,11 @@ SimpleRLTrainer.prototype.updateTrainingStep = function() {
         this.simulation.canvasHeight
     );
     
-    var neuralOutputs = this.neuralNetwork.forward(inputs);
+    // Process through transformer encoder
+    var neuralOutputs = this.simulation.predator.transformerEncoder.forward(structuredInputs);
     var neuralAction = this.actionProcessor.processAction(neuralOutputs);
     
-    this.reinforcementLearning.storeExperience(inputs, neuralAction);
+    this.reinforcementLearning.storeExperience(structuredInputs, neuralAction);
     
     if (!this.episodeActive) {
         this.startEpisode();
@@ -89,7 +135,9 @@ SimpleRLTrainer.prototype.completeEpisode = function() {
     // Only complete episodes are success episodes now (no timeout)
     var reward = this.reinforcementLearning.calculateReward(isComplete, completionFrames);
     
-    this.reinforcementLearning.applyPolicyGradient(this.neuralNetwork, reward);
+    // TODO: Implement transformer policy gradient backpropagation
+    // this.reinforcementLearning.applyPolicyGradient(this.transformerEncoder, reward);
+    
     this.reinforcementLearning.updateEpisodeStats(reward, completionFrames, isComplete);
     
     this.episodeActive = false;
@@ -100,16 +148,14 @@ SimpleRLTrainer.prototype.completeEpisode = function() {
     this.initializeSimulation();
 };
 
-
-
 SimpleRLTrainer.prototype.updateDisplay = function() {
     var stats = this.reinforcementLearning.getStatistics();
     
-    document.getElementById('episodes').textContent = stats.episodeCount;
-    document.getElementById('last-reward').textContent = Math.round(stats.episodeReward);
-    document.getElementById('avg-reward').textContent = Math.round(stats.averageReward);
+    document.getElementById('episodes').textContent = stats.episodeCount || 0;
+    document.getElementById('last-reward').textContent = Math.round(stats.episodeReward || 0);
+    document.getElementById('avg-reward').textContent = Math.round(stats.averageReward || 0);
     
-    var progress = Math.min((stats.averageReward / 100) * 100, 100);
+    var progress = Math.min(((stats.averageReward || 0) / 100) * 100, 100);
     document.getElementById('progress').textContent = Math.round(progress) + '%';
     document.getElementById('training-progress').style.width = progress + '%';
 };

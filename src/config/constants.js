@@ -23,12 +23,24 @@ window.SIMULATION_CONSTANTS = {
     PREDATOR_BORDER_OFFSET: 20,
     PREDATOR_FORCE_SCALE: 200,  // Neural network force scaling for smooth turning
     
-    // Neural network constants - New encoding system
+    // Legacy MLP constants (kept for backward compatibility)
     MAX_BOIDS: 50,              // Maximum number of boids in simulation
     BOID_VECTOR_SIZE: 4,        // Features per boid: [rel_x, rel_y, vel_x, vel_y]
     PREDATOR_VECTOR_SIZE: 4,    // Features for predator: [canvas_width_norm, canvas_height_norm, vel_x, vel_y]
     TOTAL_ENTITIES: 51,         // 50 boids + 1 predator
     NEURAL_INPUT_SIZE: 204,     // 51 entities × 4 features each
+    
+    // Transformer architecture constants
+    TRANSFORMER_EMBED_DIM: 128,     // Embedding dimension for transformer
+    TRANSFORMER_NUM_HEADS: 8,       // Number of attention heads
+    TRANSFORMER_NUM_LAYERS: 6,      // Number of transformer layers
+    TRANSFORMER_FF_DIM: 512,        // Feed-forward network dimension
+    TRANSFORMER_DROPOUT: 0.1,       // Dropout rate
+    
+    // Entity type IDs for transformer processing
+    ENTITY_TYPE_CONTEXT: 0,         // Context information
+    ENTITY_TYPE_PREDATOR: 1,        // Predator entity
+    ENTITY_TYPE_BOID: 2,            // Boid entity
     
     // Device-independent normalization constants
     MAX_DISTANCE: 1000,         // Maximum expected distance for normalization

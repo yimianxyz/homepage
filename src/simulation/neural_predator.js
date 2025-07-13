@@ -1,34 +1,27 @@
 /**
- * Neural Predator - Game entity that uses modular neural components
+ * Neural Predator - Transformer-based game entity
  * 
- * Combines:
- * - NeuralNetwork (pure neural math)
- * - InputProcessor (game state -> neural inputs)
- * - ActionProcessor (neural outputs -> game actions)
- * 
- * Updated for new encoding system: 204 inputs → 64 hidden1 → 32 hidden2 → 2 outputs
+ * Architecture:
+ * - TransformerEncoder with d_model=48, n_heads=4, n_layers=3
+ * - Token sequence: [CLS] + [CTX] + Predator + Boids
+ * - GEGLU feed-forward networks
+ * - Multi-head self-attention for entity interactions
  */
 function NeuralPredator(x, y, simulation) {
     // Inherit from basic predator
     Predator.call(this, x, y, simulation);
     
-    // Create modular components with new architecture
-    this.neuralNetwork = new NeuralNetwork(204, 64, 32, 2);
+    // Create transformer-based components
+    this.transformerEncoder = new TransformerEncoder();
     this.inputProcessor = new InputProcessor();
     this.actionProcessor = new ActionProcessor();
-    
-    // Load pre-trained weights if available and store result
-    this.modelLoadResult = this.neuralNetwork.loadParameters();
-    
-    // If loading failed, the network will use random initialization
-    if (!this.modelLoadResult.success && this.modelLoadResult.fallbackReason) {
-        console.warn("Neural Network: " + this.modelLoadResult.message + " - " + this.modelLoadResult.fallbackReason);
-    }
     
     // Simple patrol behavior when no boids
     this.autonomousTarget = new Vector(x, y);
     this.targetChangeTime = 0;
     this.targetChangeInterval = window.SIMULATION_CONSTANTS.TARGET_CHANGE_INTERVAL;
+    
+    console.log("Initialized Transformer-based Neural Predator");
 }
 
 // Inherit from Predator
@@ -36,7 +29,7 @@ NeuralPredator.prototype = Object.create(Predator.prototype);
 NeuralPredator.prototype.constructor = NeuralPredator;
 
 /**
- * Get steering force using modular neural components
+ * Get steering force using transformer encoder
  */
 NeuralPredator.prototype.getAutonomousForce = function(boids) {
     if (boids.length === 0) {
@@ -51,8 +44,8 @@ NeuralPredator.prototype.getAutonomousForce = function(boids) {
         return this.seek(this.autonomousTarget);
     }
     
-    // Step 1: Convert game state to neural inputs
-    var inputs = this.inputProcessor.processInputs(
+    // Step 1: Convert game state to structured inputs
+    var structuredInputs = this.inputProcessor.processInputs(
         boids,
         { x: this.position.x, y: this.position.y },
         { x: this.velocity.x, y: this.velocity.y },
@@ -60,8 +53,8 @@ NeuralPredator.prototype.getAutonomousForce = function(boids) {
         this.simulation.canvasHeight
     );
     
-    // Step 2: Get neural network prediction
-    var neuralOutputs = this.neuralNetwork.forward(inputs);
+    // Step 2: Process through transformer encoder
+    var neuralOutputs = this.transformerEncoder.forward(structuredInputs);
     
     // Step 3: Convert neural outputs to game actions
     var actions = this.actionProcessor.processAction(neuralOutputs);
@@ -73,7 +66,7 @@ NeuralPredator.prototype.getAutonomousForce = function(boids) {
  * Update predator behavior
  */
 NeuralPredator.prototype.update = function(boids) {
-    // Get neural network steering force
+    // Get transformer-based steering force
     var steeringForce = this.getAutonomousForce(boids);
     this.acceleration.iAdd(steeringForce);
     

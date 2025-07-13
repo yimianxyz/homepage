@@ -23,13 +23,11 @@ function BaseTrainer() {
     this.lossHistory = [];
     this.maxDisplayPoints = 200; // Maximum points to display for performance
     
-    // Training components - updated for new architecture
-    this.neuralNetwork = new NeuralNetwork(204, 64, 32, 2);
+    // Training components - transformer architecture
     this.inputProcessor = new InputProcessor();
     this.actionProcessor = new ActionProcessor();
     
-    // Load pre-trained weights by default and handle result
-    this.modelLoadResult = this.neuralNetwork.loadParameters();
+    // Note: TransformerEncoder is created in the NeuralPredator itself
 }
 
 BaseTrainer.prototype.initialize = function() {
@@ -330,10 +328,8 @@ BaseTrainer.prototype.initializeSimulation = function() {
     this.simulation.canvasHeight = this.canvas.height;
     this.simulation.initialize(false); // Don't skip predator
     
-    // Replace the pre-trained predator with our training predator
-    if (this.simulation.predator) {
-        this.simulation.predator.neuralNetwork = this.neuralNetwork;
-    }
+    // Predator already has its own TransformerEncoder
+    // No need to replace neural network components
     
     // Note: Simulation controls will be applied when user clicks Apply button
 };
@@ -427,36 +423,29 @@ BaseTrainer.prototype.stopTraining = function() {
 };
 
 BaseTrainer.prototype.resetNetwork = function() {
-    // Randomize all neural network parameters
-    this.neuralNetwork.reset();
-    
-    // Update model loading status (will show that we're using random initialization)
-    this.modelLoadResult = { 
-        success: false, 
-        message: "Using random initialization", 
-        fallbackReason: "Network was manually reset" 
-    };
-    this.showModelLoadingStatus();
-    
+    // Reset handled by subclasses for transformer encoder
     this.onNetworkReset(); // Allow subclasses to handle specific reset logic
     this.updateDisplay();
 };
 
 BaseTrainer.prototype.loadNetwork = function() {
-    // Load pre-trained weights from model.js and handle result
-    this.modelLoadResult = this.neuralNetwork.loadParameters();
-    this.showModelLoadingStatus(); // Show warning if loading failed
+    // Load handled by subclasses for transformer encoder
     this.onNetworkLoad(); // Allow subclasses to handle specific load logic
     this.updateDisplay();
 };
 
 BaseTrainer.prototype.exportNetwork = function() {
-    // Generate model.js content with current weights
-    var content = this.generateModelJSContent();
+    // Generate model.js content with current transformer weights
+    var content = this.generateTransformerModelJSContent();
+    
+    if (!content) {
+        alert('No transformer to export. Make sure the simulation is initialized.');
+        return;
+    }
     
     // Create a popup window to display the content
-    var popup = window.open('', 'Export Network', 'width=800,height=600,scrollbars=yes');
-    popup.document.write('<html><head><title>Export Network - model.js</title></head><body>');
+    var popup = window.open('', 'Export Transformer', 'width=800,height=600,scrollbars=yes');
+    popup.document.write('<html><head><title>Export Transformer - model.js</title></head><body>');
     popup.document.write('<h2>Copy this content to model.js:</h2>');
     popup.document.write('<textarea style="width:100%;height:500px;font-family:monospace;font-size:12px;">' + content + '</textarea>');
     popup.document.write('<br><button onclick="navigator.clipboard.writeText(document.querySelector(\'textarea\').value).then(function(){alert(\'Copied to clipboard!\');})">Copy to Clipboard</button>');
@@ -464,100 +453,225 @@ BaseTrainer.prototype.exportNetwork = function() {
     popup.document.close();
 };
 
-BaseTrainer.prototype.generateModelJSContent = function() {
-    var nn = this.neuralNetwork;
+BaseTrainer.prototype.generateTransformerModelJSContent = function() {
+    if (!this.simulation || !this.simulation.predator || !this.simulation.predator.transformerEncoder) {
+        return null;
+    }
+    
+    var transformer = this.simulation.predator.transformerEncoder;
+    var params = transformer.getParameters();
     var content = '';
     
     content += '/**\n';
-    content += ' * Neural Network Model - Pre-trained weights and architecture\n';
+    content += ' * Transformer Encoder Model - Pre-trained weights and architecture\n';
     content += ' * \n';
-    content += ' * Network Architecture: ' + nn.inputSize + ' inputs → ' + nn.hidden1Size + ' hidden1 → ' + nn.hidden2Size + ' hidden2 → ' + nn.outputSize + ' outputs\n';
+    content += ' * Architecture: d_model=' + params.d_model + ', n_heads=' + params.n_heads + ', n_layers=' + params.n_layers + ', ffn_hidden=' + params.ffn_hidden + '\n';
+    content += ' * Token sequence: [CLS] + [CTX] + Predator + Boids\n';
+    content += ' * Multi-head self-attention with GEGLU feed-forward networks\n';
+    content += ' * \n';
+    content += ' * Total parameters: ~' + this.estimateTransformerParameters(params) + '\n';
     content += ' */\n\n';
-    content += 'window.NEURAL_PARAMS = {\n';
-    content += '    // Network architecture\n';
-    content += '    inputSize: ' + nn.inputSize + ',\n';
-    content += '    hidden1Size: ' + nn.hidden1Size + ',\n';
-    content += '    hidden2Size: ' + nn.hidden2Size + ',\n';
-    content += '    outputSize: ' + nn.outputSize + ',\n';
-    content += '    \n';
-    content += '    // Input to Hidden1 layer weights (' + nn.hidden1Size + 'x' + nn.inputSize + ' matrix)\n';
-    content += '    weightsIH1: [\n';
     
-    for (var h1 = 0; h1 < nn.hidden1Size; h1++) {
-        content += '        // Hidden1 neuron ' + (h1 + 1) + '\n';
-        content += '        [';
-        for (var i = 0; i < nn.inputSize; i++) {
-            content += nn.weightsIH1[h1][i].toFixed(3);
-            if (i < nn.inputSize - 1) content += ', ';
-        }
-        content += ']';
-        if (h1 < nn.hidden1Size - 1) content += ',';
+    content += 'window.TRANSFORMER_PARAMS = {\n';
+    content += '    // Architecture configuration\n';
+    content += '    d_model: ' + params.d_model + ',\n';
+    content += '    n_heads: ' + params.n_heads + ',\n';
+    content += '    n_layers: ' + params.n_layers + ',\n';
+    content += '    ffn_hidden: ' + params.ffn_hidden + ',\n\n';
+    
+    // CLS embedding
+    content += '    // [CLS] token embedding (' + params.cls_embedding.length + 'D)\n';
+    content += '    cls_embedding: [\n';
+    content += '        ' + params.cls_embedding.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+    content += '    ],\n\n';
+    
+    // Type embeddings
+    content += '    // Type embeddings for different entity types\n';
+    content += '    type_embeddings: {\n';
+    content += '        cls: [\n';
+    content += '            ' + params.type_embeddings.cls.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+    content += '        ],\n';
+    content += '        ctx: [\n';
+    content += '            ' + params.type_embeddings.ctx.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+    content += '        ],\n';
+    content += '        predator: [\n';
+    content += '            ' + params.type_embeddings.predator.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+    content += '        ],\n';
+    content += '        boid: [\n';
+    content += '            ' + params.type_embeddings.boid.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+    content += '        ]\n';
+    content += '    },\n\n';
+    
+    // Input projections - full matrices
+    content += '    // Input projection matrices\n';
+    content += '    ctx_projection: [\n';
+    for (var i = 0; i < params.ctx_projection.length; i++) {
+        content += '        [' + params.ctx_projection[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+        if (i < params.ctx_projection.length - 1) content += ',';
         content += '\n';
     }
+    content += '    ],\n\n';
     
-    content += '    ],\n';
-    content += '    \n';
-    content += '    // Hidden1 to Hidden2 layer weights (' + nn.hidden2Size + 'x' + nn.hidden1Size + ' matrix)\n';
-    content += '    weightsH1H2: [\n';
-    
-    for (var h2 = 0; h2 < nn.hidden2Size; h2++) {
-        content += '        // Hidden2 neuron ' + (h2 + 1) + '\n';
-        content += '        [';
-        for (var h1 = 0; h1 < nn.hidden1Size; h1++) {
-            content += nn.weightsH1H2[h2][h1].toFixed(3);
-            if (h1 < nn.hidden1Size - 1) content += ', ';
-        }
-        content += ']';
-        if (h2 < nn.hidden2Size - 1) content += ',';
+    content += '    predator_projection: [\n';
+    for (var i = 0; i < params.predator_projection.length; i++) {
+        content += '        [' + params.predator_projection[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+        if (i < params.predator_projection.length - 1) content += ',';
         content += '\n';
     }
+    content += '    ],\n\n';
     
-    content += '    ],\n';
-    content += '    \n';
-    content += '    // Hidden2 to Output layer weights (' + nn.outputSize + 'x' + nn.hidden2Size + ' matrix)\n';
-    content += '    weightsH2O: [\n';
-    
-    var outputLabels = ['X steering force output', 'Y steering force output'];
-    for (var o = 0; o < nn.outputSize; o++) {
-        content += '        // ' + outputLabels[o] + '\n';
-        content += '        [';
-        for (var h2 = 0; h2 < nn.hidden2Size; h2++) {
-            content += nn.weightsH2O[o][h2].toFixed(3);
-            if (h2 < nn.hidden2Size - 1) content += ', ';
-        }
-        content += ']';
-        if (o < nn.outputSize - 1) content += ',';
+    content += '    boid_projection: [\n';
+    for (var i = 0; i < params.boid_projection.length; i++) {
+        content += '        [' + params.boid_projection[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+        if (i < params.boid_projection.length - 1) content += ',';
         content += '\n';
     }
+    content += '    ],\n\n';
     
+    // Transformer layers - COMPLETE serialization
+    content += '    // Transformer encoder layers\n';
+    content += '    layers: [\n';
+    for (var layer_idx = 0; layer_idx < params.layers.length; layer_idx++) {
+        var layer = params.layers[layer_idx];
+        content += '        // Layer ' + (layer_idx + 1) + '\n';
+        content += '        {\n';
+        
+        // Layer norm parameters
+        content += '            ln_scale: [\n';
+        content += '                ' + layer.ln_scale.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        content += '            ln_bias: [\n';
+        content += '                ' + layer.ln_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        
+        // QKV weight matrix - COMPLETE
+        content += '            qkv_weight: [\n';
+        for (var i = 0; i < layer.qkv_weight.length; i++) {
+            content += '                [' + layer.qkv_weight[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+            if (i < layer.qkv_weight.length - 1) content += ',';
+            content += '\n';
+        }
+        content += '            ],\n';
+        content += '            qkv_bias: [\n';
+        content += '                ' + layer.qkv_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        
+        // Attention output projection - COMPLETE
+        content += '            attn_out_weight: [\n';
+        for (var i = 0; i < layer.attn_out_weight.length; i++) {
+            content += '                [' + layer.attn_out_weight[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+            if (i < layer.attn_out_weight.length - 1) content += ',';
+        content += '\n';
+    }
+        content += '            ],\n';
+        content += '            attn_out_bias: [\n';
+        content += '                ' + layer.attn_out_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        
+        // FFN layer norm
+        content += '            ffn_ln_scale: [\n';
+        content += '                ' + layer.ffn_ln_scale.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        content += '            ffn_ln_bias: [\n';
+        content += '                ' + layer.ffn_ln_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        
+        // GEGLU FFN - COMPLETE
+        content += '            ffn_gate_weight: [\n';
+        for (var i = 0; i < layer.ffn_gate_weight.length; i++) {
+            content += '                [' + layer.ffn_gate_weight[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+            if (i < layer.ffn_gate_weight.length - 1) content += ',';
+            content += '\n';
+        }
+        content += '            ],\n';
+        content += '            ffn_gate_bias: [\n';
+        content += '                ' + layer.ffn_gate_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        content += '            ffn_up_weight: [\n';
+        for (var i = 0; i < layer.ffn_up_weight.length; i++) {
+            content += '                [' + layer.ffn_up_weight[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+            if (i < layer.ffn_up_weight.length - 1) content += ',';
+        content += '\n';
+    }
+        content += '            ],\n';
+        content += '            ffn_up_bias: [\n';
+        content += '                ' + layer.ffn_up_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ],\n';
+        content += '            ffn_down_weight: [\n';
+        for (var i = 0; i < layer.ffn_down_weight.length; i++) {
+            content += '                [' + layer.ffn_down_weight[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+            if (i < layer.ffn_down_weight.length - 1) content += ',';
+            content += '\n';
+        }
+        content += '            ],\n';
+        content += '            ffn_down_bias: [\n';
+        content += '                ' + layer.ffn_down_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+        content += '            ]\n';
+        
+        content += '        }';
+        if (layer_idx < params.layers.length - 1) content += ',';
+        content += '\n';
+    }
+    content += '    ],\n\n';
+    
+    // Output projection
+    content += '    // Final output projection\n';
+    content += '    output_weight: [\n';
+    for (var i = 0; i < params.output_weight.length; i++) {
+        content += '        [' + params.output_weight[i].map(function(x) { return x.toFixed(4); }).join(', ') + ']';
+        if (i < params.output_weight.length - 1) content += ',';
+        content += '\n';
+    }
     content += '    ],\n';
-    content += '    \n';
-    content += '    // Hidden1 layer biases (' + nn.hidden1Size + ' values)\n';
-    content += '    biasH1: [';
-    for (var h1 = 0; h1 < nn.hidden1Size; h1++) {
-        content += nn.biasH1[h1].toFixed(3);
-        if (h1 < nn.hidden1Size - 1) content += ', ';
-    }
-    content += '],\n';
-    content += '    \n';
-    content += '    // Hidden2 layer biases (' + nn.hidden2Size + ' values)\n';
-    content += '    biasH2: [';
-    for (var h2 = 0; h2 < nn.hidden2Size; h2++) {
-        content += nn.biasH2[h2].toFixed(3);
-        if (h2 < nn.hidden2Size - 1) content += ', ';
-    }
-    content += '],\n';
-    content += '    \n';
-    content += '    // Output layer biases (' + nn.outputSize + ' values)\n';
-    content += '    biasO: [';
-    for (var o = 0; o < nn.outputSize; o++) {
-        content += nn.biasO[o].toFixed(3);
-        if (o < nn.outputSize - 1) content += ', ';
-    }
-    content += ']\n';
-    content += '}; \n';
+    content += '    output_bias: [\n';
+    content += '        ' + params.output_bias.map(function(x) { return x.toFixed(4); }).join(', ') + '\n';
+    content += '    ]\n';
+    
+    content += '};\n\n';
+    content += '// This model can be loaded back into the transformer encoder\n';
+    content += '// File size: ~' + Math.round(content.length / 1024) + 'KB\n';
     
     return content;
+};
+
+// Helper function to estimate parameter count
+BaseTrainer.prototype.estimateTransformerParameters = function(params) {
+    var count = 0;
+    
+    // Embeddings
+    count += params.cls_embedding.length;
+    count += params.type_embeddings.cls.length;
+    count += params.type_embeddings.ctx.length;
+    count += params.type_embeddings.predator.length;
+    count += params.type_embeddings.boid.length;
+    
+    // Input projections
+    count += params.ctx_projection.length * params.ctx_projection[0].length;
+    count += params.predator_projection.length * params.predator_projection[0].length;
+    count += params.boid_projection.length * params.boid_projection[0].length;
+    
+    // Transformer layers
+    for (var i = 0; i < params.layers.length; i++) {
+        var layer = params.layers[i];
+        count += layer.ln_scale.length + layer.ln_bias.length;
+        count += layer.qkv_weight.length * layer.qkv_weight[0].length;
+        count += layer.qkv_bias.length;
+        count += layer.attn_out_weight.length * layer.attn_out_weight[0].length;
+        count += layer.attn_out_bias.length;
+        count += layer.ffn_ln_scale.length + layer.ffn_ln_bias.length;
+        count += layer.ffn_gate_weight.length * layer.ffn_gate_weight[0].length;
+        count += layer.ffn_gate_bias.length;
+        count += layer.ffn_up_weight.length * layer.ffn_up_weight[0].length;
+        count += layer.ffn_up_bias.length;
+        count += layer.ffn_down_weight.length * layer.ffn_down_weight[0].length;
+        count += layer.ffn_down_bias.length;
+    }
+    
+    // Output layer
+    count += params.output_weight.length * params.output_weight[0].length;
+    count += params.output_bias.length;
+    
+    return count.toLocaleString();
 };
 
 BaseTrainer.prototype.startAnimationLoop = function() {
@@ -624,7 +738,7 @@ BaseTrainer.prototype.updateSimulationStep = function() {
 };
 
 BaseTrainer.prototype.captureNeuralNetworkData = function() {
-    if (!this.neuralMonitorEnabled || !this.simulation.predator || !this.simulation.predator.neuralNetwork) return;
+    if (!this.neuralMonitorEnabled || !this.simulation.predator || !this.simulation.predator.transformerEncoder) return;
     
     // Only update at specified intervals
     this.neuralMonitorFrameCount++;
@@ -633,18 +747,9 @@ BaseTrainer.prototype.captureNeuralNetworkData = function() {
     }
     this.neuralMonitorFrameCount = 0;
     
-    var nn = this.simulation.predator.neuralNetwork;
-    
-    // Store the current neural network state
-    this.neuralNetworkData = {
-        inputs: nn.lastInputs ? nn.lastInputs.slice() : null,
-        hidden1: nn.lastHidden1 ? nn.lastHidden1.slice() : null,
-        hidden2: nn.lastHidden2 ? nn.lastHidden2.slice() : null,
-        outputs: nn.lastOutput ? nn.lastOutput.slice() : null
-    };
-    
-    // Update the display
-    this.updateNeuralNetworkDisplay();
+    // TODO: Implement transformer monitoring
+    // For now, disable neural network monitoring for transformer
+    this.neuralNetworkData = null;
 };
 
 BaseTrainer.prototype.updateNeuralNetworkDisplay = function() {
@@ -868,21 +973,8 @@ BaseTrainer.prototype.applySimulationControls = function() {
 };
 
 BaseTrainer.prototype.showModelLoadingStatus = function() {
-    var warningElement = document.getElementById('model-warning');
-    
-    if (this.modelLoadResult && !this.modelLoadResult.success) {
-        if (warningElement) {
-            warningElement.style.display = 'block';
-            warningElement.innerHTML = '<strong>⚠️ Model Loading Warning:</strong> ' + 
-                this.modelLoadResult.fallbackReason + 
-                '<br>Using randomly initialized weights. Train the network to improve performance.';
-        } else {
-            // Create warning element if it doesn't exist
-            this.createModelWarningElement();
-        }
-    } else if (warningElement) {
-        warningElement.style.display = 'none';
-    }
+    // Transformer encoder always uses random initialization
+    // No pre-trained weights to load yet
 };
 
 BaseTrainer.prototype.createModelWarningElement = function() {
