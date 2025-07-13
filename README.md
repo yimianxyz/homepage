@@ -1,121 +1,193 @@
 # AI Predator-Prey Ecosystem
 
-A transformer encoder-based predator hunting autonomous boids in a simulated ecosystem, using Vision Transformer architecture for dynamic entity interaction modeling.
+A transformer encoder-based predator hunting autonomous boids in a simulated ecosystem.
 
 ## Features
 
 - **Transformer Encoder** (d_model=48, n_heads=4, n_layers=3) for predator decision-making
-- **Variable-Length Token Sequences** with dynamic entity processing (no fixed padding)
 - **Multi-Head Self-Attention** for modeling complex boid interactions
-- **GEGLU Feed-Forward Networks** for enhanced non-linear processing
-- **Device-Independent Normalization** ensures consistent behavior across all screen sizes
-- **Frame-Based Timing** for consistent behavior across devices
-- **Two Training Modes**: Supervised learning and reinforcement learning
-- **Model Persistence**: Save/load transformer parameters for continued training
-- **Responsive Design** works on all screen sizes
+- **Dynamic Token Sequences** with variable-length processing
+- **Device-Independent Normalization** for consistent behavior
+- **Separated Data Generation & Training** for clean workflow
+- **PyTorch to JavaScript Export** for seamless browser deployment
+- **Jupyter Notebook Training** for Google Colab compatibility
 
-## Usage
+## Quick Start
 
-### Homepage
-Open `index.html` to see the trained predator simulation running in the background.
+### Option 1: Jupyter Notebook (Recommended for Colab)
 
-### Training Interfaces
-- **Supervised Learning**: Open `training-sl.html` to train using teacher policy
-- **Reinforcement Learning**: Open `training-rl.html` to train using environment rewards
+**Perfect for Google Colab with free GPU access!**
 
-### Model Management
-- **Reset Network**: Initialize transformer with random parameters
-- **Load Network**: Load pre-trained transformer from `src/config/model.js`
-- **Export Network**: Generate complete model.js content for saving trained parameters
+1. **Open `train_model.ipynb`** in Google Colab or Jupyter
+2. **Enable GPU** runtime in Colab (Runtime → Change runtime type → GPU)
+3. **Run all cells** for complete pipeline:
+   - Data generation (50 episodes training, 10 validation)
+   - Model training (10 epochs with checkpointing)
+   - Export to JavaScript
+   - Validation
 
-## Technical Details
+The notebook includes:
+- 🔥 **GPU acceleration** (if available)
+- 📊 **Training visualization** with loss plots
+- 💾 **Automatic checkpointing** every epoch
+- 🚀 **Direct export** to JavaScript format
+- ✅ **Built-in validation** tests
 
-### Transformer Architecture
-- **Model Dimensions**: d_model=48, n_heads=4, n_layers=3, ffn_hidden=96
-- **Token Sequence**: [CLS] + [CTX] + Predator + Boids (variable length)
-- **Attention Mechanism**: Multi-head self-attention with scaled dot-product
-- **Feed-Forward**: GEGLU networks (Gate-Enhanced Gated Linear Units)
-- **Output**: [CLS] token → 2D steering forces via linear projection
-- **Parameters**: ~17,000 total parameters
-- **Memory Efficiency**: 100% utilization vs 14% with fixed arrays
+### Option 2: Command Line
 
-### Token Types & Embeddings
-- **[CLS] Token**: Global aggregation token for final steering decision
-- **[CTX] Token**: Canvas context `[width/D, height/D]` for spatial awareness
-- **Predator Token**: Velocity info `[vx/V, vy/V, 0, 0]` with padding
-- **Boid Tokens**: Relative position and velocity `[dx/D, dy/D, dvx/V, dvy/V]`
-- **Type Embeddings**: Distinct embeddings for each entity type (cls, ctx, predator, boid)
+### 1. Generate Training Data
+```bash
+# Generate training and validation data
+python3 generate_train_val_data.py
 
-### Input Processing
-- **Structured Format**: `{context: {canvasWidth, canvasHeight}, predator: {velX, velY}, boids: [{relX, relY, velX, velY}, ...]}`
-- **Dynamic Sequences**: 3 + N_boids tokens (no fixed padding)
-- **Normalization**: Distances by max_distance (D), velocities by max_velocity (V)
-- **Relative Encoding**: All boid positions relative to predator
-- **Attention Efficiency**: O(S²) complexity where S = 3 + N_boids
+# Or generate custom amounts
+python3 generate_train_val_data.py --train-episodes 2000 --val-episodes 400
+```
 
-### Training
-- **Supervised**: Transformer learns to imitate simple pursuit behavior using teacher policy
-- **Reinforcement**: Transformer learns from success/failure rewards (TODO: implement backpropagation)
-- **Episodes**: Continue until predator catches enough boids (≤20 remaining)
-- **Rewards**: `max(1000 - completion_frames, 10)` for faster completion
-- **Model Persistence**: Complete parameter export/import for continuing training
+### 2. Train Model
+```bash
+# Train with generated data
+python3 -m pytorch_training.train_supervised \
+    --train-data data/train_data.pkl \
+    --val-data data/val_data.pkl
+
+# Custom training parameters
+python3 -m pytorch_training.train_supervised \
+    --train-data data/train_data.pkl \
+    --val-data data/val_data.pkl \
+    --epochs 200 \
+    --batch-size 64 \
+    --lr 1e-3
+```
+
+### 3. Export Model to JavaScript
+```bash
+# Export best model for browser deployment
+python3 export_to_js.py \
+    --checkpoint checkpoints/best_model.pt \
+    --output src/config/model.js
+
+# Export with detailed info
+python3 export_to_js.py \
+    --checkpoint checkpoints/best_model.pt \
+    --output src/config/model.js \
+    --info
+```
+
+### 4. Validate Simulation
+```bash
+python3 validate_simulation.py
+```
 
 ## Architecture
 
+### Core Simulation (Python)
 ```
-├── index.html              # Homepage with background simulation
-├── training-sl.html        # Supervised learning interface  
-├── training-rl.html        # Reinforcement learning interface
-├── transformer_test.html   # Architecture testing and analysis
-└── src/
-    ├── ai/                 # Transformer encoder components
-    │   ├── transformer_encoder.js    # Main transformer implementation
-    │   ├── input_processor.js        # Structured input processing
-    │   └── action_processor.js       # Output action conversion
-    ├── simulation/         # Boids and predator entities
-    │   ├── boid.js              # Autonomous boid behavior
-    │   ├── predator.js          # Base predator class
-    │   ├── neural_predator.js   # Transformer-controlled predator
-    │   └── simulation.js        # Main simulation controller
-    ├── training/           # Learning algorithms
-    │   ├── supervised_learning.js      # Teacher policy training
-    │   ├── reinforcement_learning.js   # Reward-based training
-    │   └── teacher_policy.js          # Simple pursuit behavior
-    ├── ui/                 # Interface controllers
-    │   ├── base_trainer.js          # Common training functionality
-    │   ├── supervised_trainer.js    # Supervised learning UI
-    │   └── reinforcement_trainer.js  # Reinforcement learning UI
-    ├── utils/              # Vector math utilities
-    └── config/             # Constants and model weights
-        ├── constants.js    # Simulation parameters
-        └── model.js        # Transformer parameters (TRANSFORMER_PARAMS)
+python_simulation/
+├── simulation.py         # Main simulation controller
+├── boid.py              # Boid flocking behavior
+├── predator.py          # Predator base class
+├── vector.py            # Vector math utilities
+├── constants.py         # Simulation parameters
+├── input_processor.py   # Neural network input processing
+└── action_processor.py  # Neural network output processing
 ```
 
-## Implementation
+### Training (PyTorch)
+```
+pytorch_training/
+├── transformer_model.py    # Transformer implementation
+├── supervised_trainer.py   # Training framework
+├── simulation_dataset.py   # Data loading
+├── teacher_policy.py       # Teacher policy for supervision
+└── train_supervised.py     # Training script
+```
 
-### Transformer Processing Flow
-1. **Input Structuring**: Convert boids/predator to structured format
-2. **Token Building**: Create [CLS] + [CTX] + Predator + Boids sequence
-3. **Embedding**: Apply input projections + type embeddings
-4. **Transformer Blocks**: 3 layers of LayerNorm → MHSA → GEGLU FFN
-5. **Output Projection**: Extract [CLS] token → 2D steering forces
+### Data Generation & Training
+```
+generate_data.py             # Generate data from single parameters
+generate_train_val_data.py   # Generate both train & val data
+export_to_js.py             # Export PyTorch models to JavaScript
+train_model.ipynb           # Complete Jupyter notebook pipeline
+validate_simulation.py       # Validate JS compatibility
+demo_usage.py               # Usage examples
+```
 
-### Key Features
-- **Dynamic Attention**: Models variable numbers of boids without padding waste
-- **Entity Interaction**: Self-attention captures complex predator-boid relationships
-- **Efficient Processing**: <10ms inference time for typical scenarios
-- **Scalable Architecture**: Vision Transformer design adapts to varying entity counts
-- **Device Consistency**: Fixed normalization ensures identical behavior across all devices and screen sizes
-- **Performance**: Optimized attention computation with fused QKV operations
+## Key Components
 
-## Performance Characteristics
+### Transformer Architecture
+- **d_model=48, n_heads=4, n_layers=3**
+- **Token sequence**: [CLS] + [CTX] + Predator + Boids
+- **~72,000 parameters** total
+- **Dynamic sequences** (no padding waste)
 
-- **Inference Time**: <10ms for typical scenarios (5-50 boids)
-- **Memory Usage**: 100% efficient (no padding waste)
-- **Parameter Count**: ~17,000 parameters
-- **Attention Complexity**: O(S²) where S = sequence length
-- **Token Efficiency**: 3 + N_boids tokens vs 51 fixed slots (14% → 100% utilization)
+### Data Generation (Separated)
+- **Teacher policy supervision** for training data
+- **Pickle format** for efficient storage
+- **Configurable episodes** and simulation parameters
+- **Separate train/validation** with different seeds
 
-## Model Files
+### Training (Simplified)
+- **Load pre-generated data** for faster training
+- **GPU acceleration** with automatic device detection
+- **Tensorboard logging** for monitoring
+- **Early stopping** and checkpointing
 
-The transformer parameters are stored in `src/config/model.js` as `window.TRANSFORMER_PARAMS`. If this file is empty or contains invalid parameters, the system will initialize with random weights and display a warning. Use the "Export Network" button in training interfaces to generate complete model.js content after training. 
+### Model Export
+- **PyTorch to JavaScript** conversion
+- **Compatible with browser transformer** implementation
+- **Preserves all trained parameters**
+- **Direct deployment** to production environment
+
+## Complete Workflow
+
+### Notebook Workflow (Recommended)
+1. **Open `train_model.ipynb`** in Google Colab
+2. **Run all cells** for complete pipeline
+3. **Download `model_export.js`** for browser deployment
+
+### Command Line Workflow
+1. **Generate Data**: `python3 generate_train_val_data.py`
+2. **Train Model**: `python3 -m pytorch_training.train_supervised --train-data data/train_data.pkl --val-data data/val_data.pkl`
+3. **Export to JS**: `python3 export_to_js.py --checkpoint checkpoints/best_model.pt --output src/config/model.js`
+4. **Deploy**: Load `src/config/model.js` in your browser application
+5. **Validate**: `python3 validate_simulation.py`
+
+## Model Management
+
+### Training Outputs
+- **`checkpoints/best_model.pt`** - Best validation loss model
+- **`checkpoints/checkpoint_epoch_N.pt`** - Regular epoch checkpoints
+- **`runs/`** - TensorBoard logs
+
+### Export Options
+```bash
+# Export to default JS location
+python3 export_to_js.py --checkpoint checkpoints/best_model.pt
+
+# Export to custom location
+python3 export_to_js.py \
+    --checkpoint checkpoints/best_model.pt \
+    --output my_model.js
+
+# Show detailed model information
+python3 export_to_js.py \
+    --checkpoint checkpoints/best_model.pt \
+    --info
+```
+
+## Installation
+
+```bash
+pip install -r requirements.txt
+```
+
+## Validation
+
+The Python simulation is validated to be 100% exact to the JavaScript version:
+
+```bash
+python3 validate_simulation.py
+```
+
+Expected output: "All tests passed! Python simulation matches JavaScript behavior." 
