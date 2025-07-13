@@ -6,19 +6,24 @@
  * - InputProcessor (game state -> neural inputs)
  * - ActionProcessor (neural outputs -> game actions)
  * 
- * This demonstrates composition and reuse of focused modules.
+ * Updated for new encoding system: 204 inputs → 64 hidden1 → 32 hidden2 → 2 outputs
  */
 function NeuralPredator(x, y, simulation) {
     // Inherit from basic predator
     Predator.call(this, x, y, simulation);
     
-    // Create modular components
-    this.neuralNetwork = new NeuralNetwork(22, 12, 8, 2);
+    // Create modular components with new architecture
+    this.neuralNetwork = new NeuralNetwork(204, 64, 32, 2);
     this.inputProcessor = new InputProcessor();
     this.actionProcessor = new ActionProcessor();
     
-    // Load pre-trained weights if available
-    this.neuralNetwork.loadParameters();
+    // Load pre-trained weights if available and store result
+    this.modelLoadResult = this.neuralNetwork.loadParameters();
+    
+    // If loading failed, the network will use random initialization
+    if (!this.modelLoadResult.success && this.modelLoadResult.fallbackReason) {
+        console.warn("Neural Network: " + this.modelLoadResult.message + " - " + this.modelLoadResult.fallbackReason);
+    }
     
     // Simple patrol behavior when no boids
     this.autonomousTarget = new Vector(x, y);

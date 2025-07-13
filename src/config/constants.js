@@ -23,10 +23,15 @@ window.SIMULATION_CONSTANTS = {
     PREDATOR_BORDER_OFFSET: 20,
     PREDATOR_FORCE_SCALE: 200,  // Neural network force scaling for smooth turning
     
-    // Neural network constants
-    VISION_WIDTH: 400,          // Rectangular vision width
-    VISION_HEIGHT: 568,         // Rectangular vision height (smallest phone height)
-    MAX_VISIBLE_BOIDS: 5,       // Maximum boids in input vector
+    // Neural network constants - New encoding system
+    MAX_BOIDS: 50,              // Maximum number of boids in simulation
+    BOID_VECTOR_SIZE: 4,        // Features per boid: [rel_x, rel_y, vel_x, vel_y]
+    PREDATOR_VECTOR_SIZE: 4,    // Features for predator: [canvas_width_norm, canvas_height_norm, vel_x, vel_y]
+    TOTAL_ENTITIES: 51,         // 50 boids + 1 predator
+    NEURAL_INPUT_SIZE: 204,     // 51 entities × 4 features each
+    
+    // Device-independent normalization constants
+    MAX_DISTANCE: 1000,         // Maximum expected distance for normalization
     
     // Simulation constants
     NUM_BOIDS: 50,

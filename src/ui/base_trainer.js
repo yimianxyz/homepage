@@ -23,13 +23,13 @@ function BaseTrainer() {
     this.lossHistory = [];
     this.maxDisplayPoints = 200; // Maximum points to display for performance
     
-    // Training components - shared across all trainers
-    this.neuralNetwork = new NeuralNetwork(22, 12, 8, 2);
+    // Training components - updated for new architecture
+    this.neuralNetwork = new NeuralNetwork(204, 64, 32, 2);
     this.inputProcessor = new InputProcessor();
     this.actionProcessor = new ActionProcessor();
     
-    // Load pre-trained weights by default
-    this.neuralNetwork.loadParameters();
+    // Load pre-trained weights by default and handle result
+    this.modelLoadResult = this.neuralNetwork.loadParameters();
 }
 
 BaseTrainer.prototype.initialize = function() {
@@ -57,6 +57,9 @@ BaseTrainer.prototype.initialize = function() {
     
     // Initialize neural monitor display state
     this.toggleNeuralMonitorDisplay();
+    
+    // Show model loading warning if needed
+    this.showModelLoadingStatus();
 };
 
 BaseTrainer.prototype.initializeLossChart = function() {
@@ -426,13 +429,23 @@ BaseTrainer.prototype.stopTraining = function() {
 BaseTrainer.prototype.resetNetwork = function() {
     // Randomize all neural network parameters
     this.neuralNetwork.reset();
+    
+    // Update model loading status (will show that we're using random initialization)
+    this.modelLoadResult = { 
+        success: false, 
+        message: "Using random initialization", 
+        fallbackReason: "Network was manually reset" 
+    };
+    this.showModelLoadingStatus();
+    
     this.onNetworkReset(); // Allow subclasses to handle specific reset logic
     this.updateDisplay();
 };
 
 BaseTrainer.prototype.loadNetwork = function() {
-    // Load pre-trained weights from model.js
-    this.neuralNetwork.loadParameters();
+    // Load pre-trained weights from model.js and handle result
+    this.modelLoadResult = this.neuralNetwork.loadParameters();
+    this.showModelLoadingStatus(); // Show warning if loading failed
     this.onNetworkLoad(); // Allow subclasses to handle specific load logic
     this.updateDisplay();
 };
@@ -458,7 +471,7 @@ BaseTrainer.prototype.generateModelJSContent = function() {
     content += '/**\n';
     content += ' * Neural Network Model - Pre-trained weights and architecture\n';
     content += ' * \n';
-    content += ' * Network Architecture: 22 inputs → 12 hidden1 → 8 hidden2 → 2 outputs\n';
+    content += ' * Network Architecture: ' + nn.inputSize + ' inputs → ' + nn.hidden1Size + ' hidden1 → ' + nn.hidden2Size + ' hidden2 → ' + nn.outputSize + ' outputs\n';
     content += ' */\n\n';
     content += 'window.NEURAL_PARAMS = {\n';
     content += '    // Network architecture\n';
@@ -666,7 +679,7 @@ BaseTrainer.prototype.toggleNeuralMonitorDisplay = function() {
 };
 
 BaseTrainer.prototype.updateInputsDisplay = function(inputs) {
-    // Update boid vision table
+    // Show first 5 boids for compatibility with existing HTML
     for (var i = 0; i < 5; i++) {
         var baseIndex = i * 4;
         var isVisible = Math.abs(inputs[baseIndex]) > 0.001 || Math.abs(inputs[baseIndex + 1]) > 0.001;
@@ -682,70 +695,101 @@ BaseTrainer.prototype.updateInputsDisplay = function(inputs) {
         if (velXCell) velXCell.textContent = inputs[baseIndex + 2].toFixed(3);
         if (velYCell) velYCell.textContent = inputs[baseIndex + 3].toFixed(3);
         
-        // Style visibility (opacity shows if boid is visible)
+        // Style visibility
         var row = document.getElementById('boid-row-' + i);
         if (row) {
             row.style.opacity = isVisible ? '1.0' : '0.5';
         }
     }
     
-    // Update predator velocity
+    // Update predator data - new format: [canvas_width_norm, canvas_height_norm, vel_x, vel_y]
     var predVelXCell = document.getElementById('pred-vel-x');
     var predVelYCell = document.getElementById('pred-vel-y');
-    if (predVelXCell) predVelXCell.textContent = inputs[20].toFixed(3);
-    if (predVelYCell) predVelYCell.textContent = inputs[21].toFixed(3);
+    var predPosXCell = document.getElementById('pred-pos-x');  // Repurpose for canvas width
+    var predPosYCell = document.getElementById('pred-pos-y');  // Repurpose for canvas height
+    
+    if (predVelXCell) predVelXCell.textContent = inputs[202].toFixed(3);  // Predator vel_x (position 2)
+    if (predVelYCell) predVelYCell.textContent = inputs[203].toFixed(3);  // Predator vel_y (position 3)
+    if (predPosXCell) predPosXCell.textContent = inputs[200].toFixed(3);  // Canvas width norm (position 0)
+    if (predPosYCell) predPosYCell.textContent = inputs[201].toFixed(3);  // Canvas height norm (position 1)
+};
+
+BaseTrainer.prototype.calculateLayerStatistics = function(layerValues) {
+    var sum = 0;
+    var max = -Infinity;
+    var min = Infinity;
+    var activeCount = 0;
+    var positiveCount = 0;
+    
+    for (var i = 0; i < layerValues.length; i++) {
+        var value = layerValues[i];
+        sum += value;
+        max = Math.max(max, value);
+        min = Math.min(min, value);
+        
+        if (Math.abs(value) > 0.1) { // Consider > 0.1 as "active"
+            activeCount++;
+        }
+        if (value > 0) {
+            positiveCount++;
+        }
+    }
+    
+    var avg = sum / layerValues.length;
+    var positivePct = (positiveCount / layerValues.length) * 100;
+    
+    // Calculate standard deviation
+    var sumSquaredDiffs = 0;
+    for (var i = 0; i < layerValues.length; i++) {
+        var diff = layerValues[i] - avg;
+        sumSquaredDiffs += diff * diff;
+    }
+    var std = Math.sqrt(sumSquaredDiffs / layerValues.length);
+    
+    return {
+        avg: avg,
+        max: max,
+        min: min,
+        std: std,
+        activeCount: activeCount,
+        positivePct: positivePct
+    };
 };
 
 BaseTrainer.prototype.updateHidden1Display = function(hidden1) {
-    // Determine color scheme based on interface
-    var positiveColor = '#28a745'; // Green for supervised learning
-    var negativeColor = '#dc3545'; // Red for negative values
+    var stats = this.calculateLayerStatistics(hidden1);
     
-    // Check if this is the RL interface by looking for specific RL elements
-    if (document.querySelector('.control-header h1') && 
-        document.querySelector('.control-header h1').textContent === 'Reinforcement Learning') {
-        positiveColor = '#20c997'; // Turquoise for RL
-    }
+    var avgCell = document.getElementById('hidden1-avg');
+    var maxCell = document.getElementById('hidden1-max');
+    var minCell = document.getElementById('hidden1-min');
+    var stdCell = document.getElementById('hidden1-std');
+    var activeCell = document.getElementById('hidden1-active');
+    var posPctCell = document.getElementById('hidden1-pos-pct');
     
-    for (var i = 0; i < hidden1.length; i++) {
-        var cell = document.getElementById('hidden1-' + i);
-        if (cell) {
-            var value = hidden1[i].toFixed(3);
-            cell.textContent = value;
-            
-            // Color coding
-            var intensity = Math.abs(hidden1[i]);
-            var color = hidden1[i] > 0 ? positiveColor : negativeColor;
-            cell.style.color = color;
-            cell.style.fontWeight = intensity > 0.5 ? 'bold' : 'normal';
-        }
-    }
+    if (avgCell) avgCell.textContent = stats.avg.toFixed(3);
+    if (maxCell) maxCell.textContent = stats.max.toFixed(3);
+    if (minCell) minCell.textContent = stats.min.toFixed(3);
+    if (stdCell) stdCell.textContent = stats.std.toFixed(3);
+    if (activeCell) activeCell.textContent = stats.activeCount;
+    if (posPctCell) posPctCell.textContent = Math.round(stats.positivePct) + '%';
 };
 
 BaseTrainer.prototype.updateHidden2Display = function(hidden2) {
-    // Determine color scheme based on interface
-    var positiveColor = '#28a745'; // Green for supervised learning
-    var negativeColor = '#dc3545'; // Red for negative values
+    var stats = this.calculateLayerStatistics(hidden2);
     
-    // Check if this is the RL interface by looking for specific RL elements
-    if (document.querySelector('.control-header h1') && 
-        document.querySelector('.control-header h1').textContent === 'Reinforcement Learning') {
-        positiveColor = '#20c997'; // Turquoise for RL
-    }
+    var avgCell = document.getElementById('hidden2-avg');
+    var maxCell = document.getElementById('hidden2-max');
+    var minCell = document.getElementById('hidden2-min');
+    var stdCell = document.getElementById('hidden2-std');
+    var activeCell = document.getElementById('hidden2-active');
+    var posPctCell = document.getElementById('hidden2-pos-pct');
     
-    for (var i = 0; i < hidden2.length; i++) {
-        var cell = document.getElementById('hidden2-' + i);
-        if (cell) {
-            var value = hidden2[i].toFixed(3);
-            cell.textContent = value;
-            
-            // Color coding
-            var intensity = Math.abs(hidden2[i]);
-            var color = hidden2[i] > 0 ? positiveColor : negativeColor;
-            cell.style.color = color;
-            cell.style.fontWeight = intensity > 0.5 ? 'bold' : 'normal';
-        }
-    }
+    if (avgCell) avgCell.textContent = stats.avg.toFixed(3);
+    if (maxCell) maxCell.textContent = stats.max.toFixed(3);
+    if (minCell) minCell.textContent = stats.min.toFixed(3);
+    if (stdCell) stdCell.textContent = stats.std.toFixed(3);
+    if (activeCell) activeCell.textContent = stats.activeCount;
+    if (posPctCell) posPctCell.textContent = Math.round(stats.positivePct) + '%';
 };
 
 BaseTrainer.prototype.updateOutputsDisplay = function(outputs) {
@@ -764,10 +808,7 @@ BaseTrainer.prototype.updateOutputsDisplay = function(outputs) {
 BaseTrainer.prototype.renderSimulation = function() {
     this.simulation.ctx.clearRect(0, 0, this.simulation.canvasWidth, this.simulation.canvasHeight);
     
-    // Draw predator vision range first (behind other elements)
-    if (this.simulation.predator && this.showVisionRange) {
-        this.drawPredatorVisionRange();
-    }
+    // Note: Vision range drawing removed since new system doesn't use vision limitations
     
     // Draw boids
     for (var i = 0; i < this.simulation.boids.length; i++) {
@@ -778,38 +819,6 @@ BaseTrainer.prototype.renderSimulation = function() {
     if (this.simulation.predator) {
         this.simulation.predator.render();
     }
-};
-
-BaseTrainer.prototype.drawPredatorVisionRange = function() {
-    var ctx = this.simulation.ctx;
-    var predator = this.simulation.predator;
-    
-    // Rectangle dimensions from constants
-    var rectWidth = window.SIMULATION_CONSTANTS.VISION_WIDTH;
-    var rectHeight = window.SIMULATION_CONSTANTS.VISION_HEIGHT;
-    
-    // Calculate rectangle position (centered on predator)
-    var rectX = predator.position.x - rectWidth / 2;
-    var rectY = predator.position.y - rectHeight / 2;
-    
-    // Save the current context state
-    ctx.save();
-    
-    // Draw vision rectangle
-    ctx.beginPath();
-    ctx.rect(rectX, rectY, rectWidth, rectHeight);
-    
-    // Semi-transparent fill
-    ctx.fillStyle = 'rgba(120, 40, 40, 0.05)';
-    ctx.fill();
-    
-    // Subtle border
-    ctx.strokeStyle = 'rgba(120, 40, 40, 0.15)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    
-    // Restore the context state
-    ctx.restore();
 };
 
 BaseTrainer.prototype.updateBoidCount = function(count) {
@@ -855,6 +864,45 @@ BaseTrainer.prototype.applySimulationControls = function() {
     if (autoRestartInput) {
         var threshold = parseInt(autoRestartInput.value);
         this.autoRestartThreshold = threshold;
+    }
+};
+
+BaseTrainer.prototype.showModelLoadingStatus = function() {
+    var warningElement = document.getElementById('model-warning');
+    
+    if (this.modelLoadResult && !this.modelLoadResult.success) {
+        if (warningElement) {
+            warningElement.style.display = 'block';
+            warningElement.innerHTML = '<strong>⚠️ Model Loading Warning:</strong> ' + 
+                this.modelLoadResult.fallbackReason + 
+                '<br>Using randomly initialized weights. Train the network to improve performance.';
+        } else {
+            // Create warning element if it doesn't exist
+            this.createModelWarningElement();
+        }
+    } else if (warningElement) {
+        warningElement.style.display = 'none';
+    }
+};
+
+BaseTrainer.prototype.createModelWarningElement = function() {
+    var warningHtml = '<div id="model-warning" style="' +
+        'background: rgba(255, 193, 7, 0.1); ' +
+        'border: 1px solid #ffc107; ' +
+        'border-radius: 4px; ' +
+        'padding: 12px; ' +
+        'margin: 15px 0; ' +
+        'color: #856404; ' +
+        'font-size: 11px; ' +
+        'line-height: 1.4;' +
+        '"><strong>⚠️ Model Loading Warning:</strong> ' + 
+        this.modelLoadResult.fallbackReason + 
+        '<br>Using randomly initialized weights. Train the network to improve performance.</div>';
+        
+    // Insert after the status indicator
+    var controlHeader = document.querySelector('.control-header');
+    if (controlHeader) {
+        controlHeader.insertAdjacentHTML('afterend', warningHtml);
     }
 };
 

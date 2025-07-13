@@ -4,8 +4,9 @@ A neural network predator hunting autonomous boids in a simulated ecosystem.
 
 ## Features
 
-- **22→12→8→2 Neural Network** for predator decision-making
-- **Vision-Based Design** with fixed 400×568 rectangular vision area
+- **204→64→32→2 Neural Network** for predator decision-making
+- **Complete Information Design** with all 50 boids + predator encoded as input vectors
+- **Device-Independent Normalization** ensures consistent behavior across all screen sizes
 - **Frame-Based Timing** for consistent behavior across devices
 - **Two Training Modes**: Supervised learning and reinforcement learning
 - **Responsive Design** works on all screen sizes
@@ -22,11 +23,19 @@ Open `index.html` to see the trained predator simulation running in the backgrou
 ## Technical Details
 
 ### Neural Network
-- **Input**: 22 neurons (5 nearest boids × 4 features + predator velocity)
-- **Hidden 1**: 12 neurons with tanh activation
-- **Hidden 2**: 8 neurons with tanh activation
+- **Input**: 204 neurons (51 entities × 4 features: 50 boids + 1 predator)
+- **Hidden 1**: 64 neurons with tanh activation
+- **Hidden 2**: 32 neurons with tanh activation
 - **Output**: 2 neurons (steering forces X, Y)
-- **Vision**: Only processes boids within 400×568 rectangular area
+- **Complete Information**: Processes all boids without distance limitations
+
+### Input Encoding
+- **Boid Vectors**: `[rel_x, rel_y, vel_x, vel_y]` normalized to [-1, 1]
+- **Predator Vector**: `[canvas_width_norm, canvas_height_norm, vel_x, vel_y]` normalized to [-1, 1]
+- **Fixed Size**: Always 51 entities (padded with zeros if fewer boids exist)
+- **No Vision Limits**: All boids included regardless of distance
+- **Unified Velocity Norm**: All velocities normalized by max(boid_speed, predator_speed) for consistency
+- **World Context**: Predator vector includes normalized canvas dimensions for spatial awareness
 
 ### Training
 - **Supervised**: Neural network learns to imitate simple pursuit behavior
@@ -52,6 +61,7 @@ Open `index.html` to see the trained predator simulation running in the backgrou
 ## Implementation
 
 - **Boid Flocking**: Reynolds rules (separation, alignment, cohesion) plus predator avoidance
-- **Predator AI**: Vision-based neural network with rectangular vision area and 4-layer architecture
+- **Predator AI**: Complete information neural network with 51-entity encoding and 4-layer architecture
+- **Device Consistency**: Fixed normalization ensures identical behavior across all devices and screen sizes
 - **Performance**: Optimized loops, centralized constants, zero unused code
 - **Consistency**: Frame-based timing ensures identical behavior across devices 

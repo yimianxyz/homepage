@@ -585,16 +585,17 @@
                         
                         <div id="neural-monitor-section">
                             <div class="neural-section">
-                                <h4>Inputs (22 values)</h4>
+                                <h4>Inputs (204 values)</h4>
+                                <p style="font-size: 10px; color: #6c757d; margin: 5px 0;">51 entities × 4 features: 50 boids + 1 predator</p>
                                 
-                                <h5>Boid Vision (5 nearest boids)</h5>
+                                <h5>Sample Boids (First 5 of 50)</h5>
                                 <div class="table-container">
                                     <table class="neural-table boid-table">
                                         <thead>
                                             <tr>
                                                 <th>Boid</th>
-                                                <th>Pos X</th>
-                                                <th>Pos Y</th>
+                                                <th>Rel X</th>
+                                                <th>Rel Y</th>
                                                 <th>Vel X</th>
                                                 <th>Vel Y</th>
                                             </tr>
@@ -651,6 +652,11 @@
                                         </thead>
                                         <tbody>
                                             <tr>
+                                                <td>Canvas Size (norm)</td>
+                                                <td id="pred-pos-x">0.000</td>
+                                                <td id="pred-pos-y">0.000</td>
+                                            </tr>
+                                            <tr>
                                                 <td>Velocity</td>
                                                 <td id="pred-vel-x">0.000</td>
                                                 <td id="pred-vel-y">0.000</td>
@@ -661,51 +667,36 @@
                             </div>
                             
                             <div class="neural-section">
-                                <h4>Hidden Layer 1 (12 neurons)</h4>
+                                <h4>Hidden Layer 1 (64 neurons)</h4>
+                                <p style="font-size: 10px; color: #6c757d; margin: 5px 0;">Aggregated statistics</p>
                                 <div class="table-container">
                                     <table class="neural-table hidden-table">
                                         <thead>
                                             <tr>
-                                                <th>Neuron</th>
-                                                <th>Activation</th>
-                                                <th>Neuron</th>
-                                                <th>Activation</th>
-                                                <th>Neuron</th>
-                                                <th>Activation</th>
+                                                <th>Statistic</th>
+                                                <th>Value</th>
+                                                <th>Statistic</th>
+                                                <th>Value</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td>1</td>
-                                                <td id="hidden1-0">0.000</td>
-                                                <td>5</td>
-                                                <td id="hidden1-4">0.000</td>
-                                                <td>9</td>
-                                                <td id="hidden1-8">0.000</td>
+                                                <td>Average</td>
+                                                <td id="hidden1-avg">0.000</td>
+                                                <td>Active Count</td>
+                                                <td id="hidden1-active">0</td>
                                             </tr>
                                             <tr>
-                                                <td>2</td>
-                                                <td id="hidden1-1">0.000</td>
-                                                <td>6</td>
-                                                <td id="hidden1-5">0.000</td>
-                                                <td>10</td>
-                                                <td id="hidden1-9">0.000</td>
+                                                <td>Maximum</td>
+                                                <td id="hidden1-max">0.000</td>
+                                                <td>Positive %</td>
+                                                <td id="hidden1-pos-pct">0%</td>
                                             </tr>
                                             <tr>
-                                                <td>3</td>
-                                                <td id="hidden1-2">0.000</td>
-                                                <td>7</td>
-                                                <td id="hidden1-6">0.000</td>
-                                                <td>11</td>
-                                                <td id="hidden1-10">0.000</td>
-                                            </tr>
-                                            <tr>
-                                                <td>4</td>
-                                                <td id="hidden1-3">0.000</td>
-                                                <td>8</td>
-                                                <td id="hidden1-7">0.000</td>
-                                                <td>12</td>
-                                                <td id="hidden1-11">0.000</td>
+                                                <td>Minimum</td>
+                                                <td id="hidden1-min">0.000</td>
+                                                <td>Std Dev</td>
+                                                <td id="hidden1-std">0.000</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -713,41 +704,36 @@
                             </div>
                             
                             <div class="neural-section">
-                                <h4>Hidden Layer 2 (8 neurons)</h4>
+                                <h4>Hidden Layer 2 (32 neurons)</h4>
+                                <p style="font-size: 10px; color: #6c757d; margin: 5px 0;">Aggregated statistics</p>
                                 <div class="table-container">
                                     <table class="neural-table hidden-table">
                                         <thead>
                                             <tr>
-                                                <th>Neuron</th>
-                                                <th>Activation</th>
-                                                <th>Neuron</th>
-                                                <th>Activation</th>
+                                                <th>Statistic</th>
+                                                <th>Value</th>
+                                                <th>Statistic</th>
+                                                <th>Value</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td>1</td>
-                                                <td id="hidden2-0">0.000</td>
-                                                <td>5</td>
-                                                <td id="hidden2-4">0.000</td>
+                                                <td>Average</td>
+                                                <td id="hidden2-avg">0.000</td>
+                                                <td>Active Count</td>
+                                                <td id="hidden2-active">0</td>
                                             </tr>
                                             <tr>
-                                                <td>2</td>
-                                                <td id="hidden2-1">0.000</td>
-                                                <td>6</td>
-                                                <td id="hidden2-5">0.000</td>
+                                                <td>Maximum</td>
+                                                <td id="hidden2-max">0.000</td>
+                                                <td>Positive %</td>
+                                                <td id="hidden2-pos-pct">0%</td>
                                             </tr>
                                             <tr>
-                                                <td>3</td>
-                                                <td id="hidden2-2">0.000</td>
-                                                <td>7</td>
-                                                <td id="hidden2-6">0.000</td>
-                                            </tr>
-                                            <tr>
-                                                <td>4</td>
-                                                <td id="hidden2-3">0.000</td>
-                                                <td>8</td>
-                                                <td id="hidden2-7">0.000</td>
+                                                <td>Minimum</td>
+                                                <td id="hidden2-min">0.000</td>
+                                                <td>Std Dev</td>
+                                                <td id="hidden2-std">0.000</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -755,7 +741,7 @@
                             </div>
                             
                             <div class="neural-section">
-                                <h4>Outputs (2 values)</h4>
+                                <h4>Output Layer (2 neurons)</h4>
                                 <div class="table-container">
                                     <table class="neural-table output-table">
                                         <thead>

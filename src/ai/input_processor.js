@@ -1,111 +1,115 @@
 /**
- * Input Processor - Vision-based neural input system
+ * Input Processor - Complete information encoding system
  * 
- * Uses fixed rectangular vision area to eliminate screen size dependencies.
- * Only considers boids within predator's limited vision range.
+ * New Architecture:
+ * - 50 boid vectors + 1 predator vector = 51 total entities
+ * - Each entity: 4 features = 204 total inputs
+ * - No vision limitations - all boids included
+ * - Device-independent normalization for consistency
  * 
- * Vision Design:
- * - Fixed rectangular vision: 400px width × 568px height
- * - Only top 5 boids within vision area
- * - Relative position normalization using vision dimensions
- * - Fixed velocity normalization: 3.0 units/frame max
- * - Screen size independent by design
+ * Boid Vector Format: [rel_x, rel_y, vel_x, vel_y]
+ * Predator Vector Format: [canvas_width_norm, canvas_height_norm, vel_x, vel_y]
  */
 function InputProcessor() {
-    // Use centralized constants - no duplicated values
-    this.visionWidth = window.SIMULATION_CONSTANTS.VISION_WIDTH;
-    this.visionHeight = window.SIMULATION_CONSTANTS.VISION_HEIGHT;
-    this.maxVelocity = window.SIMULATION_CONSTANTS.BOID_MAX_SPEED;      // Use actual boid max speed
-    this.maxBoids = window.SIMULATION_CONSTANTS.MAX_VISIBLE_BOIDS;
+    // Use centralized constants for new encoding system
+    this.maxBoids = window.SIMULATION_CONSTANTS.MAX_BOIDS;
+    this.boidVectorSize = window.SIMULATION_CONSTANTS.BOID_VECTOR_SIZE;
+    this.predatorVectorSize = window.SIMULATION_CONSTANTS.PREDATOR_VECTOR_SIZE;
+    this.totalInputSize = window.SIMULATION_CONSTANTS.NEURAL_INPUT_SIZE;
+    
+    // Unified velocity normalization - use the maximum of boid and predator speeds
+    // This ensures all velocities are normalized consistently
+    this.unifiedMaxVelocity = Math.max(
+        window.SIMULATION_CONSTANTS.BOID_MAX_SPEED,
+        window.SIMULATION_CONSTANTS.PREDATOR_MAX_SPEED
+    );
+    
+    // Device-independent normalization bounds from centralized config
+    this.maxDistance = window.SIMULATION_CONSTANTS.MAX_DISTANCE;
 }
 
 /**
- * Convert game state to neural network inputs (vision-based)
- * @param {Array} boids - Array of boid objects
+ * Convert complete game state to neural network inputs
+ * @param {Array} boids - Array of all boid objects
  * @param {Object} predatorPos - Predator position {x, y}
  * @param {Object} predatorVel - Predator velocity {x, y}
- * @param {number} canvasWidth - Canvas width (for edge wrapping)
- * @param {number} canvasHeight - Canvas height (for edge wrapping)
- * @returns {Array} 22-element input vector
+ * @param {number} canvasWidth - Canvas width
+ * @param {number} canvasHeight - Canvas height
+ * @returns {Array} 204-element input vector (51 entities × 4 features)
  */
 InputProcessor.prototype.processInputs = function(boids, predatorPos, predatorVel, canvasWidth, canvasHeight) {
-    var inputs = new Array(22);
+    var inputs = new Array(this.totalInputSize);
+    var inputIndex = 0;
     
-    // Find boids within vision range (with edge wrapping support)
-    var visibleBoids = this.findBoidsInVision(boids, predatorPos, canvasWidth, canvasHeight);
-    
-    // Fill first 20 elements with boid data (5 boids × 4 values each)
+    // Encode all boid vectors (50 slots)
     for (var i = 0; i < this.maxBoids; i++) {
-        var baseIndex = i * 4;
-        
-        if (i < visibleBoids.length) {
-            var boidData = visibleBoids[i];
-            
-            // Relative position normalized by vision dimensions
-            var relX = boidData.relativePos.x / (this.visionWidth / 2);
-            var relY = boidData.relativePos.y / (this.visionHeight / 2);
-            
-            // Boid velocity normalized by max velocity
-            var velX = boidData.boid.velocity.x / this.maxVelocity;
-            var velY = boidData.boid.velocity.y / this.maxVelocity;
-            
-            inputs[baseIndex] = this.clamp(relX);
-            inputs[baseIndex + 1] = this.clamp(relY);
-            inputs[baseIndex + 2] = this.clamp(velX);
-            inputs[baseIndex + 3] = this.clamp(velY);
+        if (i < boids.length) {
+            // Encode existing boid
+            var boidVector = this.encodeBoid(boids[i], predatorPos, canvasWidth, canvasHeight);
+            for (var j = 0; j < this.boidVectorSize; j++) {
+                inputs[inputIndex++] = boidVector[j];
+            }
         } else {
-            // No boid available - use zero values
-            inputs[baseIndex] = 0;
-            inputs[baseIndex + 1] = 0;
-            inputs[baseIndex + 2] = 0;
-            inputs[baseIndex + 3] = 0;
+            // Pad with zeros for missing boids
+            for (var j = 0; j < this.boidVectorSize; j++) {
+                inputs[inputIndex++] = 0.0;
+            }
         }
     }
     
-    // Last 2 elements: predator velocity (normalized by max velocity)
-    inputs[20] = this.clamp(predatorVel.x / this.maxVelocity);
-    inputs[21] = this.clamp(predatorVel.y / this.maxVelocity);
+    // Encode predator vector (1 slot)
+    var predatorVector = this.encodePredator(predatorVel, canvasWidth, canvasHeight);
+    for (var j = 0; j < this.predatorVectorSize; j++) {
+        inputs[inputIndex++] = predatorVector[j];
+    }
     
     return inputs;
 };
 
 /**
- * Find boids within rectangular vision range (supports edge wrapping)
- * @param {Array} boids - Array of boid objects
- * @param {Object} predatorPos - Predator position {x, y}
- * @param {number} canvasWidth - Canvas width for edge wrapping
- * @param {number} canvasHeight - Canvas height for edge wrapping
- * @returns {Array} Up to 5 nearest boids within vision, with relative positions
+ * Encode a single boid as a 4-feature vector
+ * @param {Object} boid - Boid object with position and velocity
+ * @param {Object} predatorPos - Predator position for relative calculation
+ * @param {number} canvasWidth - Canvas width for edge wrapping calculation
+ * @param {number} canvasHeight - Canvas height for edge wrapping calculation
+ * @returns {Array} [rel_x, rel_y, vel_x, vel_y] - positions normalized, velocities clamped
  */
-InputProcessor.prototype.findBoidsInVision = function(boids, predatorPos, canvasWidth, canvasHeight) {
-    var visibleBoids = [];
-    var halfWidth = this.visionWidth / 2;
-    var halfHeight = this.visionHeight / 2;
+InputProcessor.prototype.encodeBoid = function(boid, predatorPos, canvasWidth, canvasHeight) {
+    // Calculate relative position with edge wrapping support
+    var relativePos = this.calculateRelativePosition(
+        boid.position, predatorPos, canvasWidth, canvasHeight
+    );
     
-    for (var i = 0; i < boids.length; i++) {
-        var boid = boids[i];
-        
-        // Calculate relative position with edge wrapping
-        var relativePos = this.calculateRelativePosition(
-            boid.position, predatorPos, canvasWidth, canvasHeight
-        );
-        
-        // Check if boid is within rectangular vision area
-        if (Math.abs(relativePos.x) <= halfWidth && Math.abs(relativePos.y) <= halfHeight) {
-            // Calculate distance for sorting
-            var distance = Math.sqrt(relativePos.x * relativePos.x + relativePos.y * relativePos.y);
-            
-            visibleBoids.push({
-                boid: boid,
-                relativePos: relativePos,
-                distance: distance
-            });
-        }
-    }
+    // Normalize relative position by fixed maximum distance (no clamping - keep real spatial info)
+    var relX = relativePos.x / this.maxDistance;
+    var relY = relativePos.y / this.maxDistance;
     
-    // Sort by distance and take closest ones
-    visibleBoids.sort(function(a, b) { return a.distance - b.distance; });
-    return visibleBoids.slice(0, this.maxBoids);
+    // Normalize and clamp velocity by unified max velocity (velocities have natural bounds)
+    var velX = this.clamp(boid.velocity.x / this.unifiedMaxVelocity);
+    var velY = this.clamp(boid.velocity.y / this.unifiedMaxVelocity);
+    
+    return [relX, relY, velX, velY];
+};
+
+/**
+ * Encode predator as a 4-feature vector with world context and velocity
+ * @param {Object} predatorVel - Predator velocity {x, y}
+ * @param {number} canvasWidth - Canvas width
+ * @param {number} canvasHeight - Canvas height
+ * @returns {Array} [canvas_width_norm, canvas_height_norm, vel_x, vel_y] - canvas size normalized, velocities clamped
+ */
+InputProcessor.prototype.encodePredator = function(predatorVel, canvasWidth, canvasHeight) {
+    // Normalize canvas dimensions (no clamping - keep real world boundary info)
+    // This gives the network context about world boundaries
+    var canvasWidthNorm = canvasWidth / this.maxDistance;
+    var canvasHeightNorm = canvasHeight / this.maxDistance;
+    
+    // Normalize and clamp velocity by unified max velocity (velocities have natural bounds)
+    // Keep velocity in positions 2,3 like boids for consistency
+    var velX = this.clamp(predatorVel.x / this.unifiedMaxVelocity);
+    var velY = this.clamp(predatorVel.y / this.unifiedMaxVelocity);
+    
+    return [canvasWidthNorm, canvasHeightNorm, velX, velY];
 };
 
 /**

@@ -1,11 +1,13 @@
 /**
  * Pure Neural Network - Core neural network mathematics
  * 4-layer architecture: Input → Hidden1 → Hidden2 → Output
+ * Updated for new encoding system: 204 inputs → 64 hidden1 → 32 hidden2 → 2 outputs
  */
 function NeuralNetwork(inputSize, hidden1Size, hidden2Size, outputSize) {
-    this.inputSize = inputSize || 22;
-    this.hidden1Size = hidden1Size || 12;
-    this.hidden2Size = hidden2Size || 8;
+    // Use new architecture parameters from config, with fallbacks
+    this.inputSize = inputSize || window.SIMULATION_CONSTANTS.NEURAL_INPUT_SIZE || 204;
+    this.hidden1Size = hidden1Size || 64;
+    this.hidden2Size = hidden2Size || 32;
     this.outputSize = outputSize || 2;
     
     this.initializeWeights();
@@ -224,37 +226,99 @@ NeuralNetwork.prototype.policyGradientBackprop = function(reward, baseline, lear
 };
 
 NeuralNetwork.prototype.loadParameters = function(params) {
+    var loadResult = {
+        success: false,
+        message: "Using random initialization",
+        fallbackReason: null
+    };
+    
     if (!params) {
         if (typeof window.NEURAL_PARAMS !== 'undefined') {
             params = window.NEURAL_PARAMS;
         } else {
-            return;
+            loadResult.fallbackReason = "No model parameters found";
+            return loadResult;
         }
     }
     
-    this.inputSize = params.inputSize || this.inputSize;
-    this.hidden1Size = params.hidden1Size || this.hidden1Size;
-    this.hidden2Size = params.hidden2Size || this.hidden2Size;
-    this.outputSize = params.outputSize || this.outputSize;
+    // Check if parameters exist and are compatible with current architecture
+    var hasValidWeights = params.weightsIH1 && params.weightsH1H2 && params.weightsH2O;
+    var hasValidBiases = params.biasH1 && params.biasH2 && params.biasO;
     
-    if (params.weightsIH1) {
+    if (!hasValidWeights || !hasValidBiases) {
+        loadResult.fallbackReason = "Model parameters are null or missing";
+        return loadResult;
+    }
+    
+    // Check architecture compatibility
+    var expectedInputSize = params.inputSize || this.inputSize;
+    var expectedHidden1Size = params.hidden1Size || this.hidden1Size;
+    var expectedHidden2Size = params.hidden2Size || this.hidden2Size;
+    var expectedOutputSize = params.outputSize || this.outputSize;
+    
+    // Validate weight matrix dimensions
+    var inputWeightsValid = params.weightsIH1.length === expectedHidden1Size && 
+                           params.weightsIH1[0] && params.weightsIH1[0].length === expectedInputSize;
+    var hidden1WeightsValid = params.weightsH1H2.length === expectedHidden2Size && 
+                             params.weightsH1H2[0] && params.weightsH1H2[0].length === expectedHidden1Size;
+    var outputWeightsValid = params.weightsH2O.length === expectedOutputSize && 
+                            params.weightsH2O[0] && params.weightsH2O[0].length === expectedHidden2Size;
+    
+    // Validate bias vector dimensions
+    var hidden1BiasValid = params.biasH1.length === expectedHidden1Size;
+    var hidden2BiasValid = params.biasH2.length === expectedHidden2Size;
+    var outputBiasValid = params.biasO.length === expectedOutputSize;
+    
+    if (!inputWeightsValid) {
+        loadResult.fallbackReason = `Input weights incompatible: expected ${expectedHidden1Size}×${expectedInputSize}, got ${params.weightsIH1.length}×${params.weightsIH1[0] ? params.weightsIH1[0].length : 'undefined'}`;
+        return loadResult;
+    }
+    
+    if (!hidden1WeightsValid) {
+        loadResult.fallbackReason = `Hidden1 weights incompatible: expected ${expectedHidden2Size}×${expectedHidden1Size}, got ${params.weightsH1H2.length}×${params.weightsH1H2[0] ? params.weightsH1H2[0].length : 'undefined'}`;
+        return loadResult;
+    }
+    
+    if (!outputWeightsValid) {
+        loadResult.fallbackReason = `Output weights incompatible: expected ${expectedOutputSize}×${expectedHidden2Size}, got ${params.weightsH2O.length}×${params.weightsH2O[0] ? params.weightsH2O[0].length : 'undefined'}`;
+        return loadResult;
+    }
+    
+    if (!hidden1BiasValid || !hidden2BiasValid || !outputBiasValid) {
+        loadResult.fallbackReason = `Bias dimensions incompatible: expected [${expectedHidden1Size}, ${expectedHidden2Size}, ${expectedOutputSize}], got [${params.biasH1.length}, ${params.biasH2.length}, ${params.biasO.length}]`;
+        return loadResult;
+    }
+    
+    // Architecture compatibility check
+    if (expectedInputSize !== this.inputSize || expectedHidden1Size !== this.hidden1Size || 
+        expectedHidden2Size !== this.hidden2Size || expectedOutputSize !== this.outputSize) {
+        loadResult.fallbackReason = `Architecture mismatch: model is ${expectedInputSize}→${expectedHidden1Size}→${expectedHidden2Size}→${expectedOutputSize}, current is ${this.inputSize}→${this.hidden1Size}→${this.hidden2Size}→${this.outputSize}`;
+        return loadResult;
+    }
+    
+    // If we get here, parameters are valid - load them
+    try {
+        this.inputSize = expectedInputSize;
+        this.hidden1Size = expectedHidden1Size;
+        this.hidden2Size = expectedHidden2Size;
+        this.outputSize = expectedOutputSize;
+        
         this.weightsIH1 = params.weightsIH1.map(function(row) { return row.slice(); });
-    }
-    if (params.weightsH1H2) {
         this.weightsH1H2 = params.weightsH1H2.map(function(row) { return row.slice(); });
-    }
-    if (params.weightsH2O) {
         this.weightsH2O = params.weightsH2O.map(function(row) { return row.slice(); });
-    }
-    if (params.biasH1) {
         this.biasH1 = params.biasH1.slice();
-    }
-    if (params.biasH2) {
         this.biasH2 = params.biasH2.slice();
-    }
-    if (params.biasO) {
         this.biasO = params.biasO.slice();
+        
+        loadResult.success = true;
+        loadResult.message = "Successfully loaded pre-trained model";
+        loadResult.fallbackReason = null;
+        
+    } catch (error) {
+        loadResult.fallbackReason = "Error loading parameters: " + error.message;
     }
+    
+    return loadResult;
 };
 
 NeuralNetwork.prototype.reset = function() {
