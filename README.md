@@ -120,7 +120,7 @@ demo_usage.py               # Usage examples
 - **Token sequence**: [CLS] + [CTX] + Predator + Boids
 - **~72,000 parameters** total
 - **Dynamic sequences** (no padding waste)
-
+ 
 ### Data Generation (Separated)
 - **Teacher policy supervision** for training data
 - **Pickle format** for efficient storage
