@@ -93,18 +93,18 @@ class SupervisedTrainer:
             self.optimizer.zero_grad()
             
             # Forward pass
-                predictions = self.model(batch_inputs)
-                loss = self.criterion(predictions, batch_targets)
-                
-                # Backward pass
-                loss.backward()
-                
-                # Gradient clipping
-                if self.gradient_clip > 0:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
-                
-                # Optimizer step
-                self.optimizer.step()
+            predictions = self.model(batch_inputs)
+            loss = self.criterion(predictions, batch_targets)
+            
+            # Backward pass
+            loss.backward()
+            
+            # Gradient clipping
+            if self.gradient_clip > 0:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+            
+            # Optimizer step
+            self.optimizer.step()
             
             # Logging
             total_loss += loss.item()
@@ -131,8 +131,8 @@ class SupervisedTrainer:
             for batch_inputs, batch_targets in self.val_loader:
                 batch_targets = batch_targets.to(self.device)
                 
-                    predictions = self.model(batch_inputs)
-                    loss = self.criterion(predictions, batch_targets)
+                predictions = self.model(batch_inputs)
+                loss = self.criterion(predictions, batch_targets)
                 
                 total_loss += loss.item()
         
