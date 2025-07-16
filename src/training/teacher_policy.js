@@ -5,7 +5,7 @@
 
 function TeacherPolicy() {
     // Use same force scaling as ActionProcessor for consistency
-    this.maxForce = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE * window.SIMULATION_CONSTANTS.PREDATOR_FORCE_SCALE;
+            this.maxForce = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE;
 }
 
 /**

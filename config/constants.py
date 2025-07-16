@@ -17,12 +17,11 @@ class SimulationConstants:
     
     # Predator behavior constants
     PREDATOR_MAX_SPEED = 2
-    PREDATOR_MAX_FORCE = 0.001
+    PREDATOR_MAX_FORCE = 0.2
     PREDATOR_SIZE = 18
     PREDATOR_RANGE = 80
     PREDATOR_TURN_FACTOR = 0.3
     PREDATOR_BORDER_OFFSET = 20
-    PREDATOR_FORCE_SCALE = 200  # Neural network force scaling for smooth turning
     
     # Device-independent normalization constants
     MAX_DISTANCE = 1000         # Maximum expected distance for normalization

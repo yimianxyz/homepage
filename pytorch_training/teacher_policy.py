@@ -15,7 +15,7 @@ class TeacherPolicy:
     
     def __init__(self):
         # Use same force scaling as ActionProcessor for consistency  
-        self.max_force = CONSTANTS.PREDATOR_MAX_FORCE * CONSTANTS.PREDATOR_FORCE_SCALE
+        self.max_force = CONSTANTS.PREDATOR_MAX_FORCE
     
     def get_action(self, structured_inputs: Dict[str, Any]) -> List[float]:
         """

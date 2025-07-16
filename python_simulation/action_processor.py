@@ -11,7 +11,7 @@ from .constants import CONSTANTS
 class ActionProcessor:
     def __init__(self):
         # Scale neural outputs to match actual predator force limits
-        self.force_scale = CONSTANTS.PREDATOR_MAX_FORCE * CONSTANTS.PREDATOR_FORCE_SCALE
+        self.force_scale = CONSTANTS.PREDATOR_MAX_FORCE
     
     def process_action(self, neural_outputs: List[float]) -> List[float]:
         """

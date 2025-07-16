@@ -18,12 +18,11 @@ class SimulationConstants:
     
     # Predator behavior constants
     PREDATOR_MAX_SPEED = 2
-    PREDATOR_MAX_FORCE = 0.001
+    PREDATOR_MAX_FORCE = 0.2
     PREDATOR_SIZE = 18
     PREDATOR_RANGE = 80
     PREDATOR_TURN_FACTOR = 0.3
     PREDATOR_BORDER_OFFSET = 20
-    PREDATOR_FORCE_SCALE = 200  # Neural network force scaling for smooth turning
     
     # Legacy MLP constants (kept for backward compatibility)
     MAX_BOIDS = 50              # Maximum number of boids in simulation

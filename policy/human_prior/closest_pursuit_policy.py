@@ -21,7 +21,7 @@ class ClosestPursuitPolicy:
     
     def __init__(self):
         # Calculate max force using centralized constants
-        self.max_force = CONSTANTS.PREDATOR_MAX_FORCE * CONSTANTS.PREDATOR_FORCE_SCALE
+        self.max_force = CONSTANTS.PREDATOR_MAX_FORCE
     
     def get_action(self, structured_inputs: Dict[str, Any]) -> List[float]:
         """

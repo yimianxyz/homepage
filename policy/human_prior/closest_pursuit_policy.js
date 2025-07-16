@@ -16,7 +16,7 @@
  */
 function ClosestPursuitPolicy() {
     // Calculate max force using centralized constants
-    this.max_force = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE * window.SIMULATION_CONSTANTS.PREDATOR_FORCE_SCALE;
+            this.max_force = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE;
 }
 
 /**

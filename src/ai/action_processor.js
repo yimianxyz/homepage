@@ -6,7 +6,7 @@
  */
 function ActionProcessor() {
     // Scale neural outputs to match actual predator force limits
-    this.forceScale = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE * window.SIMULATION_CONSTANTS.PREDATOR_FORCE_SCALE;
+            this.forceScale = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE;
 }
 
 /**
