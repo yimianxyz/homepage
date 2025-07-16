@@ -13,16 +13,15 @@ Interface:
 import math
 from typing import Dict, List, Any
 
+# Import centralized constants
+from config.constants import CONSTANTS
+
 class ClosestPursuitPolicy:
     """Greedy pursuit policy that always targets the closest boid"""
     
     def __init__(self):
-        # Constants that must match JavaScript exactly
-        self.PREDATOR_MAX_FORCE = 0.001
-        self.PREDATOR_FORCE_SCALE = 200
-        
-        # Calculate max force (matches ActionProcessor)
-        self.max_force = self.PREDATOR_MAX_FORCE * self.PREDATOR_FORCE_SCALE
+        # Calculate max force using centralized constants
+        self.max_force = CONSTANTS.PREDATOR_MAX_FORCE * CONSTANTS.PREDATOR_FORCE_SCALE
     
     def get_action(self, structured_inputs: Dict[str, Any]) -> List[float]:
         """

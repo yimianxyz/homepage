@@ -13,25 +13,8 @@ Interface:
 import math
 from typing import List, Dict, Any, Tuple
 
-# Constants - must match exactly with JavaScript
-CONSTANTS = {
-    'BOID_MAX_SPEED': 3.5,
-    'BOID_MAX_FORCE': 0.1,
-    'BOID_DESIRED_SEPARATION': 40,
-    'BOID_NEIGHBOR_DISTANCE': 60,
-    'BOID_BORDER_OFFSET': 10,
-    'PREDATOR_MAX_SPEED': 2,
-    'PREDATOR_MAX_FORCE': 0.001,
-    'PREDATOR_SIZE': 18,
-    'PREDATOR_RANGE': 80,
-    'PREDATOR_TURN_FACTOR': 0.3,
-    'PREDATOR_BORDER_OFFSET': 20,
-    'EPSILON': 0.0000001,
-    # Flocking behavior multipliers
-    'SEPARATION_MULTIPLIER': 2.0,
-    'COHESION_MULTIPLIER': 1.0,
-    'ALIGNMENT_MULTIPLIER': 1.0
-}
+# Import centralized constants
+from config.constants import CONSTANTS
 
 # === VECTOR MATH UTILITIES ===
 
@@ -111,8 +94,8 @@ def boid_get_cohesion_vector(boid_index: int, boids_states: List[Dict[str, Any]]
         if i == boid_index:
             continue
         
-        distance = vector_distance(current_boid['position'], other_boid['position']) + CONSTANTS['EPSILON']
-        if distance <= CONSTANTS['BOID_NEIGHBOR_DISTANCE']:
+        distance = vector_distance(current_boid['position'], other_boid['position']) + CONSTANTS.EPSILON
+        if distance <= CONSTANTS.BOID_NEIGHBOR_DISTANCE:
             total_position = vector_add(total_position, other_boid['position'])
             neighbor_count += 1
     
@@ -125,9 +108,9 @@ def boid_get_cohesion_vector(boid_index: int, boids_states: List[Dict[str, Any]]
 def boid_seek(boid_state: Dict[str, Any], target_position: Dict[str, float]) -> Dict[str, float]:
     """Seek towards target position"""
     desired_vector = vector_subtract(target_position, boid_state['position'])
-    desired_vector = vector_fast_set_magnitude(desired_vector, CONSTANTS['BOID_MAX_SPEED'])
+    desired_vector = vector_fast_set_magnitude(desired_vector, CONSTANTS.BOID_MAX_SPEED)
     steering_vector = vector_subtract(desired_vector, boid_state['velocity'])
-    steering_vector = vector_fast_limit(steering_vector, CONSTANTS['BOID_MAX_FORCE'])
+    steering_vector = vector_fast_limit(steering_vector, CONSTANTS.BOID_MAX_FORCE)
     return steering_vector
 
 def boid_get_separation_vector(boid_index: int, boids_states: List[Dict[str, Any]]) -> Dict[str, float]:
@@ -140,8 +123,8 @@ def boid_get_separation_vector(boid_index: int, boids_states: List[Dict[str, Any
         if i == boid_index:
             continue
         
-        distance = vector_distance(current_boid['position'], other_boid['position']) + CONSTANTS['EPSILON']
-        if distance > 0 and distance < CONSTANTS['BOID_DESIRED_SEPARATION']:
+        distance = vector_distance(current_boid['position'], other_boid['position']) + CONSTANTS.EPSILON
+        if distance > 0 and distance < CONSTANTS.BOID_DESIRED_SEPARATION:
             delta_vector = vector_subtract(current_boid['position'], other_boid['position'])
             delta_vector = vector_normalize(delta_vector)
             delta_vector = vector_divide(delta_vector, distance)
@@ -150,9 +133,9 @@ def boid_get_separation_vector(boid_index: int, boids_states: List[Dict[str, Any
     
     if neighbor_count > 0:
         average_steering_vector = vector_divide(steering_vector, neighbor_count)
-        average_steering_vector = vector_fast_set_magnitude(average_steering_vector, CONSTANTS['BOID_MAX_SPEED'])
+        average_steering_vector = vector_fast_set_magnitude(average_steering_vector, CONSTANTS.BOID_MAX_SPEED)
         average_steering_vector = vector_subtract(average_steering_vector, current_boid['velocity'])
-        average_steering_vector = vector_fast_limit(average_steering_vector, CONSTANTS['BOID_MAX_FORCE'])
+        average_steering_vector = vector_fast_limit(average_steering_vector, CONSTANTS.BOID_MAX_FORCE)
         return average_steering_vector
     else:
         return {'x': 0, 'y': 0}
@@ -167,30 +150,30 @@ def boid_get_alignment_vector(boid_index: int, boids_states: List[Dict[str, Any]
         if i == boid_index:
             continue
         
-        distance = vector_distance(current_boid['position'], other_boid['position']) + CONSTANTS['EPSILON']
-        if distance > 0 and distance < CONSTANTS['BOID_NEIGHBOR_DISTANCE']:
+        distance = vector_distance(current_boid['position'], other_boid['position']) + CONSTANTS.EPSILON
+        if distance > 0 and distance < CONSTANTS.BOID_NEIGHBOR_DISTANCE:
             perceived_flock_velocity = vector_add(perceived_flock_velocity, other_boid['velocity'])
             neighbor_count += 1
     
     if neighbor_count > 0:
         average_velocity = vector_divide(perceived_flock_velocity, neighbor_count)
-        average_velocity = vector_fast_set_magnitude(average_velocity, CONSTANTS['BOID_MAX_SPEED'])
+        average_velocity = vector_fast_set_magnitude(average_velocity, CONSTANTS.BOID_MAX_SPEED)
         steering_vector = vector_subtract(average_velocity, current_boid['velocity'])
-        steering_vector = vector_fast_limit(steering_vector, CONSTANTS['BOID_MAX_FORCE'])
+        steering_vector = vector_fast_limit(steering_vector, CONSTANTS.BOID_MAX_FORCE)
         return steering_vector
     else:
         return {'x': 0, 'y': 0}
 
 def boid_get_predator_avoidance_vector(boid_state: Dict[str, Any], predator_state: Dict[str, Any]) -> Dict[str, float]:
     """Calculate predator avoidance force"""
-    distance = vector_distance(boid_state['position'], predator_state['position']) + CONSTANTS['EPSILON']
-    if distance > 0 and distance < CONSTANTS['PREDATOR_RANGE']:
+    distance = vector_distance(boid_state['position'], predator_state['position']) + CONSTANTS.EPSILON
+    if distance > 0 and distance < CONSTANTS.PREDATOR_RANGE:
         avoidance_vector = vector_subtract(boid_state['position'], predator_state['position'])
         avoidance_vector = vector_fast_normalize(avoidance_vector)
         
-        avoidance_strength = (CONSTANTS['PREDATOR_RANGE'] - distance) / CONSTANTS['PREDATOR_RANGE']
-        avoidance_vector = vector_multiply(avoidance_vector, avoidance_strength * CONSTANTS['PREDATOR_TURN_FACTOR'])
-        avoidance_vector = vector_fast_limit(avoidance_vector, CONSTANTS['BOID_MAX_FORCE'] * 1.5)
+        avoidance_strength = (CONSTANTS.PREDATOR_RANGE - distance) / CONSTANTS.PREDATOR_RANGE
+        avoidance_vector = vector_multiply(avoidance_vector, avoidance_strength * CONSTANTS.PREDATOR_TURN_FACTOR)
+        avoidance_vector = vector_fast_limit(avoidance_vector, CONSTANTS.BOID_MAX_FORCE * 1.5)
         
         return avoidance_vector
     
@@ -200,14 +183,14 @@ def boid_bound(position: Dict[str, float], canvas_width: float, canvas_height: f
     """Handle boundary wrapping for boid"""
     result = {'x': position['x'], 'y': position['y']}
     
-    if result['x'] > canvas_width + CONSTANTS['BOID_BORDER_OFFSET']:
-        result['x'] = -CONSTANTS['BOID_BORDER_OFFSET']
-    if result['x'] < -CONSTANTS['BOID_BORDER_OFFSET']:
-        result['x'] = canvas_width + CONSTANTS['BOID_BORDER_OFFSET']
-    if result['y'] > canvas_height + CONSTANTS['BOID_BORDER_OFFSET']:
-        result['y'] = -CONSTANTS['BOID_BORDER_OFFSET']
-    if result['y'] < -CONSTANTS['BOID_BORDER_OFFSET']:
-        result['y'] = canvas_height + CONSTANTS['BOID_BORDER_OFFSET']
+    if result['x'] > canvas_width + CONSTANTS.BOID_BORDER_OFFSET:
+        result['x'] = -CONSTANTS.BOID_BORDER_OFFSET
+    if result['x'] < -CONSTANTS.BOID_BORDER_OFFSET:
+        result['x'] = canvas_width + CONSTANTS.BOID_BORDER_OFFSET
+    if result['y'] > canvas_height + CONSTANTS.BOID_BORDER_OFFSET:
+        result['y'] = -CONSTANTS.BOID_BORDER_OFFSET
+    if result['y'] < -CONSTANTS.BOID_BORDER_OFFSET:
+        result['y'] = canvas_height + CONSTANTS.BOID_BORDER_OFFSET
     
     return result
 
@@ -217,21 +200,21 @@ def predator_bound(position: Dict[str, float], canvas_width: float, canvas_heigh
     """Handle boundary wrapping for predator"""
     result = {'x': position['x'], 'y': position['y']}
     
-    if result['x'] > canvas_width + CONSTANTS['PREDATOR_BORDER_OFFSET']:
-        result['x'] = -CONSTANTS['PREDATOR_BORDER_OFFSET']
-    if result['x'] < -CONSTANTS['PREDATOR_BORDER_OFFSET']:
-        result['x'] = canvas_width + CONSTANTS['PREDATOR_BORDER_OFFSET']
-    if result['y'] > canvas_height + CONSTANTS['PREDATOR_BORDER_OFFSET']:
-        result['y'] = -CONSTANTS['PREDATOR_BORDER_OFFSET']
-    if result['y'] < -CONSTANTS['PREDATOR_BORDER_OFFSET']:
-        result['y'] = canvas_height + CONSTANTS['PREDATOR_BORDER_OFFSET']
+    if result['x'] > canvas_width + CONSTANTS.PREDATOR_BORDER_OFFSET:
+        result['x'] = -CONSTANTS.PREDATOR_BORDER_OFFSET
+    if result['x'] < -CONSTANTS.PREDATOR_BORDER_OFFSET:
+        result['x'] = canvas_width + CONSTANTS.PREDATOR_BORDER_OFFSET
+    if result['y'] > canvas_height + CONSTANTS.PREDATOR_BORDER_OFFSET:
+        result['y'] = -CONSTANTS.PREDATOR_BORDER_OFFSET
+    if result['y'] < -CONSTANTS.PREDATOR_BORDER_OFFSET:
+        result['y'] = canvas_height + CONSTANTS.PREDATOR_BORDER_OFFSET
     
     return result
 
 def predator_check_for_prey(predator_state: Dict[str, Any], boids_states: List[Dict[str, Any]]) -> List[int]:
     """Check for caught boids and return their indices"""
     caught_boids = []
-    catch_radius = CONSTANTS['PREDATOR_SIZE'] * 0.7
+    catch_radius = CONSTANTS.PREDATOR_SIZE * 0.7
     
     for i, boid_state in enumerate(boids_states):
         distance = vector_distance(predator_state['position'], boid_state['position'])
@@ -289,9 +272,9 @@ def simulation_step(
         alignment_vector = boid_get_alignment_vector(i, new_boids_states)
         
         # Apply multipliers
-        separation_vector = vector_multiply(separation_vector, CONSTANTS['SEPARATION_MULTIPLIER'])
-        cohesion_vector = vector_multiply(cohesion_vector, CONSTANTS['COHESION_MULTIPLIER'])
-        alignment_vector = vector_multiply(alignment_vector, CONSTANTS['ALIGNMENT_MULTIPLIER'])
+        separation_vector = vector_multiply(separation_vector, CONSTANTS.SEPARATION_MULTIPLIER)
+        cohesion_vector = vector_multiply(cohesion_vector, CONSTANTS.COHESION_MULTIPLIER)
+        alignment_vector = vector_multiply(alignment_vector, CONSTANTS.ALIGNMENT_MULTIPLIER)
         
         # Combine forces
         acceleration = vector_add(cohesion_vector, separation_vector)
@@ -303,7 +286,7 @@ def simulation_step(
         
         # Update physics
         boid_state['velocity'] = vector_add(boid_state['velocity'], acceleration)
-        boid_state['velocity'] = vector_fast_limit(boid_state['velocity'], CONSTANTS['BOID_MAX_SPEED'])
+        boid_state['velocity'] = vector_fast_limit(boid_state['velocity'], CONSTANTS.BOID_MAX_SPEED)
         boid_state['position'] = vector_add(boid_state['position'], boid_state['velocity'])
         boid_state['position'] = boid_bound(boid_state['position'], canvas_width, canvas_height)
     
@@ -313,7 +296,7 @@ def simulation_step(
     
     # Update predator physics
     new_predator_state['velocity'] = vector_add(new_predator_state['velocity'], predator_acceleration)
-    new_predator_state['velocity'] = vector_fast_limit(new_predator_state['velocity'], CONSTANTS['PREDATOR_MAX_SPEED'])
+    new_predator_state['velocity'] = vector_fast_limit(new_predator_state['velocity'], CONSTANTS.PREDATOR_MAX_SPEED)
     new_predator_state['position'] = vector_add(new_predator_state['position'], new_predator_state['velocity'])
     new_predator_state['position'] = predator_bound(new_predator_state['position'], canvas_width, canvas_height)
     

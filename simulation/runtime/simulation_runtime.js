@@ -10,25 +10,7 @@
  * - Output: {boids_states, predator_state, caught_boids}
  */
 
-// Constants - must match exactly with Python
-const CONSTANTS = {
-    BOID_MAX_SPEED: 3.5,
-    BOID_MAX_FORCE: 0.1,
-    BOID_DESIRED_SEPARATION: 40,
-    BOID_NEIGHBOR_DISTANCE: 60,
-    BOID_BORDER_OFFSET: 10,
-    PREDATOR_MAX_SPEED: 2,
-    PREDATOR_MAX_FORCE: 0.001,
-    PREDATOR_SIZE: 18,
-    PREDATOR_RANGE: 80,
-    PREDATOR_TURN_FACTOR: 0.3,
-    PREDATOR_BORDER_OFFSET: 20,
-    EPSILON: 0.0000001,
-    // Flocking behavior multipliers
-    SEPARATION_MULTIPLIER: 2.0,
-    COHESION_MULTIPLIER: 1.0,
-    ALIGNMENT_MULTIPLIER: 1.0
-};
+// Constants imported from centralized config/constants.js
 
 // === VECTOR MATH UTILITIES ===
 
@@ -123,8 +105,8 @@ function boidGetCohesionVector(boidIndex, boidsStates) {
             continue;
         }
         
-        var distance = vectorDistance(currentBoid.position, boidsStates[i].position) + CONSTANTS.EPSILON;
-        if (distance <= CONSTANTS.BOID_NEIGHBOR_DISTANCE) {
+        var distance = vectorDistance(currentBoid.position, boidsStates[i].position) + window.SIMULATION_CONSTANTS.EPSILON;
+        if (distance <= window.SIMULATION_CONSTANTS.BOID_NEIGHBOR_DISTANCE) {
             totalPosition = vectorAdd(totalPosition, boidsStates[i].position);
             neighborCount++;
         }
@@ -141,9 +123,9 @@ function boidGetCohesionVector(boidIndex, boidsStates) {
 function boidSeek(boidState, targetPosition) {
     // Seek towards target position
     var desiredVector = vectorSubtract(targetPosition, boidState.position);
-    desiredVector = vectorFastSetMagnitude(desiredVector, CONSTANTS.BOID_MAX_SPEED);
+    desiredVector = vectorFastSetMagnitude(desiredVector, window.SIMULATION_CONSTANTS.BOID_MAX_SPEED);
     var steeringVector = vectorSubtract(desiredVector, boidState.velocity);
-    steeringVector = vectorFastLimit(steeringVector, CONSTANTS.BOID_MAX_FORCE);
+    steeringVector = vectorFastLimit(steeringVector, window.SIMULATION_CONSTANTS.BOID_MAX_FORCE);
     return steeringVector;
 }
 
@@ -158,8 +140,8 @@ function boidGetSeparationVector(boidIndex, boidsStates) {
             continue;
         }
         
-        var distance = vectorDistance(currentBoid.position, boidsStates[i].position) + CONSTANTS.EPSILON;
-        if (distance > 0 && distance < CONSTANTS.BOID_DESIRED_SEPARATION) {
+        var distance = vectorDistance(currentBoid.position, boidsStates[i].position) + window.SIMULATION_CONSTANTS.EPSILON;
+        if (distance > 0 && distance < window.SIMULATION_CONSTANTS.BOID_DESIRED_SEPARATION) {
             var deltaVector = vectorSubtract(currentBoid.position, boidsStates[i].position);
             deltaVector = vectorNormalize(deltaVector);
             deltaVector = vectorDivide(deltaVector, distance);
@@ -170,9 +152,9 @@ function boidGetSeparationVector(boidIndex, boidsStates) {
     
     if (neighborCount > 0) {
         var averageSteeringVector = vectorDivide(steeringVector, neighborCount);
-        averageSteeringVector = vectorFastSetMagnitude(averageSteeringVector, CONSTANTS.BOID_MAX_SPEED);
+        averageSteeringVector = vectorFastSetMagnitude(averageSteeringVector, window.SIMULATION_CONSTANTS.BOID_MAX_SPEED);
         averageSteeringVector = vectorSubtract(averageSteeringVector, currentBoid.velocity);
-        averageSteeringVector = vectorFastLimit(averageSteeringVector, CONSTANTS.BOID_MAX_FORCE);
+        averageSteeringVector = vectorFastLimit(averageSteeringVector, window.SIMULATION_CONSTANTS.BOID_MAX_FORCE);
         return averageSteeringVector;
     } else {
         return {x: 0, y: 0};
@@ -190,8 +172,8 @@ function boidGetAlignmentVector(boidIndex, boidsStates) {
             continue;
         }
         
-        var distance = vectorDistance(currentBoid.position, boidsStates[i].position) + CONSTANTS.EPSILON;
-        if (distance > 0 && distance < CONSTANTS.BOID_NEIGHBOR_DISTANCE) {
+        var distance = vectorDistance(currentBoid.position, boidsStates[i].position) + window.SIMULATION_CONSTANTS.EPSILON;
+        if (distance > 0 && distance < window.SIMULATION_CONSTANTS.BOID_NEIGHBOR_DISTANCE) {
             perceivedFlockVelocity = vectorAdd(perceivedFlockVelocity, boidsStates[i].velocity);
             neighborCount++;
         }
@@ -199,9 +181,9 @@ function boidGetAlignmentVector(boidIndex, boidsStates) {
     
     if (neighborCount > 0) {
         var averageVelocity = vectorDivide(perceivedFlockVelocity, neighborCount);
-        averageVelocity = vectorFastSetMagnitude(averageVelocity, CONSTANTS.BOID_MAX_SPEED);
+        averageVelocity = vectorFastSetMagnitude(averageVelocity, window.SIMULATION_CONSTANTS.BOID_MAX_SPEED);
         var steeringVector = vectorSubtract(averageVelocity, currentBoid.velocity);
-        steeringVector = vectorFastLimit(steeringVector, CONSTANTS.BOID_MAX_FORCE);
+        steeringVector = vectorFastLimit(steeringVector, window.SIMULATION_CONSTANTS.BOID_MAX_FORCE);
         return steeringVector;
     } else {
         return {x: 0, y: 0};
@@ -210,14 +192,14 @@ function boidGetAlignmentVector(boidIndex, boidsStates) {
 
 function boidGetPredatorAvoidanceVector(boidState, predatorState) {
     // Calculate predator avoidance force
-    var distance = vectorDistance(boidState.position, predatorState.position) + CONSTANTS.EPSILON;
-    if (distance > 0 && distance < CONSTANTS.PREDATOR_RANGE) {
+    var distance = vectorDistance(boidState.position, predatorState.position) + window.SIMULATION_CONSTANTS.EPSILON;
+    if (distance > 0 && distance < window.SIMULATION_CONSTANTS.PREDATOR_RANGE) {
         var avoidanceVector = vectorSubtract(boidState.position, predatorState.position);
         avoidanceVector = vectorFastNormalize(avoidanceVector);
         
-        var avoidanceStrength = (CONSTANTS.PREDATOR_RANGE - distance) / CONSTANTS.PREDATOR_RANGE;
-        avoidanceVector = vectorMultiply(avoidanceVector, avoidanceStrength * CONSTANTS.PREDATOR_TURN_FACTOR);
-        avoidanceVector = vectorFastLimit(avoidanceVector, CONSTANTS.BOID_MAX_FORCE * 1.5);
+        var avoidanceStrength = (window.SIMULATION_CONSTANTS.PREDATOR_RANGE - distance) / window.SIMULATION_CONSTANTS.PREDATOR_RANGE;
+        avoidanceVector = vectorMultiply(avoidanceVector, avoidanceStrength * window.SIMULATION_CONSTANTS.PREDATOR_TURN_FACTOR);
+        avoidanceVector = vectorFastLimit(avoidanceVector, window.SIMULATION_CONSTANTS.BOID_MAX_FORCE * 1.5);
         
         return avoidanceVector;
     }
@@ -229,17 +211,17 @@ function boidBound(position, canvasWidth, canvasHeight) {
     // Handle boundary wrapping for boid
     var result = {x: position.x, y: position.y};
     
-    if (result.x > canvasWidth + CONSTANTS.BOID_BORDER_OFFSET) {
-        result.x = -CONSTANTS.BOID_BORDER_OFFSET;
+    if (result.x > canvasWidth + window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET) {
+        result.x = -window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET;
     }
-    if (result.x < -CONSTANTS.BOID_BORDER_OFFSET) {
-        result.x = canvasWidth + CONSTANTS.BOID_BORDER_OFFSET;
+    if (result.x < -window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET) {
+        result.x = canvasWidth + window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET;
     }
-    if (result.y > canvasHeight + CONSTANTS.BOID_BORDER_OFFSET) {
-        result.y = -CONSTANTS.BOID_BORDER_OFFSET;
+    if (result.y > canvasHeight + window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET) {
+        result.y = -window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET;
     }
-    if (result.y < -CONSTANTS.BOID_BORDER_OFFSET) {
-        result.y = canvasHeight + CONSTANTS.BOID_BORDER_OFFSET;
+    if (result.y < -window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET) {
+        result.y = canvasHeight + window.SIMULATION_CONSTANTS.BOID_BORDER_OFFSET;
     }
     
     return result;
@@ -251,17 +233,17 @@ function predatorBound(position, canvasWidth, canvasHeight) {
     // Handle boundary wrapping for predator
     var result = {x: position.x, y: position.y};
     
-    if (result.x > canvasWidth + CONSTANTS.PREDATOR_BORDER_OFFSET) {
-        result.x = -CONSTANTS.PREDATOR_BORDER_OFFSET;
+    if (result.x > canvasWidth + window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET) {
+        result.x = -window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET;
     }
-    if (result.x < -CONSTANTS.PREDATOR_BORDER_OFFSET) {
-        result.x = canvasWidth + CONSTANTS.PREDATOR_BORDER_OFFSET;
+    if (result.x < -window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET) {
+        result.x = canvasWidth + window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET;
     }
-    if (result.y > canvasHeight + CONSTANTS.PREDATOR_BORDER_OFFSET) {
-        result.y = -CONSTANTS.PREDATOR_BORDER_OFFSET;
+    if (result.y > canvasHeight + window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET) {
+        result.y = -window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET;
     }
-    if (result.y < -CONSTANTS.PREDATOR_BORDER_OFFSET) {
-        result.y = canvasHeight + CONSTANTS.PREDATOR_BORDER_OFFSET;
+    if (result.y < -window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET) {
+        result.y = canvasHeight + window.SIMULATION_CONSTANTS.PREDATOR_BORDER_OFFSET;
     }
     
     return result;
@@ -270,7 +252,7 @@ function predatorBound(position, canvasWidth, canvasHeight) {
 function predatorCheckForPrey(predatorState, boidsStates) {
     // Check for caught boids and return their indices
     var caughtBoids = [];
-    var catchRadius = CONSTANTS.PREDATOR_SIZE * 0.7;
+    var catchRadius = window.SIMULATION_CONSTANTS.PREDATOR_SIZE * 0.7;
     
     for (var i = 0; i < boidsStates.length; i++) {
         var distance = vectorDistance(predatorState.position, boidsStates[i].position);
@@ -326,9 +308,9 @@ function simulationStep(boidsStates, predatorState, predatorAction, canvasWidth,
         var alignmentVector = boidGetAlignmentVector(i, newBoidsStates);
         
         // Apply multipliers
-        separationVector = vectorMultiply(separationVector, CONSTANTS.SEPARATION_MULTIPLIER);
-        cohesionVector = vectorMultiply(cohesionVector, CONSTANTS.COHESION_MULTIPLIER);
-        alignmentVector = vectorMultiply(alignmentVector, CONSTANTS.ALIGNMENT_MULTIPLIER);
+        separationVector = vectorMultiply(separationVector, window.SIMULATION_CONSTANTS.SEPARATION_MULTIPLIER);
+        cohesionVector = vectorMultiply(cohesionVector, window.SIMULATION_CONSTANTS.COHESION_MULTIPLIER);
+        alignmentVector = vectorMultiply(alignmentVector, window.SIMULATION_CONSTANTS.ALIGNMENT_MULTIPLIER);
         
         // Combine forces
         var acceleration = vectorAdd(cohesionVector, separationVector);
@@ -340,7 +322,7 @@ function simulationStep(boidsStates, predatorState, predatorAction, canvasWidth,
         
         // Update physics
         boidState.velocity = vectorAdd(boidState.velocity, acceleration);
-        boidState.velocity = vectorFastLimit(boidState.velocity, CONSTANTS.BOID_MAX_SPEED);
+        boidState.velocity = vectorFastLimit(boidState.velocity, window.SIMULATION_CONSTANTS.BOID_MAX_SPEED);
         boidState.position = vectorAdd(boidState.position, boidState.velocity);
         boidState.position = boidBound(boidState.position, canvasWidth, canvasHeight);
     }
@@ -351,7 +333,7 @@ function simulationStep(boidsStates, predatorState, predatorAction, canvasWidth,
     
     // Update predator physics
     newPredatorState.velocity = vectorAdd(newPredatorState.velocity, predatorAcceleration);
-    newPredatorState.velocity = vectorFastLimit(newPredatorState.velocity, CONSTANTS.PREDATOR_MAX_SPEED);
+    newPredatorState.velocity = vectorFastLimit(newPredatorState.velocity, window.SIMULATION_CONSTANTS.PREDATOR_MAX_SPEED);
     newPredatorState.position = vectorAdd(newPredatorState.position, newPredatorState.velocity);
     newPredatorState.position = predatorBound(newPredatorState.position, canvasWidth, canvasHeight);
     

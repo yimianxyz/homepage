@@ -30,6 +30,11 @@ class SimulationConstants:
     # Simulation constants
     DEFAULT_NUM_BOIDS = 50
     EPSILON = 0.0000001
+    
+    # Flocking behavior multipliers
+    SEPARATION_MULTIPLIER = 2.0
+    COHESION_MULTIPLIER = 1.0
+    ALIGNMENT_MULTIPLIER = 1.0
 
 # Global constants instance
 CONSTANTS = SimulationConstants()

@@ -15,12 +15,8 @@
  * @constructor
  */
 function ClosestPursuitPolicy() {
-    // Constants that must match Python exactly
-    this.PREDATOR_MAX_FORCE = 0.001;
-    this.PREDATOR_FORCE_SCALE = 200;
-    
-    // Calculate max force (matches ActionProcessor)
-    this.max_force = this.PREDATOR_MAX_FORCE * this.PREDATOR_FORCE_SCALE;
+    // Calculate max force using centralized constants
+    this.max_force = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE * window.SIMULATION_CONSTANTS.PREDATOR_FORCE_SCALE;
 }
 
 /**
