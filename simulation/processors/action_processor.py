@@ -1,7 +1,8 @@
 """
-Action Processor - Neural output to game actions
+Action Processor - Universal policy output interface
 
-This is a data conversion layer that converts neural network outputs to game forces.
+This is a data conversion layer that converts policy outputs to game actions.
+Works with any policy type (neural networks, rule-based, human, etc.).
 This MUST match exactly with the JavaScript implementation.
 """
 
@@ -13,17 +14,23 @@ class ActionProcessor:
         # Scale neural outputs to match actual predator force limits
         self.force_scale = CONSTANTS.PREDATOR_MAX_FORCE
     
-    def process_action(self, neural_outputs: List[float]) -> List[float]:
+    def process_action(self, policy_outputs: List[float]) -> List[float]:
         """
-        Convert neural network outputs to game actions
+        Convert policy outputs to game actions
+        
+        This universal interface works with any policy type:
+        - Neural networks: normalized outputs [-1, 1]
+        - Rule-based policies: computed steering forces
+        - Human policies: input-based actions
+        - Hybrid policies: combined outputs
         
         Args:
-            neural_outputs: Neural network outputs [x, y] in [-1, 1] range
+            policy_outputs: Policy outputs [x, y] in [-1, 1] range
             
         Returns:
             Action forces [force_x, force_y] in game units
         """
         return [
-            neural_outputs[0] * self.force_scale,
-            neural_outputs[1] * self.force_scale
+            policy_outputs[0] * self.force_scale,
+            policy_outputs[1] * self.force_scale
         ] 

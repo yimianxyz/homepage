@@ -1,14 +1,15 @@
 /**
- * Input Processor - Transformer-ready format for neural network inputs
+ * Input Processor - Universal policy input interface
  * 
- * This is a data conversion layer that transforms game state into structured inputs
- * for the neural network. This MUST match exactly with the Python implementation.
+ * This is a data conversion layer that transforms raw game state into structured inputs
+ * for any type of policy (neural networks, rule-based, human, etc.). 
+ * This MUST match exactly with the Python implementation.
  * 
  * Architecture:
  * - Context: canvas dimensions for world boundary awareness
  * - Predator: velocity information  
  * - Boids: dynamic array of relative positions and velocities
- * - No hardcoded sequence length - supports variable number of boids
+ * - Universal format: works with any policy type
  */
 function InputProcessor() {
     // Use centralized constants (matches Python)
@@ -22,7 +23,14 @@ function InputProcessor() {
 }
 
 /**
- * Convert game state to transformer-friendly format
+ * Convert raw game state to structured policy inputs
+ * 
+ * This universal interface works with any policy type including:
+ * - Neural networks (transformers, MLPs, CNNs)
+ * - Rule-based policies (closest pursuit, flocking)
+ * - Human policies (manual control)
+ * - Hybrid policies (neural + rules)
+ * 
  * @param {Array} boids - Array of all boid objects
  * @param {Object} predatorPos - Predator position {x, y}
  * @param {Object} predatorVel - Predator velocity {x, y}

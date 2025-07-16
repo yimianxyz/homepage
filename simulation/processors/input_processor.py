@@ -1,8 +1,9 @@
 """
-Input Processor - Transformer-ready format for neural network inputs
+Input Processor - Universal policy input interface
 
-This is a data conversion layer that transforms game state into structured inputs
-for the neural network. This MUST match exactly with the JavaScript implementation.
+This is a data conversion layer that transforms raw game state into structured inputs
+for any type of policy (neural networks, rule-based, human, etc.). 
+This MUST match exactly with the JavaScript implementation.
 """
 
 import math
@@ -24,7 +25,13 @@ class InputProcessor:
     def process_inputs(self, boids: List[Dict], predator_pos: Dict, predator_vel: Dict, 
                       canvas_width: float, canvas_height: float) -> Dict[str, Any]:
         """
-        Convert game state to transformer-friendly format
+        Convert raw game state to structured policy inputs
+        
+        This universal interface works with any policy type including:
+        - Neural networks (transformers, MLPs, CNNs)
+        - Rule-based policies (closest pursuit, flocking)
+        - Human policies (manual control)
+        - Hybrid policies (neural + rules)
         
         Args:
             boids: List of boid objects with position and velocity
