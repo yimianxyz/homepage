@@ -6,8 +6,9 @@
  * Python and JavaScript versions.
  * 
  * Interface:
- * - Input: structured_inputs (same format as transformer input)
- * - Output: action forces [force_x, force_y]
+ * - Input: structured_inputs (same format as universal policy input)
+ * - Output: normalized policy outputs [x, y] in [-1, 1] range
+ * - The ActionProcessor handles scaling to game forces
  */
 
 /**
@@ -15,19 +16,18 @@
  * @constructor
  */
 function ClosestPursuitPolicy() {
-    // Calculate max force using centralized constants
-            this.max_force = window.SIMULATION_CONSTANTS.PREDATOR_MAX_FORCE;
+    // No max_force needed - ActionProcessor handles scaling
 }
 
 /**
- * Get action based on structured inputs (matches Python implementation)
+ * Get normalized policy outputs (compatible with ActionProcessor)
  * 
- * @param {Object} structured_inputs - Same format as transformer input
+ * @param {Object} structured_inputs - Same format as universal policy input
  * - context: {canvasWidth: number, canvasHeight: number}
  * - predator: {velX: number, velY: number}
  * - boids: [{relX: number, relY: number, velX: number, velY: number}, ...]
  * 
- * @returns {Array} Action forces [force_x, force_y]
+ * @returns {Array} Normalized policy outputs [x, y] in [-1, 1] range
  */
 ClosestPursuitPolicy.prototype.getAction = function(structured_inputs) {
     // If no boids, return zero force
@@ -57,35 +57,24 @@ ClosestPursuitPolicy.prototype.getAction = function(structured_inputs) {
     }
     
     // Simple seeking: move toward target boid
-    // Normalized direction to target
+    // Normalized direction to target (already in [-1, 1] range)
     var dir_x = target_boid.relX / min_distance;
     var dir_y = target_boid.relY / min_distance;
     
-    // Apply force scaling (matches ActionProcessor)
-    return [dir_x * this.max_force, dir_y * this.max_force];
+    // Return normalized policy outputs - ActionProcessor handles scaling
+    return [dir_x, dir_y];
 };
 
 /**
- * Get normalized action in [-1, 1] range (for direct comparison with model output)
+ * Get normalized action in [-1, 1] range (deprecated - use getAction instead)
  * 
- * @param {Object} structured_inputs - Same format as transformer input
+ * @param {Object} structured_inputs - Same format as universal policy input
  * 
- * @returns {Array} Normalized action forces [force_x, force_y] in [-1, 1] range
+ * @returns {Array} Normalized policy outputs [x, y] in [-1, 1] range
  */
 ClosestPursuitPolicy.prototype.getNormalizedAction = function(structured_inputs) {
-    var action = this.getAction(structured_inputs);
-    
-    // Normalize by max force to get [-1, 1] range
-    var normalized_action = [
-        action[0] / this.max_force,
-        action[1] / this.max_force
-    ];
-    
-    // Clamp to ensure [-1, 1] range
-    normalized_action[0] = Math.max(-1.0, Math.min(1.0, normalized_action[0]));
-    normalized_action[1] = Math.max(-1.0, Math.min(1.0, normalized_action[1]));
-    
-    return normalized_action;
+    // Now getAction already returns normalized values
+    return this.getAction(structured_inputs);
 };
 
 /**
@@ -95,7 +84,7 @@ ClosestPursuitPolicy.prototype.getNormalizedAction = function(structured_inputs)
 function createClosestPursuitPolicy() {
     var policy = new ClosestPursuitPolicy();
     console.log("Created ClosestPursuitPolicy:");
-    console.log("  Max force: " + policy.max_force);
+    console.log("  Output: Normalized policy outputs in [-1, 1] range");
     console.log("  Strategy: Greedy pursuit (always targets closest boid)");
     return policy;
 }
@@ -116,11 +105,10 @@ if (typeof module === 'undefined') {
         ]
     };
     
-    var action = policy.getAction(test_input);
-    var normalized_action = policy.getNormalizedAction(test_input);
+    var policy_output = policy.getAction(test_input);
     
-    console.log("Test action: " + action);
-    console.log("Test normalized action: " + normalized_action);
+    console.log("Policy output (normalized): " + policy_output);
+    console.log("Note: Use ActionProcessor to convert to game forces");
 }
 */
 
