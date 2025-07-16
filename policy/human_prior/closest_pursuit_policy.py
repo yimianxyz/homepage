@@ -1,8 +1,8 @@
 """
-Classic Policy - Simple pursuit behavior for simulation
+Closest Pursuit Policy - Simple pursuit behavior targeting the closest boid
 
-This policy implements the classic pursuit behavior that matches the JavaScript
-teacher policy implementation. It's designed to be 100% identical between
+This policy implements a greedy pursuit strategy where the predator always
+moves toward the closest boid. It's designed to be 100% identical between
 Python and JavaScript versions.
 
 Interface:
@@ -13,8 +13,8 @@ Interface:
 import math
 from typing import Dict, List, Any
 
-class ClassicPolicy:
-    """Simple pursuit classic policy for simulation"""
+class ClosestPursuitPolicy:
+    """Greedy pursuit policy that always targets the closest boid"""
     
     def __init__(self):
         # Constants that must match JavaScript exactly
@@ -89,17 +89,17 @@ class ClassicPolicy:
         
         return normalized_action
 
-def create_classic_policy():
-    """Create classic policy instance"""
-    policy = ClassicPolicy()
-    print(f"Created ClassicPolicy:")
+def create_closest_pursuit_policy():
+    """Create closest pursuit policy instance"""
+    policy = ClosestPursuitPolicy()
+    print(f"Created ClosestPursuitPolicy:")
     print(f"  Max force: {policy.max_force}")
-    print(f"  Strategy: Simple pursuit (closest boid)")
+    print(f"  Strategy: Greedy pursuit (always targets closest boid)")
     return policy
 
 if __name__ == "__main__":
-    # Test classic policy
-    policy = create_classic_policy()
+    # Test closest pursuit policy
+    policy = create_closest_pursuit_policy()
     
     # Test with dummy data
     test_input = {

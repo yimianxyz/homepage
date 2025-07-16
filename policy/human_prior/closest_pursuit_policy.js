@@ -1,8 +1,8 @@
 /**
- * Classic Policy - Simple pursuit behavior for simulation
+ * Closest Pursuit Policy - Simple pursuit behavior targeting the closest boid
  * 
- * This policy implements the classic pursuit behavior that matches the JavaScript
- * teacher policy implementation. It's designed to be 100% identical between
+ * This policy implements a greedy pursuit strategy where the predator always
+ * moves toward the closest boid. It's designed to be 100% identical between
  * Python and JavaScript versions.
  * 
  * Interface:
@@ -11,10 +11,10 @@
  */
 
 /**
- * Simple pursuit classic policy for simulation
+ * Greedy pursuit policy that always targets the closest boid
  * @constructor
  */
-function ClassicPolicy() {
+function ClosestPursuitPolicy() {
     // Constants that must match Python exactly
     this.PREDATOR_MAX_FORCE = 0.001;
     this.PREDATOR_FORCE_SCALE = 200;
@@ -33,7 +33,7 @@ function ClassicPolicy() {
  * 
  * @returns {Array} Action forces [force_x, force_y]
  */
-ClassicPolicy.prototype.getAction = function(structured_inputs) {
+ClosestPursuitPolicy.prototype.getAction = function(structured_inputs) {
     // If no boids, return zero force
     if (!structured_inputs.boids || structured_inputs.boids.length === 0) {
         return [0.0, 0.0];
@@ -76,7 +76,7 @@ ClassicPolicy.prototype.getAction = function(structured_inputs) {
  * 
  * @returns {Array} Normalized action forces [force_x, force_y] in [-1, 1] range
  */
-ClassicPolicy.prototype.getNormalizedAction = function(structured_inputs) {
+ClosestPursuitPolicy.prototype.getNormalizedAction = function(structured_inputs) {
     var action = this.getAction(structured_inputs);
     
     // Normalize by max force to get [-1, 1] range
@@ -93,22 +93,22 @@ ClassicPolicy.prototype.getNormalizedAction = function(structured_inputs) {
 };
 
 /**
- * Create classic policy instance
- * @returns {ClassicPolicy} Policy instance
+ * Create closest pursuit policy instance
+ * @returns {ClosestPursuitPolicy} Policy instance
  */
-function createClassicPolicy() {
-    var policy = new ClassicPolicy();
-    console.log("Created ClassicPolicy:");
+function createClosestPursuitPolicy() {
+    var policy = new ClosestPursuitPolicy();
+    console.log("Created ClosestPursuitPolicy:");
     console.log("  Max force: " + policy.max_force);
-    console.log("  Strategy: Simple pursuit (closest boid)");
+    console.log("  Strategy: Greedy pursuit (always targets closest boid)");
     return policy;
 }
 
 // Test code (uncomment to run)
 /*
 if (typeof module === 'undefined') {
-    // Test classic policy
-    var policy = createClassicPolicy();
+    // Test closest pursuit policy
+    var policy = createClosestPursuitPolicy();
     
     // Test with dummy data
     var test_input = {
@@ -131,7 +131,7 @@ if (typeof module === 'undefined') {
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        ClassicPolicy: ClassicPolicy,
-        createClassicPolicy: createClassicPolicy
+        ClosestPursuitPolicy: ClosestPursuitPolicy,
+        createClosestPursuitPolicy: createClosestPursuitPolicy
     };
 } 
