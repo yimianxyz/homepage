@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <meta name="description" content="Boids Simulation Playground - Test and Debug">
+    <meta name="keywords" content="boids, simulation, flocking, predator, prey, debugging, playground">
+    <meta name="author" content="Yimian Liu">
+    <title>Boids Simulation Playground</title>
+    
+    <!-- Shared styles -->
+    <link rel="stylesheet" href="shared.css">
+    <link rel="stylesheet" href="playground.css">
+    
+    <!-- Configuration -->
+    <script src="config/constants.js"></script>
+    
+    <!-- Simulation Runtime -->
+    <script src="simulation/runtime/simulation_runtime.js"></script>
+    
+    <!-- Processors -->
+    <script src="simulation/processors/input_processor.js"></script>
+    <script src="simulation/processors/action_processor.js"></script>
+    
+    <!-- State Management -->
+    <script src="simulation/state_manager/state_manager.js"></script>
+    
+    <!-- Random State Generator -->
+    <script src="simulation/random_state_generator/random_state_generator.js"></script>
+    
+    <!-- Policies -->
+    <script src="policy/human_prior/closest_pursuit_policy.js"></script>
+    <script src="policy/transformer/utils/transformer_encoder.js"></script>
+    <script src="policy/transformer/utils/transformer_policy_wrapper.js"></script>
+    <script src="policy/transformer/transformer_policy.js"></script>
+    
+    <!-- UI Modules -->
+    <script src="ui/canvas.js"></script>
+    <script src="ui/rendering.js"></script>
+    <script src="ui/simulation.js"></script>
+    <script src="ui/utils.js"></script>
+</head>
+<body>
+    <canvas id="playground-canvas" class="simulation-canvas"></canvas>
+    
+    <!-- Control Panel -->
+    <div class="playground-controls">
+        <h3>🎮 Simulation Controls</h3>
+        
+        <!-- Simulation Controls -->
+        <div class="control-group">
+            <div class="collapsible active" id="sim-controls-toggle">▼ Simulation</div>
+            <div class="collapsible-content active" id="sim-controls">
+                <button id="start-btn" class="success">▶️ Start</button>
+                <button id="pause-btn">⏸️ Pause</button>
+                <button id="reset-btn" class="danger">🔄 Reset</button>
+                <button id="step-btn">⏭️ Step</button>
+                
+                <label>Speed: <span class="value-display" id="speed-value">1.0x</span></label>
+                <input type="range" id="speed-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+            </div>
+        </div>
+        
+        <!-- Policy Controls -->
+        <div class="control-group">
+            <div class="collapsible active" id="policy-controls-toggle">▼ Policy</div>
+            <div class="collapsible-content active" id="policy-controls">
+                <label>Policy Type:</label>
+                <select id="policy-select">
+                    <option value="closest_pursuit">Closest Pursuit</option>
+                    <option value="transformer">Transformer</option>
+                </select>
+                <button id="load-policy-btn">🔄 Load Policy</button>
+            </div>
+        </div>
+        
+        <!-- Boid Parameters -->
+        <div class="control-group">
+            <div class="collapsible" id="boid-controls-toggle">▶ Boid Parameters</div>
+            <div class="collapsible-content" id="boid-controls">
+                <label>Count: <span class="value-display" id="boid-count-value">50</span></label>
+                <input type="range" id="boid-count-slider" min="10" max="200" step="10" value="50">
+                
+                <label>Max Speed: <span class="value-display" id="boid-speed-value">3.5</span></label>
+                <input type="range" id="boid-speed-slider" min="1" max="8" step="0.1" value="3.5">
+                
+                <label>Max Force: <span class="value-display" id="boid-force-value">0.1</span></label>
+                <input type="range" id="boid-force-slider" min="0.01" max="0.5" step="0.01" value="0.1">
+                
+                <label>Neighbor Distance: <span class="value-display" id="neighbor-dist-value">60</span></label>
+                <input type="range" id="neighbor-dist-slider" min="20" max="150" step="5" value="60">
+                
+                <label>Separation: <span class="value-display" id="separation-value">2.0</span></label>
+                <input type="range" id="separation-slider" min="0" max="5" step="0.1" value="2.0">
+                
+                <label>Cohesion: <span class="value-display" id="cohesion-value">1.0</span></label>
+                <input type="range" id="cohesion-slider" min="0" max="5" step="0.1" value="1.0">
+                
+                <label>Alignment: <span class="value-display" id="alignment-value">1.0</span></label>
+                <input type="range" id="alignment-slider" min="0" max="5" step="0.1" value="1.0">
+            </div>
+        </div>
+        
+        <!-- Predator Parameters -->
+        <div class="control-group">
+            <div class="collapsible" id="predator-controls-toggle">▶ Predator Parameters</div>
+            <div class="collapsible-content" id="predator-controls">
+                <label>Max Speed: <span class="value-display" id="predator-speed-value">2.0</span></label>
+                <input type="range" id="predator-speed-slider" min="0.5" max="6" step="0.1" value="2.0">
+                
+                <label>Max Force: <span class="value-display" id="predator-force-value">0.2</span></label>
+                <input type="range" id="predator-force-slider" min="0.01" max="1" step="0.01" value="0.2">
+                
+                <label>Range: <span class="value-display" id="predator-range-value">80</span></label>
+                <input type="range" id="predator-range-slider" min="30" max="200" step="5" value="80">
+                
+                <label>Turn Factor: <span class="value-display" id="turn-factor-value">0.3</span></label>
+                <input type="range" id="turn-factor-slider" min="0.1" max="2" step="0.1" value="0.3">
+            </div>
+        </div>
+        
+        <!-- Visual Options -->
+        <div class="control-group">
+            <div class="collapsible" id="visual-controls-toggle">▶ Visual Options</div>
+            <div class="collapsible-content" id="visual-controls">
+                <label><input type="checkbox" id="show-debug"> Show Debug Info</label>
+                <label><input type="checkbox" id="show-velocity"> Show Velocity</label>
+                <label><input type="checkbox" id="show-range"> Show Predator Range</label>
+                <label><input type="checkbox" id="show-indices"> Show Boid Indices</label>
+                <label><input type="checkbox" id="show-performance"> Show Performance</label>
+                <label><input type="checkbox" id="show-policy-status"> Show Policy Status</label>
+                
+                <label>Background:</label>
+                <select id="background-select">
+                    <option value="transparent">Transparent</option>
+                    <option value="white">White</option>
+                    <option value="black">Black</option>
+                    <option value="fade">Fade Trail</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Initialization Options -->
+        <div class="control-group">
+            <div class="collapsible" id="init-controls-toggle">▶ Initialization</div>
+            <div class="collapsible-content" id="init-controls">
+                <label>Initial State:</label>
+                <select id="init-state-select">
+                    <option value="clustered">Clustered</option>
+                    <option value="scattered">Scattered</option>
+                    <option value="random">Random</option>
+                </select>
+                
+                <label>Seed: <span class="value-display" id="seed-value">None</span></label>
+                <input type="number" id="seed-input" placeholder="Random seed">
+                
+                <button id="generate-state-btn">🎲 Generate State</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Debug Information -->
+    <div class="debug-info hidden" id="debug-info">
+        <div id="debug-content">
+            <div>FPS: <span id="debug-fps">0</span></div>
+            <div>Boids: <span id="debug-boids">0</span></div>
+            <div>Policy: <span id="debug-policy">None</span></div>
+            <div>Frame: <span id="debug-frame">0</span></div>
+            <div>Caught: <span id="debug-caught">0</span></div>
+        </div>
+    </div>
+    
+    <!-- Performance Metrics -->
+    <div class="performance-metrics hidden" id="performance-metrics">
+        <div>FPS: <span id="perf-fps">0</span></div>
+        <div>Frame Time: <span id="perf-frame-time">0</span>ms</div>
+        <div>Total Frames: <span id="perf-total-frames">0</span></div>
+    </div>
+    
+    <!-- Policy Status -->
+    <div class="policy-status hidden" id="policy-status">
+        <span class="status-indicator inactive" id="policy-indicator"></span>
+        <span id="policy-name">No Policy</span>
+    </div>
+
+    <script>
+        /**
+         * Playground Simulation Class
+         * Enhanced version of the simulation with debugging and testing features
+         */
+        function PlaygroundSimulation(canvasId) {
+            this.canvas = document.getElementById(canvasId);
+            this.ctx = this.canvas.getContext('2d');
+            this.stateManager = new StateManager();
+            this.policy = null;
+            this.performanceMonitor = new PerformanceMonitor();
+            
+            // Animation state
+            this.isRunning = false;
+            this.isPaused = false;
+            this.animationId = null;
+            this.speed = 1.0;
+            this.stepMode = false;
+            
+            // Debug options
+            this.showDebug = false;
+            this.showVelocity = false;
+            this.showRange = false;
+            this.showIndices = false;
+            this.showPerformance = false;
+            this.showPolicyStatus = false;
+            this.backgroundMode = 'transparent';
+            
+            // Statistics
+            this.totalCaught = 0;
+            this.frameCount = 0;
+            
+            // Initialize
+            this.initializeControls();
+            this.loadPolicy('closest_pursuit');
+        }
+
+        PlaygroundSimulation.prototype.initializeControls = function() {
+            var self = this;
+            
+            // Simulation controls
+            document.getElementById('start-btn').addEventListener('click', function() {
+                self.start();
+            });
+            
+            document.getElementById('pause-btn').addEventListener('click', function() {
+                self.togglePause();
+            });
+            
+            document.getElementById('reset-btn').addEventListener('click', function() {
+                self.reset();
+            });
+            
+            document.getElementById('step-btn').addEventListener('click', function() {
+                self.step();
+            });
+            
+            // Speed control
+            document.getElementById('speed-slider').addEventListener('input', function(e) {
+                self.speed = parseFloat(e.target.value);
+                document.getElementById('speed-value').textContent = self.speed.toFixed(1) + 'x';
+            });
+            
+            // Policy controls
+            document.getElementById('policy-select').addEventListener('change', function(e) {
+                self.loadPolicy(e.target.value);
+            });
+            
+            document.getElementById('load-policy-btn').addEventListener('click', function() {
+                var policyType = document.getElementById('policy-select').value;
+                self.loadPolicy(policyType);
+            });
+            
+            // Parameter controls
+            self.setupParameterControls();
+            
+            // Visual controls
+            document.getElementById('show-debug').addEventListener('change', function(e) {
+                self.showDebug = e.target.checked;
+                document.getElementById('debug-info').classList.toggle('hidden', !self.showDebug);
+            });
+            
+            document.getElementById('show-velocity').addEventListener('change', function(e) {
+                self.showVelocity = e.target.checked;
+            });
+            
+            document.getElementById('show-range').addEventListener('change', function(e) {
+                self.showRange = e.target.checked;
+            });
+            
+            document.getElementById('show-indices').addEventListener('change', function(e) {
+                self.showIndices = e.target.checked;
+            });
+            
+            document.getElementById('show-performance').addEventListener('change', function(e) {
+                self.showPerformance = e.target.checked;
+                document.getElementById('performance-metrics').classList.toggle('hidden', !self.showPerformance);
+            });
+            
+            document.getElementById('show-policy-status').addEventListener('change', function(e) {
+                self.showPolicyStatus = e.target.checked;
+                document.getElementById('policy-status').classList.toggle('hidden', !self.showPolicyStatus);
+            });
+            
+            document.getElementById('background-select').addEventListener('change', function(e) {
+                self.backgroundMode = e.target.value;
+            });
+            
+            // Initialization controls
+            document.getElementById('generate-state-btn').addEventListener('click', function() {
+                self.generateInitialState();
+            });
+            
+            // Collapsible sections
+            self.setupCollapsibles();
+            
+            // Window resize handling
+            window.addEventListener('resize', function() {
+                resizeCanvas('playground-canvas');
+                if (self.stateManager.currentState) {
+                    self.stateManager.currentState.canvas_width = self.canvas.width;
+                    self.stateManager.currentState.canvas_height = self.canvas.height;
+                }
+            });
+        };
+
+        PlaygroundSimulation.prototype.setupParameterControls = function() {
+            var self = this;
+            
+            // Boid parameter controls
+            var boidParams = [
+                { id: 'boid-count', prop: 'DEFAULT_NUM_BOIDS', needsReset: true },
+                { id: 'boid-speed', prop: 'BOID_MAX_SPEED' },
+                { id: 'boid-force', prop: 'BOID_MAX_FORCE' },
+                { id: 'neighbor-dist', prop: 'BOID_NEIGHBOR_DISTANCE' },
+                { id: 'separation', prop: 'SEPARATION_MULTIPLIER' },
+                { id: 'cohesion', prop: 'COHESION_MULTIPLIER' },
+                { id: 'alignment', prop: 'ALIGNMENT_MULTIPLIER' }
+            ];
+            
+            boidParams.forEach(function(param) {
+                var slider = document.getElementById(param.id + '-slider');
+                var display = document.getElementById(param.id + '-value');
+                
+                slider.addEventListener('input', function(e) {
+                    var value = parseFloat(e.target.value);
+                    window.SIMULATION_CONSTANTS[param.prop] = value;
+                    display.textContent = value.toString();
+                    
+                    if (param.needsReset && self.stateManager.currentState) {
+                        self.generateInitialState();
+                    }
+                });
+            });
+            
+            // Predator parameter controls
+            var predatorParams = [
+                { id: 'predator-speed', prop: 'PREDATOR_MAX_SPEED' },
+                { id: 'predator-force', prop: 'PREDATOR_MAX_FORCE' },
+                { id: 'predator-range', prop: 'PREDATOR_RANGE' },
+                { id: 'turn-factor', prop: 'PREDATOR_TURN_FACTOR' }
+            ];
+            
+            predatorParams.forEach(function(param) {
+                var slider = document.getElementById(param.id + '-slider');
+                var display = document.getElementById(param.id + '-value');
+                
+                slider.addEventListener('input', function(e) {
+                    var value = parseFloat(e.target.value);
+                    window.SIMULATION_CONSTANTS[param.prop] = value;
+                    display.textContent = value.toString();
+                });
+            });
+        };
+
+        PlaygroundSimulation.prototype.setupCollapsibles = function() {
+            var collapsibles = document.querySelectorAll('.collapsible');
+            
+            collapsibles.forEach(function(collapsible) {
+                collapsible.addEventListener('click', function() {
+                    var content = document.getElementById(this.id.replace('-toggle', ''));
+                    var isActive = content.classList.contains('active');
+                    
+                    // Toggle active state
+                    this.classList.toggle('active', !isActive);
+                    content.classList.toggle('active', !isActive);
+                    
+                    // Update arrow
+                    this.textContent = this.textContent.replace(/[▼▶]/, isActive ? '▶' : '▼');
+                });
+            });
+        };
+
+        PlaygroundSimulation.prototype.loadPolicy = function(policyType) {
+            try {
+                this.policy = createPolicy(policyType);
+                this.updatePolicyStatus(policyType, 'active');
+                console.log('Loaded policy:', policyType);
+            } catch (error) {
+                console.error('Failed to load policy:', policyType, error);
+                this.updatePolicyStatus(policyType, 'inactive');
+            }
+        };
+
+        PlaygroundSimulation.prototype.updatePolicyStatus = function(policyName, status) {
+            var indicator = document.getElementById('policy-indicator');
+            var nameElement = document.getElementById('policy-name');
+            
+            indicator.className = 'status-indicator ' + status;
+            nameElement.textContent = policyName;
+        };
+
+        PlaygroundSimulation.prototype.generateInitialState = function() {
+            resizeCanvas('playground-canvas');
+            var canvasWidth = this.canvas.width;
+            var canvasHeight = this.canvas.height;
+            var numBoids = window.SIMULATION_CONSTANTS.DEFAULT_NUM_BOIDS;
+            var initType = document.getElementById('init-state-select').value;
+            var seedInput = document.getElementById('seed-input').value;
+            var seed = seedInput ? parseInt(seedInput) : null;
+            
+            var initialState;
+            if (initType === 'scattered') {
+                initialState = generateScatteredState(numBoids, canvasWidth, canvasHeight);
+            } else if (initType === 'random') {
+                if (typeof generateRandomState === 'function') {
+                    initialState = generateRandomState(numBoids, canvasWidth, canvasHeight, seed);
+                } else {
+                    initialState = generateClusteredState(numBoids, canvasWidth, canvasHeight);
+                }
+            } else {
+                initialState = generateClusteredState(numBoids, canvasWidth, canvasHeight);
+            }
+            
+            this.stateManager.init(initialState, this.policy);
+            this.totalCaught = 0;
+            this.frameCount = 0;
+            
+            console.log('Generated initial state:', initType, 'with', numBoids, 'boids');
+        };
+
+        PlaygroundSimulation.prototype.start = function() {
+            if (!this.stateManager.currentState) {
+                this.generateInitialState();
+            }
+            
+            this.isRunning = true;
+            this.isPaused = false;
+            this.stepMode = false;
+            this.animate();
+            
+            console.log('Simulation started');
+        };
+
+        PlaygroundSimulation.prototype.togglePause = function() {
+            this.isPaused = !this.isPaused;
+            if (!this.isPaused && this.isRunning) {
+                this.animate();
+            }
+            
+            console.log('Simulation', this.isPaused ? 'paused' : 'resumed');
+        };
+
+        PlaygroundSimulation.prototype.reset = function() {
+            this.stop();
+            this.generateInitialState();
+            console.log('Simulation reset');
+        };
+
+        PlaygroundSimulation.prototype.step = function() {
+            if (!this.stateManager.currentState) {
+                this.generateInitialState();
+            }
+            
+            this.stepMode = true;
+            this.singleStep();
+            this.render();
+            this.updateDebugInfo();
+            
+            console.log('Single step executed');
+        };
+
+        PlaygroundSimulation.prototype.stop = function() {
+            this.isRunning = false;
+            this.isPaused = false;
+            this.stepMode = false;
+            
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+            
+            console.log('Simulation stopped');
+        };
+
+        PlaygroundSimulation.prototype.singleStep = function() {
+            if (!this.stateManager.currentState || !this.policy) return;
+            
+            var newState = this.stateManager.step();
+            
+            // Remove caught boids
+            if (newState.caught_boids && newState.caught_boids.length > 0) {
+                this.totalCaught += newState.caught_boids.length;
+                
+                // Remove caught boids in reverse order to maintain indices
+                for (var i = newState.caught_boids.length - 1; i >= 0; i--) {
+                    newState.boids_states.splice(newState.caught_boids[i], 1);
+                }
+            }
+            
+            this.frameCount++;
+        };
+
+        PlaygroundSimulation.prototype.animate = function() {
+            if (!this.isRunning || this.isPaused || this.stepMode) return;
+            
+            // Apply speed control
+            for (var i = 0; i < this.speed; i++) {
+                this.singleStep();
+            }
+            
+            this.render();
+            this.updateDebugInfo();
+            this.performanceMonitor.update();
+            
+            this.animationId = requestAnimationFrame(this.animate.bind(this));
+        };
+
+        PlaygroundSimulation.prototype.render = function() {
+            if (!this.stateManager.currentState) return;
+            
+            // Clear canvas with background
+            if (this.backgroundMode === 'transparent') {
+                clearCanvas(this.ctx);
+            } else if (this.backgroundMode === 'white') {
+                clearCanvas(this.ctx, 'white');
+            } else if (this.backgroundMode === 'black') {
+                clearCanvas(this.ctx, 'black');
+            } else if (this.backgroundMode === 'fade') {
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+            
+            var currentState = this.stateManager.currentState;
+            
+            // Render boids
+            for (var i = 0; i < currentState.boids_states.length; i++) {
+                renderBoid(this.ctx, currentState.boids_states[i], window.SIMULATION_CONSTANTS.BOID_RENDER_SIZE);
+                
+                // Render debug info for boids
+                if (this.showVelocity || this.showIndices) {
+                    renderBoidDebug(this.ctx, currentState.boids_states[i], i, this.showVelocity, this.showIndices);
+                }
+            }
+            
+            // Render predator
+            renderPredator(this.ctx, currentState.predator_state, window.SIMULATION_CONSTANTS.PREDATOR_SIZE);
+            
+            // Render predator debug info
+            if (this.showVelocity || this.showRange) {
+                renderPredatorDebug(this.ctx, currentState.predator_state, this.showVelocity, this.showRange);
+            }
+        };
+
+        PlaygroundSimulation.prototype.updateDebugInfo = function() {
+            if (!this.showDebug) return;
+            
+            var currentState = this.stateManager.currentState;
+            var metrics = this.performanceMonitor.getMetrics();
+            
+            document.getElementById('debug-fps').textContent = metrics.fps;
+            document.getElementById('debug-boids').textContent = currentState ? currentState.boids_states.length : 0;
+            document.getElementById('debug-policy').textContent = this.policy ? this.policy.constructor.name : 'None';
+            document.getElementById('debug-frame').textContent = this.frameCount;
+            document.getElementById('debug-caught').textContent = this.totalCaught;
+            
+            // Update performance metrics
+            if (this.showPerformance) {
+                document.getElementById('perf-fps').textContent = metrics.fps;
+                document.getElementById('perf-frame-time').textContent = metrics.frameTime;
+                document.getElementById('perf-total-frames').textContent = metrics.frameCount;
+            }
+        };
+
+        /**
+         * Initialize playground on page load
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!isCanvasSupported()) {
+                console.error("Canvas not supported");
+                return;
+            }
+            
+            // Create playground simulation
+            var playground = new PlaygroundSimulation('playground-canvas');
+            
+            // Store globally for debugging
+            window.playground = playground;
+            
+            console.log('Playground initialized');
+        });
+    </script>
+</body>
+</html> 

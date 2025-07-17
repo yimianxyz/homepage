@@ -22,29 +22,74 @@ function RandomStateGenerator(seed) {
 }
 
 /**
- * Generate completely random state for simulation
+ * Generate completely random (scattered) state for simulation (default method)
  * 
  * @param {number} numBoids - Number of boids to generate
  * @param {number} canvasWidth - Canvas width
  * @param {number} canvasHeight - Canvas height
- * @returns {Object} State dict in StateManager format:
- *   {
- *       boids_states: [
- *           {
- *               position: {x: float, y: float},
- *               velocity: {x: float, y: float}
- *           },
- *           ...
- *       ],
- *       predator_state: {
- *           position: {x: float, y: float},
- *           velocity: {x: float, y: float}
- *       },
- *       canvas_width: float,
- *       canvas_height: float
- *   }
+ * @returns {Object} State dict in StateManager format
  */
 RandomStateGenerator.prototype.generateRandomState = function(numBoids, canvasWidth, canvasHeight) {
+    return this.generateScatteredState(numBoids, canvasWidth, canvasHeight);
+};
+
+/**
+ * Generate clustered state - boids clustered around a random starting point
+ * 
+ * @param {number} numBoids - Number of boids to generate
+ * @param {number} canvasWidth - Canvas width
+ * @param {number} canvasHeight - Canvas height
+ * @returns {Object} State dict in StateManager format
+ */
+RandomStateGenerator.prototype.generateClusteredState = function(numBoids, canvasWidth, canvasHeight) {
+    var boidsStates = [];
+    var startX = Math.floor(this.random() * canvasWidth);
+    var startY = Math.floor(this.random() * canvasHeight);
+    
+    // Create boids clustered around a random starting point
+    for (var i = 0; i < numBoids; i++) {
+        var randomAngle = this.random() * 2 * Math.PI;
+        boidsStates.push({
+            position: {
+                x: startX + (this.random() - 0.5) * 100,
+                y: startY + (this.random() - 0.5) * 100
+            },
+            velocity: {
+                x: Math.cos(randomAngle),
+                y: Math.sin(randomAngle)
+            }
+        });
+    }
+    
+    // Create predator in center
+    var predatorState = {
+        position: {
+            x: canvasWidth / 2,
+            y: canvasHeight / 2
+        },
+        velocity: {
+            x: this.random() * 2 - 1,
+            y: this.random() * 2 - 1
+        }
+    };
+    
+    return {
+        boids_states: boidsStates,
+        predator_state: predatorState,
+        canvas_width: canvasWidth,
+        canvas_height: canvasHeight
+    };
+};
+
+/**
+ * Generate scattered state - boids scattered randomly across the canvas
+ * 
+ * @param {number} numBoids - Number of boids to generate
+ * @param {number} canvasWidth - Canvas width
+ * @param {number} canvasHeight - Canvas height
+ * @returns {Object} State dict in StateManager format
+ */
+RandomStateGenerator.prototype.generateScatteredState = function(numBoids, canvasWidth, canvasHeight) {
     // Generate random boids
     var boidsStates = [];
     for (var i = 0; i < numBoids; i++) {
@@ -60,6 +105,33 @@ RandomStateGenerator.prototype.generateRandomState = function(numBoids, canvasWi
         predator_state: predatorState,
         canvas_width: canvasWidth,
         canvas_height: canvasHeight
+    };
+};
+
+/**
+ * Clone an existing state
+ * 
+ * @param {Object} state - State to clone
+ * @returns {Object} Cloned state
+ */
+RandomStateGenerator.prototype.cloneState = function(state) {
+    var clonedBoids = [];
+    for (var i = 0; i < state.boids_states.length; i++) {
+        var boid = state.boids_states[i];
+        clonedBoids.push({
+            position: { x: boid.position.x, y: boid.position.y },
+            velocity: { x: boid.velocity.x, y: boid.velocity.y }
+        });
+    }
+    
+    return {
+        boids_states: clonedBoids,
+        predator_state: {
+            position: { x: state.predator_state.position.x, y: state.predator_state.position.y },
+            velocity: { x: state.predator_state.velocity.x, y: state.predator_state.velocity.y }
+        },
+        canvas_width: state.canvas_width,
+        canvas_height: state.canvas_height
     };
 };
 
@@ -142,18 +214,25 @@ RandomStateGenerator.prototype.seededRandom = function(seed) {
     };
 };
 
-/**
- * Convenience function to generate random state
- * 
- * @param {number} numBoids - Number of boids to generate
- * @param {number} canvasWidth - Canvas width
- * @param {number} canvasHeight - Canvas height
- * @param {number} seed - Optional seed for reproducible generation
- * @returns {Object} Random state dict in StateManager format
- */
+// Convenience functions for easy use
 function generateRandomState(numBoids, canvasWidth, canvasHeight, seed) {
     var generator = new RandomStateGenerator(seed);
     return generator.generateRandomState(numBoids, canvasWidth, canvasHeight);
+}
+
+function generateClusteredState(numBoids, canvasWidth, canvasHeight, seed) {
+    var generator = new RandomStateGenerator(seed);
+    return generator.generateClusteredState(numBoids, canvasWidth, canvasHeight);
+}
+
+function generateScatteredState(numBoids, canvasWidth, canvasHeight, seed) {
+    var generator = new RandomStateGenerator(seed);
+    return generator.generateScatteredState(numBoids, canvasWidth, canvasHeight);
+}
+
+function cloneState(state) {
+    var generator = new RandomStateGenerator();
+    return generator.cloneState(state);
 }
 
 // Example usage for testing
@@ -167,5 +246,20 @@ if (typeof window === 'undefined') {
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { RandomStateGenerator: RandomStateGenerator, generateRandomState: generateRandomState };
+    module.exports = { 
+        RandomStateGenerator: RandomStateGenerator, 
+        generateRandomState: generateRandomState,
+        generateClusteredState: generateClusteredState,
+        generateScatteredState: generateScatteredState,
+        cloneState: cloneState
+    };
+}
+
+// Global registration for browser use
+if (typeof window !== 'undefined') {
+    window.RandomStateGenerator = RandomStateGenerator;
+    window.generateRandomState = generateRandomState;
+    window.generateClusteredState = generateClusteredState;
+    window.generateScatteredState = generateScatteredState;
+    window.cloneState = cloneState;
 } 

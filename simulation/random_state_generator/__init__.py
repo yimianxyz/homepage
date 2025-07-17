@@ -5,6 +5,18 @@ This package provides random state generation for the simulation system.
 Both Python and JavaScript versions are maintained for 100% identical behavior.
 """
 
-from .random_state_generator import RandomStateGenerator, generate_random_state
+from .random_state_generator import (
+    RandomStateGenerator, 
+    generate_random_state, 
+    generate_clustered_state, 
+    generate_scattered_state, 
+    clone_state
+)
 
-__all__ = ['RandomStateGenerator', 'generate_random_state'] 
+__all__ = [
+    'RandomStateGenerator', 
+    'generate_random_state', 
+    'generate_clustered_state', 
+    'generate_scattered_state', 
+    'clone_state'
+] 

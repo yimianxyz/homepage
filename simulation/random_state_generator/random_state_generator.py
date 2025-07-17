@@ -35,7 +35,7 @@ class RandomStateGenerator:
                             canvas_width: float, 
                             canvas_height: float) -> Dict[str, Any]:
         """
-        Generate completely random state for simulation
+        Generate completely random (scattered) state for simulation (default method)
         
         Args:
             num_boids: Number of boids to generate
@@ -43,22 +43,76 @@ class RandomStateGenerator:
             canvas_height: Canvas height
             
         Returns:
-            State dict in StateManager format:
-            {
-                'boids_states': [
-                    {
-                        'position': {'x': float, 'y': float},
-                        'velocity': {'x': float, 'y': float}
-                    },
-                    ...
-                ],
-                'predator_state': {
-                    'position': {'x': float, 'y': float},
-                    'velocity': {'x': float, 'y': float}
+            State dict in StateManager format
+        """
+        return self.generate_scattered_state(num_boids, canvas_width, canvas_height)
+    
+    def generate_clustered_state(self, 
+                               num_boids: int, 
+                               canvas_width: float, 
+                               canvas_height: float) -> Dict[str, Any]:
+        """
+        Generate clustered state - boids clustered around a random starting point
+        
+        Args:
+            num_boids: Number of boids to generate
+            canvas_width: Canvas width
+            canvas_height: Canvas height
+            
+        Returns:
+            State dict in StateManager format
+        """
+        boids_states = []
+        start_x = math.floor(self.random() * canvas_width)
+        start_y = math.floor(self.random() * canvas_height)
+        
+        # Create boids clustered around a random starting point
+        for i in range(num_boids):
+            random_angle = self.random() * 2 * math.pi
+            boids_states.append({
+                'position': {
+                    'x': start_x + (self.random() - 0.5) * 100,
+                    'y': start_y + (self.random() - 0.5) * 100
                 },
-                'canvas_width': float,
-                'canvas_height': float
+                'velocity': {
+                    'x': math.cos(random_angle),
+                    'y': math.sin(random_angle)
+                }
+            })
+        
+        # Create predator in center
+        predator_state = {
+            'position': {
+                'x': canvas_width / 2,
+                'y': canvas_height / 2
+            },
+            'velocity': {
+                'x': self.random() * 2 - 1,
+                'y': self.random() * 2 - 1
             }
+        }
+        
+        return {
+            'boids_states': boids_states,
+            'predator_state': predator_state,
+            'canvas_width': canvas_width,
+            'canvas_height': canvas_height
+        }
+    
+    def generate_scattered_state(self, 
+                               num_boids: int, 
+                               canvas_width: float, 
+                               canvas_height: float) -> Dict[str, Any]:
+        """
+        Generate scattered state - boids scattered randomly across the canvas
+        
+        Args:
+            num_boids: Number of boids to generate
+            canvas_width: Canvas width
+            canvas_height: Canvas height
+            
+        Returns:
+            State dict in StateManager format
         """
         # Generate random boids
         boids_states = []
@@ -74,6 +128,33 @@ class RandomStateGenerator:
             'predator_state': predator_state,
             'canvas_width': canvas_width,
             'canvas_height': canvas_height
+        }
+    
+    def clone_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Clone an existing state
+        
+        Args:
+            state: State to clone
+            
+        Returns:
+            Cloned state
+        """
+        cloned_boids = []
+        for boid in state['boids_states']:
+            cloned_boids.append({
+                'position': {'x': boid['position']['x'], 'y': boid['position']['y']},
+                'velocity': {'x': boid['velocity']['x'], 'y': boid['velocity']['y']}
+            })
+        
+        return {
+            'boids_states': cloned_boids,
+            'predator_state': {
+                'position': {'x': state['predator_state']['position']['x'], 'y': state['predator_state']['position']['y']},
+                'velocity': {'x': state['predator_state']['velocity']['x'], 'y': state['predator_state']['velocity']['y']}
+            },
+            'canvas_width': state['canvas_width'],
+            'canvas_height': state['canvas_height']
         }
     
     def _generate_random_boid(self, canvas_width: float, canvas_height: float) -> Dict[str, Any]:
@@ -161,6 +242,7 @@ class RandomStateGenerator:
         
         return next_random
 
+# Convenience functions for easy use
 def generate_random_state(num_boids: int, 
                          canvas_width: float, 
                          canvas_height: float, 
@@ -179,6 +261,57 @@ def generate_random_state(num_boids: int,
     """
     generator = RandomStateGenerator(seed)
     return generator.generate_random_state(num_boids, canvas_width, canvas_height)
+
+def generate_clustered_state(num_boids: int, 
+                           canvas_width: float, 
+                           canvas_height: float, 
+                           seed: int = None) -> Dict[str, Any]:
+    """
+    Convenience function to generate clustered state
+    
+    Args:
+        num_boids: Number of boids to generate
+        canvas_width: Canvas width
+        canvas_height: Canvas height
+        seed: Optional seed for reproducible generation
+        
+    Returns:
+        Clustered state dict in StateManager format
+    """
+    generator = RandomStateGenerator(seed)
+    return generator.generate_clustered_state(num_boids, canvas_width, canvas_height)
+
+def generate_scattered_state(num_boids: int, 
+                           canvas_width: float, 
+                           canvas_height: float, 
+                           seed: int = None) -> Dict[str, Any]:
+    """
+    Convenience function to generate scattered state
+    
+    Args:
+        num_boids: Number of boids to generate
+        canvas_width: Canvas width
+        canvas_height: Canvas height
+        seed: Optional seed for reproducible generation
+        
+    Returns:
+        Scattered state dict in StateManager format
+    """
+    generator = RandomStateGenerator(seed)
+    return generator.generate_scattered_state(num_boids, canvas_width, canvas_height)
+
+def clone_state(state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convenience function to clone state
+    
+    Args:
+        state: State to clone
+        
+    Returns:
+        Cloned state
+    """
+    generator = RandomStateGenerator()
+    return generator.clone_state(state)
 
 # Example usage
 if __name__ == "__main__":
