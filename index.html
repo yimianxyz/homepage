@@ -17,26 +17,21 @@
     <link rel="stylesheet" href="styles.css">
     
     <!-- Configuration -->
-    <script src="src/config/constants.js"></script>
-    <script src="src/config/model.js"></script>
+    <script src="config/constants.js"></script>
     
-    <!-- Utilities -->
-    <script src="src/utils/vector.js"></script>
+    <!-- Simulation Runtime -->
+    <script src="simulation/runtime/simulation_runtime.js"></script>
     
-    <!-- AI Components -->
-    <script src="src/ai/transformer_encoder.js"></script>
-    <script src="src/ai/input_processor.js"></script>
-    <script src="src/ai/action_processor.js"></script>
+    <!-- Processors -->
+    <script src="simulation/processors/input_processor.js"></script>
+    <script src="simulation/processors/action_processor.js"></script>
     
-    <!-- Simulation Components -->
-    <script src="src/simulation/boid.js"></script>
-    <script src="src/simulation/predator.js"></script>
-    <script src="src/simulation/neural_predator.js"></script>
-    <script src="src/simulation/simulation.js"></script>
-    <script src="src/ui/canvas_init.js"></script>
+    <!-- State Management -->
+    <script src="simulation/state_manager/state_manager.js"></script>
     
-    <!-- Homepage Initialization -->
-    <script src="src/init.js"></script>
+    <!-- Policy -->
+    <script src="policy/human_prior/closest_pursuit_policy.js"></script>
+    
     <style>
         html, body {
             margin: 0;
@@ -72,9 +67,6 @@
         
         @import url('https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap');
     </style>
-    <script>
-        window.addEventListener("resize", resizeCanvas);
-    </script>
 </head>
 <body>
     <canvas id="boids1"></canvas>
@@ -96,5 +88,256 @@
             <p>Find me on <a href="mailto:i@yimian.xyz">Email</a> | <a href="https://github.com/yimianxyz" target="_blank" rel="noopener noreferrer">GitHub</a> | <a href="https://www.linkedin.com/in/yimianxyz" target="_blank" rel="noopener noreferrer">LinkedIn</a></p>
         </div>
     </main>
+
+    <script>
+        /**
+         * Canvas Utilities
+         */
+        function resizeCanvas() {
+            var canvas = document.getElementById('boids1');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        function isCanvasSupported() {
+            var canvas = document.createElement('canvas');
+            return !!(canvas.getContext && canvas.getContext('2d'));
+        }
+
+        /**
+         * Visualization/Rendering Functions
+         */
+        function renderBoid(ctx, boidState, renderSize) {
+            var position = boidState.position;
+            var velocity = boidState.velocity;
+            
+            // Calculate direction vector
+            var magnitude = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+            if (magnitude === 0) return;
+            
+            var directionX = (velocity.x / magnitude) * renderSize;
+            var directionY = (velocity.y / magnitude) * renderSize;
+            
+            // Calculate perpendicular vectors for triangle
+            var inverse1X = -directionY / 3;
+            var inverse1Y = directionX / 3;
+            var inverse2X = directionY / 3;
+            var inverse2Y = -directionX / 3;
+
+            ctx.beginPath();
+            ctx.moveTo(position.x, position.y);
+            ctx.lineTo(position.x + inverse1X, position.y + inverse1Y);
+            ctx.lineTo(position.x + directionX, position.y + directionY);
+            ctx.lineTo(position.x + inverse2X, position.y + inverse2Y);
+            ctx.lineTo(position.x, position.y);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fill();
+        }
+
+        function renderPredator(ctx, predatorState, predatorSize) {
+            var position = predatorState.position;
+            var velocity = predatorState.velocity;
+            
+            // Calculate direction vector
+            var magnitude = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+            if (magnitude === 0) return;
+            
+            var directionX = (velocity.x / magnitude) * predatorSize * 1.2;
+            var directionY = (velocity.y / magnitude) * predatorSize * 1.2;
+            
+            // Calculate perpendicular vectors for elongated triangle
+            var inverse1X = -directionY / 4;
+            var inverse1Y = directionX / 4;
+            var inverse2X = directionY / 4;
+            var inverse2Y = -directionX / 4;
+            
+            ctx.beginPath();
+            ctx.moveTo(position.x, position.y);
+            ctx.lineTo(position.x + inverse1X, position.y + inverse1Y);
+            ctx.lineTo(position.x + directionX, position.y + directionY);
+            ctx.lineTo(position.x + inverse2X, position.y + inverse2Y);
+            ctx.lineTo(position.x, position.y);
+            
+            // Distinctive dark red coloring
+            ctx.strokeStyle = 'rgba(80, 30, 30, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(120, 40, 40, 0.4)';
+            ctx.fill();
+            
+            // Add inner highlight
+            ctx.beginPath();
+            ctx.arc(position.x, position.y, Math.max(2, predatorSize * 0.15), 0, 2 * Math.PI);
+            ctx.fillStyle = 'rgba(160, 60, 60, 0.3)';
+            ctx.fill();
+        }
+
+        /**
+         * State Initialization
+         */
+        function createInitialState(numBoids, canvasWidth, canvasHeight) {
+            var boidsStates = [];
+            var startX = Math.floor(Math.random() * canvasWidth);
+            var startY = Math.floor(Math.random() * canvasHeight);
+            
+            // Create boids clustered around a random starting point
+            for (var i = 0; i < numBoids; i++) {
+                var randomAngle = Math.random() * 2 * Math.PI;
+                boidsStates.push({
+                    position: {
+                        x: startX + (Math.random() - 0.5) * 100,
+                        y: startY + (Math.random() - 0.5) * 100
+                    },
+                    velocity: {
+                        x: Math.cos(randomAngle),
+                        y: Math.sin(randomAngle)
+                    }
+                });
+            }
+            
+            // Create predator in center
+            var predatorState = {
+                position: {
+                    x: canvasWidth / 2,
+                    y: canvasHeight / 2
+                },
+                velocity: {
+                    x: Math.random() * 2 - 1,
+                    y: Math.random() * 2 - 1
+                }
+            };
+            
+            return {
+                boids_states: boidsStates,
+                predator_state: predatorState,
+                canvas_width: canvasWidth,
+                canvas_height: canvasHeight
+            };
+        }
+
+        /**
+         * Main Simulation Class
+         */
+        function HomepageSimulation(canvasId) {
+            this.canvas = document.getElementById(canvasId);
+            this.ctx = this.canvas.getContext('2d');
+            this.stateManager = new StateManager();
+            this.policy = createClosestPursuitPolicy();
+            
+            // Animation state
+            this.isRunning = false;
+            this.animationId = null;
+        }
+
+        HomepageSimulation.prototype.initialize = function() {
+            // Set canvas size
+            resizeCanvas();
+            var canvasWidth = this.canvas.width;
+            var canvasHeight = this.canvas.height;
+            
+            // Create initial state
+            var initialState = createInitialState(
+                window.SIMULATION_CONSTANTS.DEFAULT_NUM_BOIDS,
+                canvasWidth,
+                canvasHeight
+            );
+            
+            // Initialize state manager with closest pursuit policy
+            this.stateManager.init(initialState, this.policy);
+            
+            console.log("Homepage simulation initialized with closest pursuit policy");
+            console.log("Boids:", window.SIMULATION_CONSTANTS.DEFAULT_NUM_BOIDS);
+        };
+
+        HomepageSimulation.prototype.step = function() {
+            // Update canvas size if changed
+            var newWidth = window.innerWidth;
+            var newHeight = window.innerHeight;
+            
+            if (this.canvas.width !== newWidth || this.canvas.height !== newHeight) {
+                this.canvas.width = newWidth;
+                this.canvas.height = newHeight;
+                
+                // Update state with new canvas dimensions
+                this.stateManager.currentState.canvas_width = newWidth;
+                this.stateManager.currentState.canvas_height = newHeight;
+            }
+            
+            // Step simulation
+            var newState = this.stateManager.step();
+            
+            // Remove caught boids
+            if (newState.caught_boids && newState.caught_boids.length > 0) {
+                // Remove caught boids in reverse order to maintain indices
+                for (var i = newState.caught_boids.length - 1; i >= 0; i--) {
+                    newState.boids_states.splice(newState.caught_boids[i], 1);
+                }
+            }
+        };
+
+        HomepageSimulation.prototype.render = function() {
+            // Clear canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            var currentState = this.stateManager.currentState;
+            
+            // Render boids
+            for (var i = 0; i < currentState.boids_states.length; i++) {
+                renderBoid(this.ctx, currentState.boids_states[i], window.SIMULATION_CONSTANTS.BOID_RENDER_SIZE);
+            }
+            
+            // Render predator
+            renderPredator(this.ctx, currentState.predator_state, window.SIMULATION_CONSTANTS.PREDATOR_SIZE);
+        };
+
+        HomepageSimulation.prototype.animate = function() {
+            if (!this.isRunning) return;
+            
+            this.step();
+            this.render();
+            
+            this.animationId = requestAnimationFrame(this.animate.bind(this));
+        };
+
+        HomepageSimulation.prototype.start = function() {
+            if (this.isRunning) return;
+            
+            this.isRunning = true;
+            this.animate();
+        };
+
+        HomepageSimulation.prototype.stop = function() {
+            this.isRunning = false;
+            if (this.animationId) {
+                cancelAnimationFrame(this.animationId);
+                this.animationId = null;
+            }
+        };
+
+        /**
+         * Initialize on page load
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!isCanvasSupported()) {
+                console.warn("Canvas not supported");
+                return;
+            }
+            
+            // Create and start simulation
+            var simulation = new HomepageSimulation('boids1');
+            simulation.initialize();
+            simulation.start();
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                resizeCanvas();
+            });
+            
+            // Store globally for debugging
+            window.simulation = simulation;
+        });
+    </script>
 </body>
 </html> 
