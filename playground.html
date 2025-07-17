@@ -33,6 +33,7 @@
     <script src="policy/transformer/utils/transformer_encoder.js"></script>
     <script src="policy/transformer/utils/transformer_policy_wrapper.js"></script>
     <script src="policy/transformer/transformer_policy.js"></script>
+    <script src="policy/transformer/models/test.js"></script>
     
     <!-- UI Modules -->
     <script src="ui/canvas.js"></script>
@@ -68,7 +69,7 @@
                 <label>Policy Type:</label>
                 <select id="policy-select">
                     <option value="closest_pursuit">Closest Pursuit</option>
-                    <option value="transformer">Transformer</option>
+                    <option value="transformer" selected>Transformer</option>
                 </select>
                 <button id="load-policy-btn">🔄 Load Policy</button>
             </div>
@@ -217,7 +218,7 @@
             
             // Initialize
             this.initializeControls();
-            this.loadPolicy('closest_pursuit');
+            this.loadPolicy('transformer');
         }
 
         PlaygroundSimulation.prototype.initializeControls = function() {
