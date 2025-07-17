@@ -1,0 +1,290 @@
+/**
+ * Transformer Policy Wrapper - Universal wrapper for transformer-based policies
+ * 
+ * This wrapper provides a universal policy interface that can work with any trained
+ * transformer model from a model.js file. It handles loading different model parameters
+ * and provides consistent inference interface for the simulation framework.
+ * 
+ * Interface:
+ * - Input: structured_inputs (same format as universal policy input)
+ * - Output: normalized policy outputs [x, y] in [-1, 1] range
+ * - Compatible with ActionProcessor for scaling to game forces
+ * 
+ * Usage:
+ * - Can load from global TRANSFORMER_PARAMS (from model.js)
+ * - Can load from custom parameter objects
+ * - Can work with different trained models without code changes
+ */
+
+/**
+ * Transformer Policy Wrapper - works with any trained transformer model
+ * @param {Object} modelParams - Optional model parameters object
+ * @param {string} modelPath - Optional path to model file
+ * @constructor
+ */
+function TransformerPolicyWrapper(modelParams, modelPath) {
+    // Initialize transformer encoder
+    this.transformer = new TransformerEncoder();
+    
+    // Load model if provided
+    if (modelParams) {
+        this.loadModel(modelParams);
+    } else if (modelPath) {
+        this.loadModelFromPath(modelPath);
+    }
+    
+    // Policy metadata
+    this.policyType = 'transformer';
+    this.architecture = {
+        d_model: this.transformer.d_model,
+        n_heads: this.transformer.n_heads,
+        n_layers: this.transformer.n_layers,
+        ffn_hidden: this.transformer.ffn_hidden
+    };
+    
+    console.log("Created TransformerPolicyWrapper:");
+    console.log("  Architecture:", this.architecture);
+    console.log("  Model load result:", this.transformer.modelLoadResult);
+}
+
+/**
+ * Get normalized policy outputs (compatible with ActionProcessor)
+ * 
+ * @param {Object} structured_inputs - Same format as universal policy input
+ * - context: {canvasWidth: number, canvasHeight: number}
+ * - predator: {velX: number, velY: number}
+ * - boids: [{relX: number, relY: number, velX: number, velY: number}, ...]
+ * 
+ * @returns {Array} Normalized policy outputs [x, y] in [-1, 1] range
+ */
+TransformerPolicyWrapper.prototype.getAction = function(structured_inputs) {
+    try {
+        // Validate input structure
+        if (!this.validateInputs(structured_inputs)) {
+            console.warn("TransformerPolicyWrapper: Invalid input structure, returning zero action");
+            return [0.0, 0.0];
+        }
+        
+        // Forward pass through transformer
+        var outputs = this.transformer.forward(structured_inputs);
+        
+        // Ensure outputs are in [-1, 1] range (transformer already applies tanh)
+        var clampedOutputs = [
+            Math.max(-1, Math.min(1, outputs[0])),
+            Math.max(-1, Math.min(1, outputs[1]))
+        ];
+        
+        return clampedOutputs;
+        
+    } catch (error) {
+        console.error("TransformerPolicyWrapper: Error during forward pass:", error);
+        return [0.0, 0.0];
+    }
+};
+
+/**
+ * Load model from parameters object
+ * 
+ * @param {Object} modelParams - Model parameters object from model.js
+ * @returns {Object} Load result with success status and message
+ */
+TransformerPolicyWrapper.prototype.loadModel = function(modelParams) {
+    console.log("TransformerPolicyWrapper: Loading model from parameters...");
+    
+    var loadResult = this.transformer.loadParameters(modelParams);
+    
+    if (loadResult.success) {
+        console.log("TransformerPolicyWrapper: Model loaded successfully");
+        this.modelLoaded = true;
+    } else {
+        console.warn("TransformerPolicyWrapper: Model loading failed:", loadResult.fallbackReason);
+        this.modelLoaded = false;
+    }
+    
+    return loadResult;
+};
+
+/**
+ * Load model from file path (for future use with dynamic loading)
+ * 
+ * @param {string} modelPath - Path to model file
+ * @returns {Object} Load result
+ */
+TransformerPolicyWrapper.prototype.loadModelFromPath = function(modelPath) {
+    console.log("TransformerPolicyWrapper: Loading model from path:", modelPath);
+    
+    // For now, assume the model is already loaded globally
+    // In a real implementation, you might use fetch() or require()
+    if (typeof window !== 'undefined' && window.TRANSFORMER_PARAMS) {
+        return this.loadModel(window.TRANSFORMER_PARAMS);
+    } else {
+        console.warn("TransformerPolicyWrapper: No global TRANSFORMER_PARAMS found");
+        return {
+            success: false,
+            message: "Model file not found",
+            fallbackReason: "Could not load model from path: " + modelPath
+        };
+    }
+};
+
+/**
+ * Validate structured inputs
+ * 
+ * @param {Object} structured_inputs - Inputs to validate
+ * @returns {boolean} True if valid
+ */
+TransformerPolicyWrapper.prototype.validateInputs = function(structured_inputs) {
+    // Check required top-level structure
+    if (!structured_inputs || typeof structured_inputs !== 'object') {
+        return false;
+    }
+    
+    // Check context
+    if (!structured_inputs.context || 
+        typeof structured_inputs.context.canvasWidth !== 'number' ||
+        typeof structured_inputs.context.canvasHeight !== 'number') {
+        return false;
+    }
+    
+    // Check predator
+    if (!structured_inputs.predator ||
+        typeof structured_inputs.predator.velX !== 'number' ||
+        typeof structured_inputs.predator.velY !== 'number') {
+        return false;
+    }
+    
+    // Check boids (can be empty array)
+    if (!Array.isArray(structured_inputs.boids)) {
+        return false;
+    }
+    
+    // Validate each boid
+    for (var i = 0; i < structured_inputs.boids.length; i++) {
+        var boid = structured_inputs.boids[i];
+        if (!boid || 
+            typeof boid.relX !== 'number' ||
+            typeof boid.relY !== 'number' ||
+            typeof boid.velX !== 'number' ||
+            typeof boid.velY !== 'number') {
+            return false;
+        }
+    }
+    
+    return true;
+};
+
+/**
+ * Get model information
+ * 
+ * @returns {Object} Model information
+ */
+TransformerPolicyWrapper.prototype.getModelInfo = function() {
+    return {
+        policyType: this.policyType,
+        architecture: this.architecture,
+        modelLoaded: this.modelLoaded || false,
+        loadResult: this.transformer.modelLoadResult,
+        parameterCount: this.getParameterCount()
+    };
+};
+
+/**
+ * Get approximate parameter count
+ * 
+ * @returns {number} Approximate number of parameters
+ */
+TransformerPolicyWrapper.prototype.getParameterCount = function() {
+    var d_model = this.architecture.d_model;
+    var n_heads = this.architecture.n_heads;
+    var n_layers = this.architecture.n_layers;
+    var ffn_hidden = this.architecture.ffn_hidden;
+    
+    // Approximate calculation
+    var embedding_params = d_model * 4; // 4 type embeddings
+    var projection_params = (2 + 4 + 4) * d_model; // ctx, predator, boid projections
+    var layer_params = n_layers * (
+        d_model * 3 * d_model + // QKV projection
+        d_model * d_model +     // attention output
+        d_model * ffn_hidden * 3 + // GEGLU (gate, up, down)
+        d_model * 4             // layer norm parameters
+    );
+    var output_params = d_model * 2;
+    
+    return embedding_params + projection_params + layer_params + output_params;
+};
+
+/**
+ * Reset model to random initialization
+ */
+TransformerPolicyWrapper.prototype.resetModel = function() {
+    this.transformer.reset();
+    this.modelLoaded = false;
+    console.log("TransformerPolicyWrapper: Model reset to random initialization");
+};
+
+/**
+ * Get normalized action (deprecated - use getAction instead)
+ * 
+ * @param {Object} structured_inputs - Same format as universal policy input
+ * @returns {Array} Normalized policy outputs [x, y] in [-1, 1] range
+ */
+TransformerPolicyWrapper.prototype.getNormalizedAction = function(structured_inputs) {
+    return this.getAction(structured_inputs);
+};
+
+/**
+ * Create transformer policy wrapper instance
+ * 
+ * @param {Object} modelParams - Optional model parameters from model.js
+ * @param {string} modelPath - Optional model file path
+ * @returns {TransformerPolicyWrapper} Policy wrapper instance
+ */
+function createTransformerPolicyWrapper(modelParams, modelPath) {
+    var policy = new TransformerPolicyWrapper(modelParams, modelPath);
+    
+    console.log("TransformerPolicyWrapper created:");
+    console.log("  Policy type:", policy.policyType);
+    console.log("  Parameters:", policy.getParameterCount().toLocaleString());
+    console.log("  Model loaded:", policy.modelLoaded);
+    
+    return policy;
+}
+
+/**
+ * Create transformer policy wrapper from global TRANSFORMER_PARAMS
+ * 
+ * @returns {TransformerPolicyWrapper} Policy wrapper instance
+ */
+function createTransformerPolicyFromGlobal() {
+    if (typeof window !== 'undefined' && window.TRANSFORMER_PARAMS) {
+        return createTransformerPolicyWrapper(window.TRANSFORMER_PARAMS);
+    } else {
+        console.warn("No global TRANSFORMER_PARAMS found, creating policy with random weights");
+        return createTransformerPolicyWrapper();
+    }
+}
+
+/**
+ * Create transformer policy wrapper with custom model parameters
+ * 
+ * @param {Object} customParams - Custom model parameters object
+ * @returns {TransformerPolicyWrapper} Policy wrapper instance
+ */
+function createTransformerPolicyWithModel(customParams) {
+    if (!customParams) {
+        console.warn("No custom parameters provided, using global TRANSFORMER_PARAMS");
+        return createTransformerPolicyFromGlobal();
+    }
+    
+    return createTransformerPolicyWrapper(customParams);
+}
+
+// Export for module systems
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        TransformerPolicyWrapper: TransformerPolicyWrapper,
+        createTransformerPolicyWrapper: createTransformerPolicyWrapper,
+        createTransformerPolicyFromGlobal: createTransformerPolicyFromGlobal,
+        createTransformerPolicyWithModel: createTransformerPolicyWithModel
+    };
+} 
