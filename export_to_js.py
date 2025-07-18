@@ -51,7 +51,7 @@ def extract_architecture_from_state_dict(state_dict: dict) -> dict:
     print(f"  n_layers: {n_layers} (counted from transformer_layers)")
     
     # Extract ffn_hidden from first layer's gate projection
-    ffn_key = "transformer_layers.0.ffn.gate_proj.weight"
+    ffn_key = "transformer_layers.0.ffn_gate_proj.weight"
     if ffn_key in state_dict:
         ffn_hidden = state_dict[ffn_key].shape[0]
         print(f"  ffn_hidden: {ffn_hidden} (from FFN gate projection shape)")
@@ -206,14 +206,14 @@ def convert_state_dict_to_js(state_dict: dict) -> dict:
         
         # GEGLU FFN parameters
         # PyTorch Linear(in, out) has weight [out, in], which matches JS expectation for gate/up
-        ffn_gate_weight = state_dict[f"{layer_prefix}.ffn.gate_proj.weight"]     # [96, 48] - correct for JS
-        ffn_gate_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.ffn.gate_proj.bias"])
+        ffn_gate_weight = state_dict[f"{layer_prefix}.ffn_gate_proj.weight"]     # [96, 48] - correct for JS
+        ffn_gate_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.ffn_gate_proj.bias"])
         
-        ffn_up_weight = state_dict[f"{layer_prefix}.ffn.up_proj.weight"]         # [96, 48] - correct for JS
-        ffn_up_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.ffn.up_proj.bias"])
+        ffn_up_weight = state_dict[f"{layer_prefix}.ffn_up_proj.weight"]         # [96, 48] - correct for JS
+        ffn_up_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.ffn_up_proj.bias"])
         
-        ffn_down_weight = state_dict[f"{layer_prefix}.ffn.down_proj.weight"]     # [48, 96] - correct for JS
-        ffn_down_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.ffn.down_proj.bias"])
+        ffn_down_weight = state_dict[f"{layer_prefix}.ffn_down_proj.weight"]     # [48, 96] - correct for JS
+        ffn_down_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.ffn_down_proj.bias"])
         
         layer_params = {
             "ln_scale": ln_scale,
