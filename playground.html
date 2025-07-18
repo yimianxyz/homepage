@@ -168,6 +168,7 @@
             <div>Policy: <span id="debug-policy">None</span></div>
             <div>Frame: <span id="debug-frame">0</span></div>
             <div>Caught: <span id="debug-caught">0</span></div>
+            <div>Canvas: <span id="debug-canvas-size">0×0</span></div>
         </div>
     </div>
     
@@ -559,6 +560,7 @@
             document.getElementById('debug-policy').textContent = this.policy ? this.policy.constructor.name : 'None';
             document.getElementById('debug-frame').textContent = this.frameCount;
             document.getElementById('debug-caught').textContent = this.totalCaught;
+            document.getElementById('debug-canvas-size').textContent = this.canvas.width + '×' + this.canvas.height;
             
             // Update performance metrics
             if (this.showPerformance) {
