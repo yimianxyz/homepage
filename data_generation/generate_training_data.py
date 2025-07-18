@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-Training Data Generator for Supervised Learning
+Training Data Generator for Supervised Learning (Memory-Efficient Streaming)
 
 This script generates training data using the closest pursuit policy as the teacher.
-It creates diverse scenarios with random boid counts (1-50) and canvas sizes
-covering mobile to desktop devices for comprehensive training data.
+It uses streaming writes to avoid memory issues with large datasets, allowing generation
+of millions of samples without memory problems.
 
-Output format:
+Features:
+- Memory-efficient streaming writes
+- Diverse scenarios with random boid counts (1-50) and canvas sizes
 - JSON dataset with input-output pairs
-- Inputs: Structured format from InputProcessor  
-- Outputs: Normalized actions from ClosestPursuitPolicy
-- Metadata: Canvas size, boid count, generation parameters
+- Comprehensive progress tracking and statistics
 
 Usage:
-    python generate_training_data.py --samples 10000 --output training_data.json
+    python generate_training_data.py --samples 1000000 --output training_data.json
 """
 
 import json
@@ -36,7 +36,7 @@ from policy.human_prior.closest_pursuit_policy import create_closest_pursuit_pol
 from config.constants import CONSTANTS
 
 class TrainingDataGenerator:
-    """Generate training data using closest pursuit policy as teacher"""
+    """Memory-efficient streaming data generator using closest pursuit policy as teacher"""
     
     def __init__(self, seed: int = None):
         """
@@ -70,6 +70,7 @@ class TrainingDataGenerator:
         print(f"  Canvas width range: {self.min_canvas_width}-{self.max_canvas_width}")
         print(f"  Canvas height range: {self.min_canvas_height}-{self.max_canvas_height}")
         print(f"  Teacher policy: Closest Pursuit")
+        print(f"  Mode: Streaming (memory-efficient)")
     
     def generate_random_canvas_size(self) -> Tuple[int, int]:
         """
@@ -147,20 +148,20 @@ class TrainingDataGenerator:
     
     def generate_dataset(self, 
                         num_samples: int, 
-                        progress_interval: int = 1000) -> Dict[str, Any]:
+                        output_path: str,
+                        progress_interval: int = 1000,
+                        batch_size: int = 1000) -> None:
         """
-        Generate complete training dataset
+        Generate dataset with streaming write to avoid memory issues
         
         Args:
             num_samples: Number of samples to generate
+            output_path: Output file path for streaming write
             progress_interval: Print progress every N samples
-            
-        Returns:
-            Complete dataset with samples and metadata
+            batch_size: Write to file every N samples
         """
-        print(f"\nGenerating {num_samples:,} training samples...")
+        print(f"\nGenerating {num_samples:,} training samples (streaming mode)...")
         
-        samples = []
         start_time = time.time()
         
         # Statistics tracking
@@ -169,45 +170,60 @@ class TrainingDataGenerator:
         canvas_height_stats = {'min': float('inf'), 'max': 0, 'total': 0}
         valid_target_count = 0
         
-        for i in range(num_samples):
-            sample = self.generate_single_sample()
-            samples.append(sample)
+        # Open file for streaming write
+        with open(output_path, 'w') as f:
+            # Write JSON opening
+            f.write('{\n  "samples": [\n')
             
-            # Update statistics
-            metadata = sample['metadata']
+            # Generate and write samples incrementally
+            for i in range(num_samples):
+                sample = self.generate_single_sample()
+                
+                # Update statistics
+                metadata = sample['metadata']
+                
+                boid_count = metadata['num_boids']
+                boid_count_stats['min'] = min(boid_count_stats['min'], boid_count)
+                boid_count_stats['max'] = max(boid_count_stats['max'], boid_count)
+                boid_count_stats['total'] += boid_count
+                
+                canvas_width = metadata['canvas_width']
+                canvas_width_stats['min'] = min(canvas_width_stats['min'], canvas_width)
+                canvas_width_stats['max'] = max(canvas_width_stats['max'], canvas_width)
+                canvas_width_stats['total'] += canvas_width
+                
+                canvas_height = metadata['canvas_height']
+                canvas_height_stats['min'] = min(canvas_height_stats['min'], canvas_height)
+                canvas_height_stats['max'] = max(canvas_height_stats['max'], canvas_height)
+                canvas_height_stats['total'] += canvas_height
+                
+                if metadata['has_valid_target']:
+                    valid_target_count += 1
+                
+                # Write sample to file immediately (streaming)
+                sample_json = json.dumps(sample, separators=(',', ':'))
+                if i > 0:
+                    f.write(',\n    ')
+                else:
+                    f.write('    ')
+                f.write(sample_json)
+                
+                # Flush periodically to ensure data is written
+                if (i + 1) % batch_size == 0:
+                    f.flush()
+                
+                # Print progress
+                if (i + 1) % progress_interval == 0:
+                    elapsed = time.time() - start_time
+                    rate = (i + 1) / elapsed
+                    remaining = (num_samples - i - 1) / rate if rate > 0 else 0
+                    print(f"  Progress: {i+1:,}/{num_samples:,} ({(i+1)/num_samples*100:.1f}%) "
+                          f"- {rate:.1f} samples/sec - ETA: {remaining:.1f}s")
             
-            boid_count = metadata['num_boids']
-            boid_count_stats['min'] = min(boid_count_stats['min'], boid_count)
-            boid_count_stats['max'] = max(boid_count_stats['max'], boid_count)
-            boid_count_stats['total'] += boid_count
+            elapsed_time = time.time() - start_time
             
-            canvas_width = metadata['canvas_width']
-            canvas_width_stats['min'] = min(canvas_width_stats['min'], canvas_width)
-            canvas_width_stats['max'] = max(canvas_width_stats['max'], canvas_width)
-            canvas_width_stats['total'] += canvas_width
-            
-            canvas_height = metadata['canvas_height']
-            canvas_height_stats['min'] = min(canvas_height_stats['min'], canvas_height)
-            canvas_height_stats['max'] = max(canvas_height_stats['max'], canvas_height)
-            canvas_height_stats['total'] += canvas_height
-            
-            if metadata['has_valid_target']:
-                valid_target_count += 1
-            
-            # Print progress
-            if (i + 1) % progress_interval == 0:
-                elapsed = time.time() - start_time
-                rate = (i + 1) / elapsed
-                remaining = (num_samples - i - 1) / rate if rate > 0 else 0
-                print(f"  Progress: {i+1:,}/{num_samples:,} ({(i+1)/num_samples*100:.1f}%) "
-                      f"- {rate:.1f} samples/sec - ETA: {remaining:.1f}s")
-        
-        elapsed_time = time.time() - start_time
-        
-        # Compile dataset with metadata
-        dataset = {
-            'samples': samples,
-            'metadata': {
+            # Compile metadata
+            metadata = {
                 'total_samples': num_samples,
                 'generation_time_seconds': elapsed_time,
                 'generation_rate_samples_per_second': num_samples / elapsed_time,
@@ -242,7 +258,11 @@ class TrainingDataGenerator:
                     'valid_target_percentage': (valid_target_count / num_samples) * 100
                 }
             }
-        }
+            
+            # Write JSON closing with metadata
+            f.write('\n  ],\n  "metadata": ')
+            json.dump(metadata, f, indent=2)
+            f.write('\n}\n')
         
         print(f"\nDataset generation completed!")
         print(f"  Total samples: {num_samples:,}")
@@ -252,28 +272,15 @@ class TrainingDataGenerator:
         print(f"  Canvas width range: {canvas_width_stats['min']}-{canvas_width_stats['max']} (avg: {canvas_width_stats['total']/num_samples:.0f})")
         print(f"  Canvas height range: {canvas_height_stats['min']}-{canvas_height_stats['max']} (avg: {canvas_height_stats['total']/num_samples:.0f})")
         
-        return dataset
-    
-    def save_dataset(self, dataset: Dict[str, Any], output_path: str) -> None:
-        """
-        Save dataset to JSON file
-        
-        Args:
-            dataset: Generated dataset
-            output_path: Output file path
-        """
-        print(f"\nSaving dataset to {output_path}...")
-        
-        with open(output_path, 'w') as f:
-            json.dump(dataset, f, indent=2)
-        
         # Calculate file size
         file_size = Path(output_path).stat().st_size
         file_size_mb = file_size / (1024 * 1024)
         
-        print(f"Dataset saved successfully!")
+        print(f"\nDataset saved successfully!")
         print(f"  File: {output_path}")
         print(f"  Size: {file_size_mb:.2f} MB ({file_size:,} bytes)")
+    
+
 
 def main():
     """Main function for command-line usage"""
@@ -304,6 +311,12 @@ def main():
         default=1000,
         help='Progress reporting interval (default: 1000)'
     )
+    parser.add_argument(
+        '--batch-size', 
+        type=int, 
+        default=1000,
+        help='Write batch size for memory efficiency (default: 1000)'
+    )
     
     args = parser.parse_args()
     
@@ -313,13 +326,16 @@ def main():
     print(f"Output file: {args.output}")
     print(f"Random seed: {args.seed if args.seed else 'random'}")
     print(f"Progress interval: {args.progress}")
+    print(f"Batch size: {args.batch_size}")
     
-    # Generate dataset
+    # Generate dataset with streaming
     generator = TrainingDataGenerator(seed=args.seed)
-    dataset = generator.generate_dataset(args.samples, args.progress)
-    
-    # Save dataset
-    generator.save_dataset(dataset, args.output)
+    generator.generate_dataset(
+        args.samples, 
+        args.output, 
+        args.progress, 
+        args.batch_size
+    )
     
     print("\n✅ Training data generation completed successfully!")
 
