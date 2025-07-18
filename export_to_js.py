@@ -34,15 +34,82 @@ def convert_tensor_to_js(tensor: torch.Tensor) -> list:
     """Convert PyTorch tensor to JavaScript array"""
     return tensor.detach().cpu().numpy().tolist()
 
+def extract_architecture_from_state_dict(state_dict: dict) -> dict:
+    """Extract architecture parameters from PyTorch state dict"""
+    print("Extracting architecture parameters from checkpoint...")
+    
+    # Extract d_model from CLS embedding
+    d_model = state_dict["cls_embedding"].shape[0]
+    print(f"  d_model: {d_model} (from cls_embedding shape)")
+    
+    # Count transformer layers
+    n_layers = 0
+    for key in state_dict.keys():
+        if key.startswith("transformer_layers.") and key.endswith(".norm1.weight"):
+            layer_idx = int(key.split(".")[1])
+            n_layers = max(n_layers, layer_idx + 1)
+    print(f"  n_layers: {n_layers} (counted from transformer_layers)")
+    
+    # Extract ffn_hidden from first layer's gate projection
+    ffn_key = "transformer_layers.0.ffn.gate_proj.weight"
+    if ffn_key in state_dict:
+        ffn_hidden = state_dict[ffn_key].shape[0]
+        print(f"  ffn_hidden: {ffn_hidden} (from FFN gate projection shape)")
+    else:
+        raise ValueError(f"Could not find FFN gate projection: {ffn_key}")
+    
+    # Extract n_heads from QKV projection
+    qkv_key = "transformer_layers.0.self_attn.in_proj_weight"
+    if qkv_key in state_dict:
+        qkv_out_dim = state_dict[qkv_key].shape[0]  # Should be 3 * d_model
+        if qkv_out_dim != 3 * d_model:
+            raise ValueError(f"QKV projection dimension mismatch: expected {3 * d_model}, got {qkv_out_dim}")
+        
+        # Try to infer n_heads from attention output projection or assume standard values
+        # For now, we'll use a heuristic based on d_model
+        if d_model % 4 == 0 and d_model >= 32:
+            n_heads = 4
+        elif d_model % 2 == 0 and d_model >= 16:
+            n_heads = 2
+        elif d_model % 8 == 0 and d_model >= 64:
+            n_heads = 8
+        else:
+            n_heads = 1
+        print(f"  n_heads: {n_heads} (inferred from d_model, assuming head_dim divides evenly)")
+    else:
+        raise ValueError(f"Could not find QKV projection: {qkv_key}")
+    
+    # Validate that d_model is divisible by n_heads
+    if d_model % n_heads != 0:
+        # Try other common head counts
+        for candidate_heads in [1, 2, 4, 8, 16]:
+            if d_model % candidate_heads == 0:
+                n_heads = candidate_heads
+                print(f"  n_heads: adjusted to {n_heads} to ensure divisibility")
+                break
+        else:
+            raise ValueError(f"Could not find valid n_heads for d_model={d_model}")
+    
+    architecture = {
+        "d_model": d_model,
+        "n_heads": n_heads,
+        "n_layers": n_layers,
+        "ffn_hidden": ffn_hidden
+    }
+    
+    print(f"✓ Extracted architecture: {d_model}×{n_heads}×{n_layers}×{ffn_hidden}")
+    return architecture
+
 def validate_matrix_dimensions(js_params: dict) -> dict:
     """Validate that all matrices have correct dimensions for JavaScript transformer"""
     errors = []
     total_matrices = 0
     
-    # Expected dimensions for JavaScript transformer
-    d_model = 48
-    n_heads = 4
-    ffn_hidden = 96
+    # Get architecture dimensions from the model parameters
+    d_model = js_params["d_model"]
+    n_heads = js_params["n_heads"]
+    n_layers = js_params["n_layers"]
+    ffn_hidden = js_params["ffn_hidden"]
     
     # Input projection matrices
     matrices_to_check = [
@@ -84,13 +151,8 @@ def convert_state_dict_to_js(state_dict: dict) -> dict:
     """Convert PyTorch state dict to JavaScript transformer format"""
     print("Converting parameters to JavaScript transformer format...")
     
-    # Architecture parameters (fixed for our model)
-    js_params = {
-        "d_model": 48,
-        "n_heads": 4,
-        "n_layers": 3,
-        "ffn_hidden": 96
-    }
+    # Extract architecture parameters from the model weights
+    js_params = extract_architecture_from_state_dict(state_dict)
     
     # Convert embeddings
     js_params["cls_embedding"] = convert_tensor_to_js(state_dict["cls_embedding"])
@@ -120,7 +182,7 @@ def convert_state_dict_to_js(state_dict: dict) -> dict:
     
     # Convert transformer layers
     layers = []
-    for i in range(3):  # 3 layers
+    for i in range(js_params["n_layers"]):
         layer_prefix = f"transformer_layers.{i}"
         
         # Layer normalization parameters
@@ -171,7 +233,7 @@ def convert_state_dict_to_js(state_dict: dict) -> dict:
         }
         
         layers.append(layer_params)
-        print(f"  Converted layer {i+1}/3")
+        print(f"  Converted layer {i+1}/{js_params['n_layers']}")
     
     js_params["layers"] = layers
     
@@ -207,12 +269,19 @@ def save_js_model(js_params: dict, output_path: str):
         os.makedirs(output_dir, exist_ok=True)
     
     # Format as JavaScript file
+    arch = f"{js_params['d_model']}×{js_params['n_heads']}×{js_params['n_layers']}×{js_params['ffn_hidden']}"
     js_content = f"""// Transformer Model Parameters
 // Generated from PyTorch checkpoint
+// Architecture: {arch}
 
 window.TRANSFORMER_PARAMS = {json.dumps(js_params, indent=2)};
 
-console.log("Loaded transformer model with", Object.keys(window.TRANSFORMER_PARAMS).length, "parameter tensors");
+console.log("Loaded transformer model:");
+console.log("  Architecture: " + window.TRANSFORMER_PARAMS.d_model + "×" + 
+           window.TRANSFORMER_PARAMS.n_heads + "×" + 
+           window.TRANSFORMER_PARAMS.n_layers + "×" + 
+           window.TRANSFORMER_PARAMS.ffn_hidden);
+console.log("  Parameter tensors:", Object.keys(window.TRANSFORMER_PARAMS).length);
 """
     
     # Write to file
@@ -301,6 +370,13 @@ def main():
         
         # Convert to JavaScript format
         js_params = convert_state_dict_to_js(state_dict)
+        
+        # Display extracted architecture
+        print(f"\nExtracted Architecture:")
+        print(f"  d_model: {js_params['d_model']}")
+        print(f"  n_heads: {js_params['n_heads']}")
+        print(f"  n_layers: {js_params['n_layers']}")
+        print(f"  ffn_hidden: {js_params['ffn_hidden']}")
         
         # Save JavaScript model
         save_js_model(js_params, args.output)
