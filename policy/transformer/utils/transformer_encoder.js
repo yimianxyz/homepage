@@ -1,13 +1,13 @@
 /**
  * Transformer Encoder for Policy Wrapper
  * 
- * This is a transformer encoder implementation specifically designed for the
- * policy wrapper. It provides inference-only functionality with the same
- * architecture as the main transformer encoder.
+ * This is a flexible transformer encoder implementation that reads its architecture
+ * parameters from the model file. It provides inference-only functionality and can
+ * work with different transformer architectures.
  * 
- * Architecture:
- * - d_model = 48, n_heads = 4, n_layers = 3
- * - GEGLU feed-forward networks (96 hidden → 48)
+ * Architecture (configurable via model parameters):
+ * - d_model, n_heads, n_layers, ffn_hidden from model
+ * - GEGLU feed-forward networks
  * - Token sequence: [CLS] + [CTX] + Predator + Boids
  * - Type embeddings for different entity types
  */
@@ -15,14 +15,22 @@
 /**
  * Transformer Encoder for predator control (inference only)
  * @constructor
+ * @param {Object} params - Model parameters containing architecture
  */
-function TransformerEncoder() {
-    // Model hyperparameters
-    this.d_model = 48;
-    this.n_heads = 4;
-    this.n_layers = 3;
-    this.head_dim = this.d_model / this.n_heads; // 12
-    this.ffn_hidden = 96;
+function TransformerEncoder(params) {
+    if (!params) {
+        throw new Error("TransformerEncoder requires model parameters with architecture");
+    }
+    
+    // Validate architecture parameters
+    this.validateArchitecture(params);
+    
+    // Extract architecture from model parameters
+    this.d_model = params.d_model;
+    this.n_heads = params.n_heads;
+    this.n_layers = params.n_layers;
+    this.head_dim = this.d_model / this.n_heads;
+    this.ffn_hidden = params.ffn_hidden;
     
     // Normalization constants from simulation (required)
     if (typeof window === 'undefined' || !window.SIMULATION_CONSTANTS) {
@@ -35,16 +43,64 @@ function TransformerEncoder() {
         window.SIMULATION_CONSTANTS.PREDATOR_MAX_SPEED
     );
     
-    // Initialize with random parameters by default
-    this.initializeParameters();
-    
-    // Model loading state
-    this.modelLoadResult = {
-        success: false,
-        message: "Using random initialization",
-        fallbackReason: "No model loaded"
-    };
+    // Load parameters immediately
+    var loadResult = this.loadParameters(params);
+    this.modelLoadResult = loadResult;
 }
+
+/**
+ * Validate architecture parameters
+ * @param {Object} params - Model parameters to validate
+ */
+TransformerEncoder.prototype.validateArchitecture = function(params) {
+    // Check required architecture parameters exist
+    var requiredArchParams = ['d_model', 'n_heads', 'n_layers', 'ffn_hidden'];
+    for (var i = 0; i < requiredArchParams.length; i++) {
+        var param = requiredArchParams[i];
+        if (!(param in params) || typeof params[param] !== 'number') {
+            throw new Error("Missing or invalid architecture parameter: " + param);
+        }
+    }
+    
+    // Validate parameter ranges and relationships
+    if (params.d_model <= 0 || params.d_model % 1 !== 0) {
+        throw new Error("d_model must be a positive integer, got: " + params.d_model);
+    }
+    
+    if (params.n_heads <= 0 || params.n_heads % 1 !== 0) {
+        throw new Error("n_heads must be a positive integer, got: " + params.n_heads);
+    }
+    
+    if (params.n_layers <= 0 || params.n_layers % 1 !== 0) {
+        throw new Error("n_layers must be a positive integer, got: " + params.n_layers);
+    }
+    
+    if (params.ffn_hidden <= 0 || params.ffn_hidden % 1 !== 0) {
+        throw new Error("ffn_hidden must be a positive integer, got: " + params.ffn_hidden);
+    }
+    
+    // Check that d_model is divisible by n_heads
+    if (params.d_model % params.n_heads !== 0) {
+        throw new Error("d_model (" + params.d_model + ") must be divisible by n_heads (" + params.n_heads + ")");
+    }
+    
+    // Check reasonable ranges
+    if (params.d_model < 8 || params.d_model > 2048) {
+        throw new Error("d_model should be between 8 and 2048, got: " + params.d_model);
+    }
+    
+    if (params.n_heads < 1 || params.n_heads > 32) {
+        throw new Error("n_heads should be between 1 and 32, got: " + params.n_heads);
+    }
+    
+    if (params.n_layers < 1 || params.n_layers > 24) {
+        throw new Error("n_layers should be between 1 and 24, got: " + params.n_layers);
+    }
+    
+    if (params.ffn_hidden < params.d_model || params.ffn_hidden > params.d_model * 8) {
+        throw new Error("ffn_hidden should be between d_model and 8*d_model, got: " + params.ffn_hidden + " (d_model=" + params.d_model + ")");
+    }
+};
 
 /**
  * Load parameters from model object
@@ -69,16 +125,7 @@ TransformerEncoder.prototype.loadParameters = function(params) {
         return loadResult;
     }
     
-    // Check architecture compatibility
-    if (params.d_model !== this.d_model || 
-        params.n_heads !== this.n_heads || 
-        params.n_layers !== this.n_layers ||
-        params.ffn_hidden !== this.ffn_hidden) {
-        loadResult.fallbackReason = "Architecture mismatch: model is " + 
-            params.d_model + "×" + params.n_heads + "×" + params.n_layers + "×" + params.ffn_hidden + 
-            ", current is " + this.d_model + "×" + this.n_heads + "×" + this.n_layers + "×" + this.ffn_hidden;
-        return loadResult;
-    }
+
     
     try {
         // Load all parameters
@@ -165,70 +212,7 @@ TransformerEncoder.prototype.validateParameterStructure = function(params) {
     return true;
 };
 
-/**
- * Initialize parameters with random values
- */
-TransformerEncoder.prototype.initializeParameters = function() {
-    // [CLS] token - learned embedding
-    this.cls_embedding = this.randomArray(this.d_model);
-    
-    // Type embeddings for different entity types
-    this.type_embeddings = {
-        cls: this.randomArray(this.d_model),      // type_id 0
-        ctx: this.randomArray(this.d_model),      // type_id 1  
-        predator: this.randomArray(this.d_model), // type_id 2
-        boid: this.randomArray(this.d_model)      // type_id 3
-    };
-    
-    // Input projection layers
-    this.ctx_projection = this.randomMatrix(2, this.d_model);     // [w/D, h/D] → 48D
-    this.predator_projection = this.randomMatrix(4, this.d_model); // [vx/V, vy/V, 0, 0] → 48D
-    this.boid_projection = this.randomMatrix(4, this.d_model);     // [dx/D, dy/D, dvx/V, dvy/V] → 48D
-    
-    // Transformer layers
-    this.layers = [];
-    for (var i = 0; i < this.n_layers; i++) {
-        this.layers.push({
-            // Layer normalization parameters
-            ln_scale: this.onesArray(this.d_model),
-            ln_bias: this.zerosArray(this.d_model),
-            
-            // Fused QKV projection (3 × 48 × 48)
-            qkv_weight: this.randomMatrix(this.d_model, 3 * this.d_model),
-            qkv_bias: this.zerosArray(3 * this.d_model),
-            
-            // Output projection after attention
-            attn_out_weight: this.randomMatrix(this.d_model, this.d_model),
-            attn_out_bias: this.zerosArray(this.d_model),
-            
-            // GEGLU feed-forward
-            ffn_ln_scale: this.onesArray(this.d_model),
-            ffn_ln_bias: this.zerosArray(this.d_model),
-            ffn_gate_weight: this.randomMatrix(this.d_model, this.ffn_hidden),
-            ffn_gate_bias: this.zerosArray(this.ffn_hidden),
-            ffn_up_weight: this.randomMatrix(this.d_model, this.ffn_hidden),
-            ffn_up_bias: this.zerosArray(this.ffn_hidden),
-            ffn_down_weight: this.randomMatrix(this.ffn_hidden, this.d_model),
-            ffn_down_bias: this.zerosArray(this.d_model)
-        });
-    }
-    
-    // Final output projection: [CLS] token → steering forces
-    this.output_weight = this.randomMatrix(this.d_model, 2);
-    this.output_bias = this.zerosArray(2);
-};
 
-/**
- * Reset parameters to random initialization
- */
-TransformerEncoder.prototype.reset = function() {
-    this.initializeParameters();
-    this.modelLoadResult = {
-        success: false,
-        message: "Reset to random initialization",
-        fallbackReason: "Model reset"
-    };
-};
 
 /**
  * Forward pass through transformer encoder
