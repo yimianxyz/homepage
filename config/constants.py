@@ -24,7 +24,7 @@ class SimulationConstants:
     PREDATOR_BORDER_OFFSET = 20
     
     # Device-independent normalization constants
-    MAX_DISTANCE = 1000         # Maximum expected distance for normalization
+    MAX_DISTANCE = 2000         # Maximum expected distance for normalization
     
     # Simulation constants
     DEFAULT_NUM_BOIDS = 50
