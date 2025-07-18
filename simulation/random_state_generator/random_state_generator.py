@@ -174,9 +174,9 @@ class RandomStateGenerator:
             'y': self.random() * canvas_height
         }
         
-        # Random velocity with random direction and speed
+        # Random velocity with uniform distribution across all possible speeds
         angle = self.random() * 2 * math.pi
-        speed = 0.5 + self.random() * (CONSTANTS.BOID_MAX_SPEED - 0.5)
+        speed = self.random() * CONSTANTS.BOID_MAX_SPEED
         velocity = {
             'x': math.cos(angle) * speed,
             'y': math.sin(angle) * speed
@@ -204,9 +204,9 @@ class RandomStateGenerator:
             'y': self.random() * canvas_height
         }
         
-        # Random velocity with random direction and speed
+        # Random velocity with uniform distribution across all possible speeds
         angle = self.random() * 2 * math.pi
-        speed = 0.5 + self.random() * (CONSTANTS.PREDATOR_MAX_SPEED - 0.5)
+        speed = self.random() * CONSTANTS.PREDATOR_MAX_SPEED
         velocity = {
             'x': math.cos(angle) * speed,
             'y': math.sin(angle) * speed

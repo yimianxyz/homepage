@@ -150,9 +150,9 @@ RandomStateGenerator.prototype._generateRandomBoid = function(canvasWidth, canva
         y: this.random() * canvasHeight
     };
     
-    // Random velocity with random direction and speed
+    // Random velocity with uniform distribution across all possible speeds
     var angle = this.random() * 2 * Math.PI;
-    var speed = 0.5 + this.random() * (window.SIMULATION_CONSTANTS.BOID_MAX_SPEED - 0.5);
+    var speed = this.random() * window.SIMULATION_CONSTANTS.BOID_MAX_SPEED;
     var velocity = {
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed
@@ -179,9 +179,9 @@ RandomStateGenerator.prototype._generateRandomPredator = function(canvasWidth, c
         y: this.random() * canvasHeight
     };
     
-    // Random velocity with random direction and speed
+    // Random velocity with uniform distribution across all possible speeds
     var angle = this.random() * 2 * Math.PI;
-    var speed = 0.5 + this.random() * (window.SIMULATION_CONSTANTS.PREDATOR_MAX_SPEED - 0.5);
+    var speed = this.random() * window.SIMULATION_CONSTANTS.PREDATOR_MAX_SPEED;
     var velocity = {
         x: Math.cos(angle) * speed,
         y: Math.sin(angle) * speed
