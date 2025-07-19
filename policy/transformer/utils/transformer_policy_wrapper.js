@@ -220,6 +220,21 @@ function createTransformerPolicyWithModel(customParams) {
     return createTransformerPolicyWrapper(customParams);
 }
 
+// Export to global scope for browser use
+if (typeof window !== 'undefined') {
+    window.TransformerPolicyWrapper = TransformerPolicyWrapper;
+    window.createTransformerPolicyWrapper = createTransformerPolicyWrapper;
+    window.createTransformerPolicyFromGlobal = createTransformerPolicyFromGlobal;
+    window.createTransformerPolicyWithModel = createTransformerPolicyWithModel;
+} else if (typeof global !== 'undefined') {
+    // For Node.js environment
+    global.window = global.window || {};
+    global.window.TransformerPolicyWrapper = TransformerPolicyWrapper;
+    global.window.createTransformerPolicyWrapper = createTransformerPolicyWrapper;
+    global.window.createTransformerPolicyFromGlobal = createTransformerPolicyFromGlobal;
+    global.window.createTransformerPolicyWithModel = createTransformerPolicyWithModel;
+}
+
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {

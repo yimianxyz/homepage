@@ -11,32 +11,58 @@ import argparse
 import os
 from pathlib import Path
 
-def load_checkpoint(checkpoint_path: str) -> dict:
-    """Load PyTorch checkpoint"""
+def load_checkpoint(checkpoint_path: str) -> tuple:
+    """Load PyTorch checkpoint and return state_dict and architecture"""
     print(f"Loading checkpoint from {checkpoint_path}...")
     
     # Load checkpoint
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
-    # Extract model state dict
+    # Extract model state dict and architecture
     if 'model_state_dict' in checkpoint:
         state_dict = checkpoint['model_state_dict']
+        architecture = checkpoint.get('architecture', None)
         print(f"Loaded checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
         print(f"Best validation loss: {checkpoint.get('best_val_loss', 'unknown')}")
+        
+        if architecture:
+            print(f"✅ Found stored architecture: {architecture}")
+        else:
+            print("⚠️  No architecture found in checkpoint - will attempt inference")
+            print("   Consider re-saving your checkpoint with architecture info for accuracy")
+            
     else:
-        # Assume it's just the state dict
+        # Assume it's just the state dict (older format)
         state_dict = checkpoint
-        print("Loaded raw state dict")
+        architecture = None
+        print("⚠️  Raw state dict format (no metadata) - will attempt architecture inference")
     
-    return state_dict
+    return state_dict, architecture
 
 def convert_tensor_to_js(tensor: torch.Tensor) -> list:
     """Convert PyTorch tensor to JavaScript array"""
     return tensor.detach().cpu().numpy().tolist()
 
-def extract_architecture_from_state_dict(state_dict: dict) -> dict:
-    """Extract architecture parameters from PyTorch state dict"""
-    print("Extracting architecture parameters from checkpoint...")
+def get_architecture_from_checkpoint(stored_architecture: dict = None, state_dict: dict = None) -> dict:
+    """Get architecture parameters from stored checkpoint data"""
+    
+    if stored_architecture:
+        print("Using stored architecture from checkpoint...")
+        architecture = {
+            "d_model": stored_architecture["d_model"],
+            "n_heads": stored_architecture["n_heads"], 
+            "n_layers": stored_architecture["n_layers"],
+            "ffn_hidden": stored_architecture["ffn_hidden"]
+        }
+        print(f"✓ Using stored architecture: {architecture['d_model']}×{architecture['n_heads']}×{architecture['n_layers']}×{architecture['ffn_hidden']}")
+        return architecture
+    
+    # Fallback: This should rarely be needed if checkpoints are saved properly
+    print("⚠️  No stored architecture found. Attempting to infer from state dict...")
+    print("   (This may be inaccurate - consider re-saving your checkpoint with architecture info)")
+    
+    if state_dict is None:
+        raise ValueError("Cannot infer architecture: no state_dict provided")
     
     # Extract d_model from CLS embedding
     d_model = state_dict["cls_embedding"].shape[0]
@@ -58,31 +84,30 @@ def extract_architecture_from_state_dict(state_dict: dict) -> dict:
     else:
         raise ValueError(f"Could not find FFN gate projection: {ffn_key}")
     
-    # Extract n_heads from QKV projection
-    qkv_key = "transformer_layers.0.self_attn.in_proj_weight"
-    if qkv_key in state_dict:
-        qkv_out_dim = state_dict[qkv_key].shape[0]  # Should be 3 * d_model
-        if qkv_out_dim != 3 * d_model:
-            raise ValueError(f"QKV projection dimension mismatch: expected {3 * d_model}, got {qkv_out_dim}")
-        
-        # Try to infer n_heads from attention output projection or assume standard values
-        # For now, we'll use a heuristic based on d_model
-        if d_model % 4 == 0 and d_model >= 32:
-            n_heads = 4
-        elif d_model % 2 == 0 and d_model >= 16:
-            n_heads = 2
-        elif d_model % 8 == 0 and d_model >= 64:
-            n_heads = 8
-        else:
-            n_heads = 1
-        print(f"  n_heads: {n_heads} (inferred from d_model, assuming head_dim divides evenly)")
+    # For n_heads, we need to be more careful - prioritize higher head counts
+    # This is the bug that was causing n_heads=4 instead of n_heads=8
+    if d_model == 128:
+        n_heads = 8  # Common for d_model=128
+    elif d_model == 64:
+        n_heads = 8  # Common for d_model=64
+    elif d_model == 256:
+        n_heads = 8  # Common for d_model=256
+    elif d_model % 8 == 0 and d_model >= 64:
+        n_heads = 8
+    elif d_model % 4 == 0 and d_model >= 32:
+        n_heads = 4
+    elif d_model % 2 == 0 and d_model >= 16:
+        n_heads = 2
     else:
-        raise ValueError(f"Could not find QKV projection: {qkv_key}")
+        n_heads = 1
+        
+    print(f"  n_heads: {n_heads} (inferred - may be incorrect!)")
+    print(f"  ⚠️  WARNING: Inferred n_heads may be wrong. Save architecture in checkpoint to avoid this.")
     
     # Validate that d_model is divisible by n_heads
     if d_model % n_heads != 0:
         # Try other common head counts
-        for candidate_heads in [1, 2, 4, 8, 16]:
+        for candidate_heads in [8, 4, 2, 1]:
             if d_model % candidate_heads == 0:
                 n_heads = candidate_heads
                 print(f"  n_heads: adjusted to {n_heads} to ensure divisibility")
@@ -97,7 +122,7 @@ def extract_architecture_from_state_dict(state_dict: dict) -> dict:
         "ffn_hidden": ffn_hidden
     }
     
-    print(f"✓ Extracted architecture: {d_model}×{n_heads}×{n_layers}×{ffn_hidden}")
+    print(f"✓ Inferred architecture: {d_model}×{n_heads}×{n_layers}×{ffn_hidden}")
     return architecture
 
 def validate_matrix_dimensions(js_params: dict) -> dict:
@@ -147,12 +172,12 @@ def validate_matrix_dimensions(js_params: dict) -> dict:
         "total_matrices": total_matrices
     }
 
-def convert_state_dict_to_js(state_dict: dict) -> dict:
+def convert_state_dict_to_js(state_dict: dict, stored_architecture: dict = None) -> dict:
     """Convert PyTorch state dict to JavaScript transformer format"""
     print("Converting parameters to JavaScript transformer format...")
     
-    # Extract architecture parameters from the model weights
-    js_params = extract_architecture_from_state_dict(state_dict)
+    # Get architecture parameters from checkpoint
+    js_params = get_architecture_from_checkpoint(stored_architecture, state_dict)
     
     # Convert embeddings
     js_params["cls_embedding"] = convert_tensor_to_js(state_dict["cls_embedding"])
@@ -197,7 +222,7 @@ def convert_state_dict_to_js(state_dict: dict) -> dict:
         # No transpose needed for QKV - already correct [144, 48]
         qkv_weight_t = qkv_weight
         
-        attn_out_weight = state_dict[f"{layer_prefix}.self_attn.out_proj.weight"].t()  # [48, 48]
+        attn_out_weight = state_dict[f"{layer_prefix}.self_attn.out_proj.weight"]  # [128, 128] - no transpose needed
         attn_out_bias = convert_tensor_to_js(state_dict[f"{layer_prefix}.self_attn.out_proj.bias"])
         
         # FFN layer norm
@@ -366,10 +391,10 @@ def main():
     
     try:
         # Load checkpoint
-        state_dict = load_checkpoint(args.checkpoint)
+        state_dict, stored_architecture = load_checkpoint(args.checkpoint)
         
         # Convert to JavaScript format
-        js_params = convert_state_dict_to_js(state_dict)
+        js_params = convert_state_dict_to_js(state_dict, stored_architecture)
         
         # Display extracted architecture
         print(f"\nExtracted Architecture:")

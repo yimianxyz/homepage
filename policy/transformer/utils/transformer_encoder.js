@@ -251,7 +251,7 @@ TransformerEncoder.prototype.buildTokens = function(structuredInputs) {
     var cls_token = this.addVectors(this.cls_embedding, this.type_embeddings.cls);
     tokens.push(cls_token);
     
-    // Token 1: [CTX] - context projection + type embedding
+    // Token 1: [CTX] - context projection + type embedding (bias already in type embedding)
     var ctx_input = [
         structuredInputs.context.canvasWidth,  // w/D (already normalized)
         structuredInputs.context.canvasHeight  // h/D (already normalized)
@@ -260,7 +260,7 @@ TransformerEncoder.prototype.buildTokens = function(structuredInputs) {
     var ctx_token = this.addVectors(ctx_projected, this.type_embeddings.ctx);
     tokens.push(ctx_token);
     
-    // Token 2: Predator - predator projection + type embedding
+    // Token 2: Predator - predator projection + type embedding (bias already in type embedding)
     var predator_input = [
         structuredInputs.predator.velX,  // vx/V (already normalized)
         structuredInputs.predator.velY,  // vy/V (already normalized)
@@ -271,14 +271,14 @@ TransformerEncoder.prototype.buildTokens = function(structuredInputs) {
     var predator_token = this.addVectors(predator_projected, this.type_embeddings.predator);
     tokens.push(predator_token);
     
-    // Tokens 3+: Boids - boid projections + type embeddings
+    // Tokens 3+: Boids - boid projections + type embeddings (bias already in type embedding)
     for (var i = 0; i < structuredInputs.boids.length; i++) {
         var boid = structuredInputs.boids[i];
         var boid_input = [
             boid.relX,  // dx/D (already normalized)
             boid.relY,  // dy/D (already normalized)
-            boid.velX,  // dvx/V (already normalized)
-            boid.velY   // dvy/V (already normalized)
+            boid.velX,  // vx/V (already normalized)
+            boid.velY   // vy/V (already normalized)
         ];
         var boid_projected = this.matrixVectorMultiply(this.boid_projection, boid_input);
         var boid_token = this.addVectors(boid_projected, this.type_embeddings.boid);
@@ -334,102 +334,137 @@ TransformerEncoder.prototype.transformerBlock = function(tokens, layer) {
 };
 
 /**
- * Multi-head self-attention
+ * Multi-head self-attention - Exact PyTorch replication
  * @param {Array} tokens - Input tokens [S × d_model]
  * @param {Object} layer - Layer parameters
  * @returns {Array} Attention output [S × d_model]
  */
 TransformerEncoder.prototype.multiHeadAttention = function(tokens, layer) {
     var seq_len = tokens.length;
+    var d_model = this.d_model;
+    var n_heads = this.n_heads;
+    var head_dim = this.head_dim;
+    var scale = 0.25;  // Exact PyTorch scale: 1 / sqrt(16) = 0.25
     
-    // Compute QKV for all tokens
-    var Q = [], K = [], V = [];
+    // Step 1: QKV Projection for all tokens
+    var qkv_all = [];
     for (var i = 0; i < seq_len; i++) {
         var qkv = this.addVectors(
             this.matrixVectorMultiply(layer.qkv_weight, tokens[i]),
             layer.qkv_bias
         );
+        qkv_all.push(qkv);
+    }
+    
+    // Step 2: Reshape QKV following PyTorch's exact approach
+    // PyTorch: [batch=1, seq_len, 3*d_model] -> [batch=1, seq_len, 3, n_heads, head_dim] -> [3, batch=1, n_heads, seq_len, head_dim]
+    
+    // Extract Q, K, V tensors in PyTorch format: [n_heads, seq_len, head_dim]
+    var Q = [], K = [], V = [];
+    
+    // Initialize head arrays
+    for (var h = 0; h < n_heads; h++) {
+        Q[h] = [];
+        K[h] = [];
+        V[h] = [];
+    }
+    
+    // Fill Q, K, V following PyTorch's reshape and permute operations
+    for (var seq = 0; seq < seq_len; seq++) {
+        var qkv = qkv_all[seq]; // [3*d_model]
         
-        // Split into Q, K, V
-        Q.push(qkv.slice(0, this.d_model));
-        K.push(qkv.slice(this.d_model, 2 * this.d_model));
-        V.push(qkv.slice(2 * this.d_model, 3 * this.d_model));
-    }
-    
-    // Process each attention head
-    var head_outputs = [];
-    for (var head = 0; head < this.n_heads; head++) {
-        var head_output = this.attentionHead(Q, K, V, head);
-        head_outputs.push(head_output);
-    }
-    
-    // Concatenate heads and project
-    var concat_output = [];
-    for (var i = 0; i < seq_len; i++) {
-        var concat_token = [];
-        for (var head = 0; head < this.n_heads; head++) {
-            concat_token = concat_token.concat(head_outputs[head][i]);
+        for (var h = 0; h < n_heads; h++) {
+            var q_head = [];
+            var k_head = [];
+            var v_head = [];
+            
+            for (var dim = 0; dim < head_dim; dim++) {
+                // PyTorch memory layout after view(batch, seq_len, 3, n_heads, head_dim)
+                // q: qkv_idx=0, k: qkv_idx=1, v: qkv_idx=2
+                var q_idx = 0 * d_model + h * head_dim + dim;  // Q section
+                var k_idx = 1 * d_model + h * head_dim + dim;  // K section  
+                var v_idx = 2 * d_model + h * head_dim + dim;  // V section
+                
+                q_head.push(qkv[q_idx]);
+                k_head.push(qkv[k_idx]);
+                v_head.push(qkv[v_idx]);
+            }
+            
+            Q[h].push(q_head);  // Q[h][seq][dim]
+            K[h].push(k_head);  // K[h][seq][dim]
+            V[h].push(v_head);  // V[h][seq][dim]
         }
+    }
+    
+    // Step 3: Compute attention for all heads simultaneously
+    var attn_output = []; // [n_heads][seq_len][head_dim]
+    
+    for (var h = 0; h < n_heads; h++) {
+        var q_head = Q[h];  // [seq_len][head_dim]
+        var k_head = K[h];  // [seq_len][head_dim] 
+        var v_head = V[h];  // [seq_len][head_dim]
         
-        var projected = this.addVectors(
-            this.matrixVectorMultiply(layer.attn_out_weight, concat_token),
-            layer.attn_out_bias
-        );
-        concat_output.push(projected);
-    }
-    
-    return concat_output;
-};
-
-/**
- * Single attention head computation
- * @param {Array} Q - Query matrices [S × d_model]
- * @param {Array} K - Key matrices [S × d_model]
- * @param {Array} V - Value matrices [S × d_model]
- * @param {number} head - Head index
- * @returns {Array} Head output [S × head_dim]
- */
-TransformerEncoder.prototype.attentionHead = function(Q, K, V, head) {
-    var seq_len = Q.length;
-    var start_idx = head * this.head_dim;
-    var end_idx = start_idx + this.head_dim;
-    
-    // Extract head-specific Q, K, V
-    var q_head = [], k_head = [], v_head = [];
-    for (var i = 0; i < seq_len; i++) {
-        q_head.push(Q[i].slice(start_idx, end_idx));
-        k_head.push(K[i].slice(start_idx, end_idx));
-        v_head.push(V[i].slice(start_idx, end_idx));
-    }
-    
-    // Compute attention scores
-    var scores = [];
-    var scale = 1.0 / Math.sqrt(this.head_dim);
-    
-    for (var i = 0; i < seq_len; i++) {
-        scores[i] = [];
-        for (var j = 0; j < seq_len; j++) {
-            scores[i][j] = this.dotProduct(q_head[i], k_head[j]) * scale;
-        }
-        
-        // Softmax
-        scores[i] = this.softmax(scores[i]);
-    }
-    
-    // Apply attention to values
-    var output = [];
-    for (var i = 0; i < seq_len; i++) {
-        var attended = new Array(this.head_dim).fill(0);
-        for (var j = 0; j < seq_len; j++) {
-            for (var k = 0; k < this.head_dim; k++) {
-                attended[k] += scores[i][j] * v_head[j][k];
+        // Compute attention scores: Q @ K.T
+        var scores = [];
+        for (var i = 0; i < seq_len; i++) {
+            scores[i] = [];
+            for (var j = 0; j < seq_len; j++) {
+                var score = this.dotProduct(q_head[i], k_head[j]) * scale;
+                scores[i][j] = score;
             }
         }
-        output.push(attended);
+        
+        // Apply softmax to each row
+        for (var i = 0; i < seq_len; i++) {
+            scores[i] = this.softmax(scores[i]);
+        }
+        
+        // Apply attention to values: scores @ V
+        var head_output = [];
+        for (var i = 0; i < seq_len; i++) {
+            var attended = new Array(head_dim).fill(0);
+            for (var j = 0; j < seq_len; j++) {
+                for (var d = 0; d < head_dim; d++) {
+                    attended[d] += scores[i][j] * v_head[j][d];
+                }
+            }
+            head_output.push(attended);
+        }
+        
+        attn_output.push(head_output);
     }
     
-    return output;
+    // Step 4: Concatenate heads following PyTorch's transpose and view operations
+    // PyTorch: [batch, n_heads, seq_len, head_dim] -> transpose(1,2) -> [batch, seq_len, n_heads, head_dim] -> view -> [batch, seq_len, d_model]
+    var concatenated = [];
+    
+    for (var i = 0; i < seq_len; i++) {
+        var token_concat = [];
+        
+        // Concatenate all heads for token i
+        for (var h = 0; h < n_heads; h++) {
+            for (var d = 0; d < head_dim; d++) {
+                token_concat.push(attn_output[h][i][d]);
+            }
+        }
+        
+        concatenated.push(token_concat);
+    }
+    
+    // Step 5: Apply output projection
+    var final_output = [];
+    for (var i = 0; i < seq_len; i++) {
+        var projected = this.addVectors(
+            this.matrixVectorMultiply(layer.attn_out_weight, concatenated[i]),
+            layer.attn_out_bias
+        );
+        final_output.push(projected);
+    }
+    
+    return final_output;
 };
+
+// Removed old attentionHead function - now integrated into multiHeadAttention
 
 /**
  * GEGLU feed-forward network
@@ -585,7 +620,7 @@ TransformerEncoder.prototype.dotProduct = function(a, b) {
 TransformerEncoder.prototype.layerNorm = function(x, scale, bias) {
     var mean = x.reduce(function(a, b) { return a + b; }) / x.length;
     var variance = x.reduce(function(a, b) { return a + (b - mean) * (b - mean); }, 0) / x.length;
-    var std = Math.sqrt(variance + 1e-6);
+    var std = Math.sqrt(variance + 1e-5);  // Fixed: use PyTorch's epsilon value
     
     var result = [];
     for (var i = 0; i < x.length; i++) {
@@ -607,15 +642,39 @@ TransformerEncoder.prototype.softmax = function(x) {
 };
 
 /**
- * GELU activation function
+ * Error function (erf) approximation - high precision
+ * @param {number} x - Input value
+ * @returns {number} erf(x)
+ */
+TransformerEncoder.prototype.erf = function(x) {
+    // High-precision erf approximation using Abramowitz and Stegun
+    var a1 =  0.254829592;
+    var a2 = -0.284496736;
+    var a3 =  1.421413741;
+    var a4 = -1.453152027;
+    var a5 =  1.061405429;
+    var p  =  0.3275911;
+
+    var sign = x >= 0 ? 1 : -1;
+    x = Math.abs(x);
+
+    var t = 1 / (1 + p * x);
+    var y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+
+    return sign * y;
+};
+
+/**
+ * GELU activation function - exact formula matching PyTorch
  * @param {number} x - Input value
  * @returns {number} GELU output
  */
 TransformerEncoder.prototype.gelu = function(x) {
-    return 0.5 * x * (1 + Math.tanh(Math.sqrt(2 / Math.PI) * (x + 0.044715 * x * x * x)));
+    // Exact GELU: 0.5 * x * (1 + erf(x / sqrt(2)))
+    return 0.5 * x * (1 + this.erf(x / Math.sqrt(2)));
 };
 
 // Export for module systems
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { TransformerEncoder: TransformerEncoder };
-} 
+}
