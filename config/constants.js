@@ -33,5 +33,8 @@ window.SIMULATION_CONSTANTS = {
     // Flocking behavior multipliers
     SEPARATION_MULTIPLIER: 2.0,
     COHESION_MULTIPLIER: 1.0,
-    ALIGNMENT_MULTIPLIER: 1.0
+    ALIGNMENT_MULTIPLIER: 1.0,
+    
+    // Reward system constants
+    MAX_RETRO_REWARD_STEPS: 50
 }; 

@@ -110,11 +110,17 @@ class StateManager:
         )
         
         # Remove caught boids from the state
-        caught_boids = step_result['caught_boids']
+        caught_boids_indices = step_result['caught_boids']
         new_boids_states = step_result['boids_states']
         
+        # Convert caught boid indices to IDs before removing them
+        caught_boid_ids = []
+        for boid_index in caught_boids_indices:
+            if boid_index < len(new_boids_states):
+                caught_boid_ids.append(new_boids_states[boid_index]['id'])
+        
         # Remove caught boids in reverse order to maintain indices
-        for i in reversed(caught_boids):
+        for i in reversed(caught_boids_indices):
             new_boids_states.pop(i)
         
         # Update current state
@@ -125,7 +131,10 @@ class StateManager:
             'canvas_height': self.current_state['canvas_height']
         }
         
-        return self.get_state()
+        # Return state with caught boid IDs (not indices)
+        result = self.get_state()
+        result['caught_boids'] = caught_boid_ids  # Add caught boid IDs to the result
+        return result
     
     def get_state(self) -> Dict[str, Any]:
         """

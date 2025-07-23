@@ -113,12 +113,21 @@ StateManager.prototype.step = function() {
     );
     
     // Remove caught boids from the state
-    var caughtBoids = stepResult.caught_boids;
+    var caughtBoidsIndices = stepResult.caught_boids;
     var newBoidsStates = stepResult.boids_states;
     
+    // Convert caught boid indices to IDs before removing them
+    var caughtBoidIds = [];
+    for (var i = 0; i < caughtBoidsIndices.length; i++) {
+        var boidIndex = caughtBoidsIndices[i];
+        if (boidIndex < newBoidsStates.length) {
+            caughtBoidIds.push(newBoidsStates[boidIndex].id);
+        }
+    }
+    
     // Remove caught boids in reverse order to maintain indices
-    for (var i = caughtBoids.length - 1; i >= 0; i--) {
-        newBoidsStates.splice(caughtBoids[i], 1);
+    for (var i = caughtBoidsIndices.length - 1; i >= 0; i--) {
+        newBoidsStates.splice(caughtBoidsIndices[i], 1);
     }
     
     // Update current state
@@ -129,7 +138,10 @@ StateManager.prototype.step = function() {
         canvas_height: this.currentState.canvas_height
     };
     
-    return this.getState();
+    // Return state with caught boid IDs (not indices)
+    var result = this.getState();
+    result.caught_boids = caughtBoidIds;  // Add caught boid IDs to the result
+    return result;
 };
 
 /**
