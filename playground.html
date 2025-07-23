@@ -35,6 +35,9 @@
     <script src="policy/transformer/transformer_policy.js"></script>
     <script src="policy/transformer/models/2.js"></script>
     
+    <!-- Rewards -->
+    <script src="rewards/reward_processor.js"></script>
+    
     <!-- UI Modules -->
     <script src="ui/canvas.js"></script>
     <script src="ui/rendering.js"></script>
@@ -141,6 +144,30 @@
             </div>
         </div>
         
+        <!-- Replay Controls -->
+        <div class="control-group">
+            <div class="collapsible" id="replay-controls-toggle">▶ Replay Controls</div>
+            <div class="collapsible-content" id="replay-controls">
+                <button id="start-replay-btn">🎬 Start Replay</button>
+                <button id="stop-replay-btn" disabled>⏹️ Stop Replay</button>
+                
+                <div class="replay-navigation">
+                    <button id="replay-prev-10-btn" disabled>⏪ -10</button>
+                    <button id="replay-prev-btn" disabled>⏮️ -1</button>
+                    <button id="replay-step-btn" disabled>⏭️ +1</button>
+                    <button id="replay-next-10-btn" disabled>⏩ +10</button>
+                </div>
+                
+                <label>Replay Speed: <span class="value-display" id="replay-speed-value">1.0x</span></label>
+                <input type="range" id="replay-speed-slider" min="0.1" max="5.0" step="0.1" value="1.0">
+                
+                <div class="replay-status">
+                    <div>History: <span id="history-length">0</span> steps</div>
+                    <div>Current: <span id="replay-current">0</span> / <span id="replay-total">0</span></div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Initialization Options -->
         <div class="control-group">
             <div class="collapsible" id="init-controls-toggle">▶ Initialization</div>
@@ -184,6 +211,30 @@
         <span class="status-indicator inactive" id="policy-indicator"></span>
         <span id="policy-name">No Policy</span>
     </div>
+    
+    <!-- Reward Information -->
+    <div class="reward-info hidden" id="reward-info">
+        <h3>Reward Analysis</h3>
+        <div class="reward-details">
+            <div class="reward-component">
+                <span class="reward-label">Total:</span>
+                <span id="reward-total" class="reward-value">0.000</span>
+            </div>
+            <div class="reward-component">
+                <span class="reward-label">Approaching:</span>
+                <span id="reward-approaching" class="reward-value">0.000</span>
+            </div>
+            <div class="reward-component">
+                <span class="reward-label">Catch Retro:</span>
+                <span id="reward-catch-retro" class="reward-value">0.000</span>
+            </div>
+        </div>
+        <div class="reward-step-info">
+            <div>Step: <span id="reward-step">0</span></div>
+            <div>Boids: <span id="reward-boids-count">0</span></div>
+            <div>Caught: <span id="reward-caught-this-step">0</span></div>
+        </div>
+    </div>
 
     <script>
         /**
@@ -196,6 +247,7 @@
             this.stateManager = new StateManager();
             this.policy = null;
             this.performanceMonitor = new PerformanceMonitor();
+            this.rewardProcessor = new RewardProcessor();
             
             // Animation state
             this.isRunning = false;
@@ -216,6 +268,16 @@
             // Statistics
             this.totalCaught = 0;
             this.frameCount = 0;
+            
+            // Replay system
+            this.stepHistory = [];
+            this.maxHistorySteps = 1000;
+            this.isReplaying = false;
+            this.replayIndex = 0;
+            this.replaySpeed = 1.0;
+            this.replayAnimationId = null;
+            this.replayStepMode = false;
+            this.preCalculatedRewards = []; // Store pre-calculated rewards
             
             // Initialize
             this.initializeControls();
@@ -296,6 +358,36 @@
             // Initialization controls
             document.getElementById('generate-state-btn').addEventListener('click', function() {
                 self.generateInitialState();
+            });
+            
+            // Replay controls
+            document.getElementById('start-replay-btn').addEventListener('click', function() {
+                self.startReplay();
+            });
+            
+            document.getElementById('stop-replay-btn').addEventListener('click', function() {
+                self.stopReplay();
+            });
+            
+            document.getElementById('replay-step-btn').addEventListener('click', function() {
+                self.replayStep();
+            });
+            
+            document.getElementById('replay-prev-btn').addEventListener('click', function() {
+                self.replayPreviousStep();
+            });
+            
+            document.getElementById('replay-next-10-btn').addEventListener('click', function() {
+                self.replayNext10Steps();
+            });
+            
+            document.getElementById('replay-prev-10-btn').addEventListener('click', function() {
+                self.replayPrevious10Steps();
+            });
+            
+            document.getElementById('replay-speed-slider').addEventListener('input', function(e) {
+                self.replaySpeed = parseFloat(e.target.value);
+                document.getElementById('replay-speed-value').textContent = self.replaySpeed.toFixed(1) + 'x';
             });
             
             // Collapsible sections
@@ -423,6 +515,11 @@
             this.totalCaught = 0;
             this.frameCount = 0;
             
+            // Clear step history and pre-calculated rewards when generating new state
+            this.stepHistory = [];
+            this.preCalculatedRewards = [];
+            this.updateHistoryDisplay();
+            
             console.log('Generated initial state:', initType, 'with', numBoids, 'boids');
         };
 
@@ -483,19 +580,54 @@
         PlaygroundSimulation.prototype.singleStep = function() {
             if (!this.stateManager.currentState || !this.policy) return;
             
-            var newState = this.stateManager.step();
-            
-            // Remove caught boids
-            if (newState.caught_boids && newState.caught_boids.length > 0) {
-                this.totalCaught += newState.caught_boids.length;
+            // Only run simulation during normal mode, not replay
+            if (!this.isReplaying) {
+                // Record step data BEFORE executing the step
+                var preStepState = this.stateManager.getState();
+                var structuredInputs = this.stateManager._convertStateToStructuredInputs(preStepState);
+                var action = this.policy.getAction(structuredInputs);
                 
-                // Remove caught boids in reverse order to maintain indices
-                for (var i = newState.caught_boids.length - 1; i >= 0; i--) {
-                    newState.boids_states.splice(newState.caught_boids[i], 1);
+                // Execute the simulation step
+                var newState = this.stateManager.step();
+                
+                // Record this step with the caught boid IDs from StateManager
+                var stepRecord = {
+                    caughtBoids: newState.caught_boids || [],  // StateManager now returns boid IDs
+                    state: structuredInputs,                   // State BEFORE step (for reward calculation)
+                    action: action,                            // Action taken
+                    visualState: {                             // Visual state BEFORE step (for replay)
+                        boids_states: JSON.parse(JSON.stringify(preStepState.boids_states)),
+                        predator_state: JSON.parse(JSON.stringify(preStepState.predator_state)),
+                        canvas_width: preStepState.canvas_width,
+                        canvas_height: preStepState.canvas_height
+                    }
+                };
+                
+                // Debug logging for catches
+                if (stepRecord.caughtBoids.length > 0) {
+                    console.log('🎯 CATCH RECORDED at step', this.stepHistory.length, ':', {
+                        caughtBoidIds: stepRecord.caughtBoids,
+                        totalBoidsInState: stepRecord.state.boids.length,
+                        totalBoidsInVisual: stepRecord.visualState.boids_states.length
+                    });
                 }
+                
+                this.stepHistory.push(stepRecord);
+                
+                // Keep only last maxHistorySteps
+                if (this.stepHistory.length > this.maxHistorySteps) {
+                    this.stepHistory.shift();
+                }
+                
+                this.updateHistoryDisplay();
+                
+                // Update total caught count
+                if (newState.caught_boids && newState.caught_boids.length > 0) {
+                    this.totalCaught += newState.caught_boids.length;
+                }
+                
+                this.frameCount++;
             }
-            
-            this.frameCount++;
         };
 
         PlaygroundSimulation.prototype.animate = function() {
@@ -567,6 +699,236 @@
                 document.getElementById('perf-fps').textContent = metrics.fps;
                 document.getElementById('perf-frame-time').textContent = metrics.frameTime;
                 document.getElementById('perf-total-frames').textContent = metrics.frameCount;
+            }
+        };
+
+        // === REPLAY SYSTEM METHODS ===
+
+        PlaygroundSimulation.prototype.updateHistoryDisplay = function() {
+            document.getElementById('history-length').textContent = this.stepHistory.length;
+        };
+
+        PlaygroundSimulation.prototype.startReplay = function() {
+            if (this.stepHistory.length === 0) {
+                console.warn('No step history available for replay');
+                return;
+            }
+            
+            // Stop normal simulation
+            this.stop();
+            
+            // Pre-calculate rewards for entire episode ONCE
+            console.log('Pre-calculating rewards for', this.stepHistory.length, 'steps...');
+            
+            // Determine if episode actually ended (all boids caught)
+            var lastStep = this.stepHistory[this.stepHistory.length - 1];
+            var isActualEpisodeEnd = lastStep.state.boids.length === 0;
+            
+            // Calculate rewards for the entire sequence
+            this.preCalculatedRewards = this.rewardProcessor.processRewards(this.stepHistory, isActualEpisodeEnd);
+            
+            console.log('Pre-calculated', this.preCalculatedRewards.length, 'rewards, episode ended:', isActualEpisodeEnd);
+            
+            // Debug: Show first few rewards and any non-zero catch retro rewards
+            if (this.preCalculatedRewards.length > 0) {
+                console.log('First 3 rewards:', this.preCalculatedRewards.slice(0, 3));
+                var catchRetroRewards = this.preCalculatedRewards.filter(r => r.catchRetro > 0);
+                if (catchRetroRewards.length > 0) {
+                    console.log('✅ Non-zero catch retro rewards found:', catchRetroRewards.length, 'examples:', catchRetroRewards.slice(0, 3));
+                } else {
+                    console.log('❌ No catch retro rewards found - investigating...');
+                    // Check if we recorded any catches
+                    var stepsWithCatches = this.stepHistory.filter(s => s.caughtBoids.length > 0);
+                    console.log('  Steps with catches recorded:', stepsWithCatches.length);
+                    if (stepsWithCatches.length > 0) {
+                        console.log('  Example catch step:', stepsWithCatches[0]);
+                        console.log('  All catch steps:', stepsWithCatches.map(s => ({
+                            step: this.stepHistory.indexOf(s),
+                            caughtIds: s.caughtBoids,
+                            boidCount: s.state.boids.length
+                        })));
+                    }
+                }
+            }
+            
+            // Enter replay mode
+            this.isReplaying = true;
+            this.replayIndex = 0;
+            this.replayStepMode = false;
+            
+            // Update UI
+            document.getElementById('start-replay-btn').disabled = true;
+            document.getElementById('stop-replay-btn').disabled = false;
+            document.getElementById('replay-step-btn').disabled = false;
+            document.getElementById('replay-prev-btn').disabled = false;
+            document.getElementById('replay-next-10-btn').disabled = false;
+            document.getElementById('replay-prev-10-btn').disabled = false;
+            document.getElementById('reward-info').classList.remove('hidden');
+            
+            // Update replay status
+            this.updateReplayStatus();
+            
+            // Set initial replay state
+            if (this.stepHistory.length > 0 && this.stepHistory[0].visualState) {
+                this.stateManager.currentState = JSON.parse(JSON.stringify(this.stepHistory[0].visualState));
+                this.render(); // Show initial state
+                
+                // Show initial reward
+                this.updateRewardDisplay(this.getRewardForStep(0), 0);
+            }
+            
+            // Start replay animation
+            this.replayAnimate();
+            
+            console.log('Started replay with', this.stepHistory.length, 'steps');
+        };
+
+        PlaygroundSimulation.prototype.stopReplay = function() {
+            // Exit replay mode
+            this.isReplaying = false;
+            this.replayStepMode = false;
+            
+            if (this.replayAnimationId) {
+                cancelAnimationFrame(this.replayAnimationId);
+                this.replayAnimationId = null;
+            }
+            
+            // Update UI
+            document.getElementById('start-replay-btn').disabled = false;
+            document.getElementById('stop-replay-btn').disabled = true;
+            document.getElementById('replay-step-btn').disabled = true;
+            document.getElementById('replay-prev-btn').disabled = true;
+            document.getElementById('replay-next-10-btn').disabled = true;
+            document.getElementById('replay-prev-10-btn').disabled = true;
+            document.getElementById('reward-info').classList.add('hidden');
+            
+            console.log('Stopped replay');
+        };
+
+        PlaygroundSimulation.prototype.replayStep = function() {
+            if (!this.isReplaying) return;
+            
+            // Go forward one step (but not beyond end)
+            if (this.replayIndex < this.stepHistory.length - 1) {
+                this.replayIndex++;
+            }
+            
+            this.replayStepMode = true;
+            this.updateReplayStateAndDisplay();
+        };
+
+        PlaygroundSimulation.prototype.singleReplayStep = function() {
+            if (this.replayIndex >= this.stepHistory.length) {
+                this.stopReplay();
+                return;
+            }
+            
+            // Use shared update logic
+            this.updateReplayStateAndDisplay();
+            
+            // Advance to next step for automatic playback
+            this.replayIndex++;
+        };
+
+        PlaygroundSimulation.prototype.getRewardForStep = function(stepIndex) {
+            // Return pre-calculated reward or zero if not available
+            if (stepIndex >= 0 && stepIndex < this.preCalculatedRewards.length) {
+                return this.preCalculatedRewards[stepIndex];
+            }
+            return { total: 0, approaching: 0, catchRetro: 0 };
+        };
+
+        // === NEW NAVIGATION METHODS ===
+
+        PlaygroundSimulation.prototype.replayPreviousStep = function() {
+            if (!this.isReplaying) return;
+            
+            // Go back one step (but not below 0)
+            this.replayIndex = Math.max(0, this.replayIndex - 1);
+            
+            this.replayStepMode = true;
+            this.updateReplayStateAndDisplay();
+        };
+
+        PlaygroundSimulation.prototype.replayNext10Steps = function() {
+            if (!this.isReplaying) return;
+            
+            // Go forward 10 steps (but not beyond end)
+            var targetIndex = Math.min(this.stepHistory.length - 1, this.replayIndex + 10);
+            this.replayIndex = targetIndex;
+            
+            this.replayStepMode = true;
+            this.updateReplayStateAndDisplay();
+        };
+
+        PlaygroundSimulation.prototype.replayPrevious10Steps = function() {
+            if (!this.isReplaying) return;
+            
+            // Go back 10 steps (but not below 0)
+            this.replayIndex = Math.max(0, this.replayIndex - 10);
+            
+            this.replayStepMode = true;
+            this.updateReplayStateAndDisplay();
+        };
+
+        PlaygroundSimulation.prototype.updateReplayStateAndDisplay = function() {
+            if (this.replayIndex < this.stepHistory.length) {
+                // Get current step data
+                var currentStep = this.stepHistory[this.replayIndex];
+                
+                // Restore visual state for this step
+                if (currentStep.visualState) {
+                    this.stateManager.currentState = JSON.parse(JSON.stringify(currentStep.visualState));
+                }
+                
+                // Get pre-calculated reward for this step
+                var currentReward = this.getRewardForStep(this.replayIndex);
+                
+                // Update displays
+                this.render();
+                this.updateRewardDisplay(currentReward, this.replayIndex);
+                this.updateReplayStatus();
+            }
+        };
+
+        PlaygroundSimulation.prototype.replayAnimate = function() {
+            if (!this.isReplaying || this.replayStepMode) return;
+            
+            // Apply speed control
+            for (var i = 0; i < this.replaySpeed; i++) {
+                this.singleReplayStep();
+            }
+            
+            this.updateReplayDisplay();
+            
+            if (this.replayIndex < this.stepHistory.length) {
+                this.replayAnimationId = requestAnimationFrame(this.replayAnimate.bind(this));
+            } else {
+                this.stopReplay();
+            }
+        };
+
+        PlaygroundSimulation.prototype.updateReplayStatus = function() {
+            document.getElementById('replay-current').textContent = this.replayIndex;
+            document.getElementById('replay-total').textContent = this.stepHistory.length;
+        };
+
+        PlaygroundSimulation.prototype.updateReplayDisplay = function() {
+            this.updateReplayStatus();
+            // Render the current replay state
+            this.render();
+        };
+
+        PlaygroundSimulation.prototype.updateRewardDisplay = function(reward, stepIndex) {
+            document.getElementById('reward-total').textContent = reward.total.toFixed(3);
+            document.getElementById('reward-approaching').textContent = reward.approaching.toFixed(3);
+            document.getElementById('reward-catch-retro').textContent = reward.catchRetro.toFixed(3);
+            
+            var stepData = this.stepHistory[stepIndex];
+            if (stepData) {
+                document.getElementById('reward-step').textContent = stepIndex;
+                document.getElementById('reward-boids-count').textContent = stepData.state.boids.length;
+                document.getElementById('reward-caught-this-step').textContent = stepData.caughtBoids.length;
             }
         };
 
