@@ -56,6 +56,7 @@ InputProcessor.prototype.processInputs = function(boids, predatorPos, predatorVe
     for (var i = 0; i < boids.length; i++) {
         var boidData = this.encodeBoid(boids[i], predatorPos, canvasWidth, canvasHeight);
         boidArray.push({
+            id: boids[i].id,  // Include boid ID for identification
             relX: boidData[0],
             relY: boidData[1], 
             velX: boidData[2],

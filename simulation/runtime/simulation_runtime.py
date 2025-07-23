@@ -253,6 +253,7 @@ def simulation_step(
     new_boids_states = []
     for boid_state in boids_states:
         new_boids_states.append({
+            'id': boid_state['id'],  # Preserve boid ID
             'position': {'x': boid_state['position']['x'], 'y': boid_state['position']['y']},
             'velocity': {'x': boid_state['velocity']['x'], 'y': boid_state['velocity']['y']}
         })

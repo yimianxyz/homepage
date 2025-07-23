@@ -157,6 +157,7 @@ StateManager.prototype._convertStateToStructuredInputs = function(state) {
     var boidsForProcessor = [];
     for (var i = 0; i < state.boids_states.length; i++) {
         boidsForProcessor.push({
+            id: state.boids_states[i].id,  // Include boid ID
             position: state.boids_states[i].position,
             velocity: state.boids_states[i].velocity
         });

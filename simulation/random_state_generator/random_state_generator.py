@@ -70,6 +70,7 @@ class RandomStateGenerator:
         for i in range(num_boids):
             random_angle = self.random() * 2 * math.pi
             boids_states.append({
+                'id': i,  # Unique ID for each boid
                 'position': {
                     'x': start_x + (self.random() - 0.5) * 100,
                     'y': start_y + (self.random() - 0.5) * 100
@@ -117,7 +118,7 @@ class RandomStateGenerator:
         # Generate random boids
         boids_states = []
         for i in range(num_boids):
-            boid_state = self._generate_random_boid(canvas_width, canvas_height)
+            boid_state = self._generate_random_boid(canvas_width, canvas_height, boid_id=i)
             boids_states.append(boid_state)
         
         # Generate random predator
@@ -143,6 +144,7 @@ class RandomStateGenerator:
         cloned_boids = []
         for boid in state['boids_states']:
             cloned_boids.append({
+                'id': boid['id'],  # Preserve boid ID
                 'position': {'x': boid['position']['x'], 'y': boid['position']['y']},
                 'velocity': {'x': boid['velocity']['x'], 'y': boid['velocity']['y']}
             })
@@ -157,13 +159,14 @@ class RandomStateGenerator:
             'canvas_height': state['canvas_height']
         }
     
-    def _generate_random_boid(self, canvas_width: float, canvas_height: float) -> Dict[str, Any]:
+    def _generate_random_boid(self, canvas_width: float, canvas_height: float, boid_id: int = None) -> Dict[str, Any]:
         """
         Generate single random boid state
         
         Args:
             canvas_width: Canvas width
             canvas_height: Canvas height
+            boid_id: Unique ID for the boid
             
         Returns:
             Boid state dict
@@ -183,6 +186,7 @@ class RandomStateGenerator:
         }
         
         return {
+            'id': boid_id if boid_id is not None else 0,  # Include unique ID
             'position': position,
             'velocity': velocity
         }

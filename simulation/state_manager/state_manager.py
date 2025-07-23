@@ -153,6 +153,7 @@ class StateManager:
         boids_for_processor = []
         for boid_state in state['boids_states']:
             boids_for_processor.append({
+                'id': boid_state['id'],  # Include boid ID
                 'position': boid_state['position'],
                 'velocity': boid_state['velocity']
             })

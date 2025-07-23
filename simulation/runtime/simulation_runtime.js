@@ -288,6 +288,7 @@ function simulationStep(boidsStates, predatorState, predatorAction, canvasWidth,
     var newBoidsStates = [];
     for (var i = 0; i < boidsStates.length; i++) {
         newBoidsStates.push({
+            id: boidsStates[i].id,  // Preserve boid ID
             position: {x: boidsStates[i].position.x, y: boidsStates[i].position.y},
             velocity: {x: boidsStates[i].velocity.x, y: boidsStates[i].velocity.y}
         });

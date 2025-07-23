@@ -50,6 +50,7 @@ RandomStateGenerator.prototype.generateClusteredState = function(numBoids, canva
     for (var i = 0; i < numBoids; i++) {
         var randomAngle = this.random() * 2 * Math.PI;
         boidsStates.push({
+            id: i,  // Unique ID for each boid
             position: {
                 x: startX + (this.random() - 0.5) * 100,
                 y: startY + (this.random() - 0.5) * 100
@@ -93,7 +94,7 @@ RandomStateGenerator.prototype.generateScatteredState = function(numBoids, canva
     // Generate random boids
     var boidsStates = [];
     for (var i = 0; i < numBoids; i++) {
-        var boidState = this._generateRandomBoid(canvasWidth, canvasHeight);
+        var boidState = this._generateRandomBoid(canvasWidth, canvasHeight, i);
         boidsStates.push(boidState);
     }
     
@@ -119,6 +120,7 @@ RandomStateGenerator.prototype.cloneState = function(state) {
     for (var i = 0; i < state.boids_states.length; i++) {
         var boid = state.boids_states[i];
         clonedBoids.push({
+            id: boid.id,  // Preserve boid ID
             position: { x: boid.position.x, y: boid.position.y },
             velocity: { x: boid.velocity.x, y: boid.velocity.y }
         });
@@ -140,10 +142,11 @@ RandomStateGenerator.prototype.cloneState = function(state) {
  * 
  * @param {number} canvasWidth - Canvas width
  * @param {number} canvasHeight - Canvas height
+ * @param {number} boidId - Unique ID for the boid
  * @returns {Object} Boid state dict
  * @private
  */
-RandomStateGenerator.prototype._generateRandomBoid = function(canvasWidth, canvasHeight) {
+RandomStateGenerator.prototype._generateRandomBoid = function(canvasWidth, canvasHeight, boidId) {
     // Random position within canvas bounds
     var position = {
         x: this.random() * canvasWidth,
@@ -159,6 +162,7 @@ RandomStateGenerator.prototype._generateRandomBoid = function(canvasWidth, canva
     };
     
     return {
+        id: boidId !== undefined ? boidId : 0,  // Include unique ID
         position: position,
         velocity: velocity
     };

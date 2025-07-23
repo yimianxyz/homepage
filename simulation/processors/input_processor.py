@@ -60,6 +60,7 @@ class InputProcessor:
         for boid in boids:
             boid_data = self.encode_boid(boid, predator_pos, canvas_width, canvas_height)
             boid_array.append({
+                'id': boid['id'],  # Include boid ID for identification
                 'relX': boid_data[0],
                 'relY': boid_data[1],
                 'velX': boid_data[2],
