@@ -202,16 +202,26 @@ def main():
     # Quick test mode
     if args.quick_test:
         print("⚡ Quick test mode enabled - using minimal parameters")
-        args.timesteps = 3000         # Enough for ~2 episodes in quick test
-        args.min_boids = 3            # Few boids min
-        args.max_boids = 5            # Few boids max
-        args.max_episode_steps = 100  # Shorter episodes for quick test
-        args.eval_interval = 200      # Evaluate reasonably
-        args.save_interval = 300      # Save reasonably  
-        args.log_interval = 100       # Log reasonably
-        args.ppo_epochs = 3           # Fewer PPO epochs but not too few
-        args.mini_batch_size = 32     # Reasonable batches
-        args.debug = True
+        args.timesteps = 500          # Ultra-short for speed (5 episodes max)
+        args.min_boids = 2            # Minimum boids for faster episodes
+        args.max_boids = 3            # Maximum boids for faster episodes  
+        args.max_episode_steps = 50   # Very short episodes for speed
+        args.eval_interval = 1000     # Evaluate at most once (500 < 1000)
+        args.save_interval = 1000     # Save at most once (500 < 1000)
+        args.log_interval = 200       # Log only 2-3 times (500/200 = 2.5)
+        args.ppo_epochs = 2           # Fewer PPO epochs for speed
+        args.mini_batch_size = 16     # Smaller batches for speed
+        args.debug = False            # Disable debug to reduce noise
+        print("   🔇 Debug disabled for clean output")
+    
+    # Performance recommendations for real training
+    if not args.quick_test and args.timesteps >= 100000:
+        print("\n💡 Performance Tips for Long Training:")
+        print("   • Use fewer boids initially (10-20) then increase")
+        print("   • Set eval_interval = timesteps // 50 for reasonable evaluation frequency")
+        print("   • Set save_interval = timesteps // 20 for regular checkpoints")
+        print("   • Consider larger mini_batch_size (128-256) for efficiency")
+        print("   • Use max_episode_steps = 500-2000 depending on task complexity")
     
     # Print training configuration
     print(f"\n🚀 Training Configuration:")
