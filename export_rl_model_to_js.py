@@ -2,9 +2,9 @@
 """
 Export RL PyTorch Model to JavaScript
 
-Converts trained RL (PPO) PyTorch checkpoints to JavaScript model files for browser deployment.
-This script specifically handles RL checkpoints that contain both actor and critic models,
-extracting only the actor (policy) for deployment.
+Converts trained RL (PPO) PyTorch checkpoints from the new /rl training system 
+to JavaScript model files for browser deployment. This script handles the specific
+format used by the PPOModel class and extracts only the actor (policy) for deployment.
 """
 
 import torch
@@ -14,18 +14,23 @@ import os
 from pathlib import Path
 
 def load_rl_checkpoint(checkpoint_path: str) -> tuple:
-    """Load RL PyTorch checkpoint and return actor state_dict and architecture"""
+    """Load RL PyTorch checkpoint and return model state_dict and architecture"""
     print(f"Loading RL checkpoint from {checkpoint_path}...")
     
     # Load checkpoint (weights_only=False for RL checkpoints with numpy scalars)
     checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     
-    # Extract actor model state dict and architecture
-    if 'actor_state_dict' in checkpoint:
-        actor_state_dict = checkpoint['actor_state_dict']
+    # Extract model state dict and architecture
+    if 'model_state_dict' in checkpoint:
+        model_state_dict = checkpoint['model_state_dict']
         architecture = checkpoint.get('architecture', None)
-        print(f"Loaded RL checkpoint from update {checkpoint.get('update', 'unknown')}")
-        print(f"Training config: {checkpoint.get('config', 'unknown')}")
+        model_type = checkpoint.get('model_type', 'Unknown')
+        
+        print(f"Loaded RL checkpoint from epoch {checkpoint.get('epoch', 'unknown')}")
+        print(f"Model type: {model_type}")
+        print(f"Timesteps: {checkpoint.get('timesteps', 'unknown')}")
+        print(f"Episodes: {checkpoint.get('episodes', 'unknown')}")
+        print(f"Best eval reward: {checkpoint.get('best_eval_reward', 'unknown')}")
         
         if architecture:
             print(f"✅ Found stored architecture: {architecture}")
@@ -34,16 +39,9 @@ def load_rl_checkpoint(checkpoint_path: str) -> tuple:
             print("   Consider re-saving your checkpoint with architecture info for accuracy")
             
     else:
-        # Check if it's a regular SL checkpoint being used
-        if 'model_state_dict' in checkpoint:
-            print("⚠️  This appears to be an SL checkpoint, not an RL checkpoint")
-            print("   Using model_state_dict as actor...")
-            actor_state_dict = checkpoint['model_state_dict']
-            architecture = checkpoint.get('architecture', None)
-        else:
-            raise ValueError("Checkpoint does not contain actor_state_dict or model_state_dict")
+        raise ValueError("Checkpoint does not contain model_state_dict")
     
-    return actor_state_dict, architecture
+    return model_state_dict, architecture
 
 def convert_tensor_to_js(tensor: torch.Tensor) -> list:
     """Convert PyTorch tensor to JavaScript array"""
@@ -177,9 +175,9 @@ def validate_matrix_dimensions(js_params: dict) -> dict:
         "total_matrices": total_matrices
     }
 
-def convert_state_dict_to_js(state_dict: dict, stored_architecture: dict = None) -> dict:
-    """Convert PyTorch state dict to JavaScript transformer format"""
-    print("Converting RL actor parameters to JavaScript transformer format...")
+def convert_rl_state_dict_to_js(state_dict: dict, stored_architecture: dict = None) -> dict:
+    """Convert RL PyTorch state dict to JavaScript transformer format"""
+    print("Converting RL PPO model parameters to JavaScript transformer format...")
     
     # Get architecture parameters from checkpoint
     js_params = get_architecture_from_checkpoint(stored_architecture, state_dict)
@@ -260,15 +258,32 @@ def convert_state_dict_to_js(state_dict: dict, stored_architecture: dict = None)
     
     js_params["layers"] = layers
     
-    # Output projection  
-    # PyTorch Linear(in, out) has weight [out, in], which matches JS expectation
-    output_weight = state_dict["output_projection.weight"]  # [2, d_model] - correct for JS
-    output_bias = convert_tensor_to_js(state_dict["output_projection.bias"])
+    # Output projection - Use actor_projection from RL model
+    # Map back to output_projection for JS compatibility
+    if "actor_projection.weight" in state_dict:
+        output_weight = state_dict["actor_projection.weight"]  # [2, d_model] - correct for JS
+        output_bias = convert_tensor_to_js(state_dict["actor_projection.bias"])
+        print("  ✓ Using actor_projection as output (RL trained policy)")
+    else:
+        # Fallback to output_projection (shouldn't happen with RL checkpoints)
+        output_weight = state_dict["output_projection.weight"]  # [2, d_model] - correct for JS
+        output_bias = convert_tensor_to_js(state_dict["output_projection.bias"])
+        print("  ⚠️  Using output_projection (not RL trained)")
     
     js_params["output_weight"] = convert_tensor_to_js(output_weight)
     js_params["output_bias"] = output_bias
     
-    print(f"✓ Converted RL actor to JavaScript transformer format")
+    # Skip critic_projection and log_std - not needed for JS deployment
+    skipped_keys = []
+    if "critic_projection.weight" in state_dict:
+        skipped_keys.append("critic_projection")
+    if "log_std" in state_dict:
+        skipped_keys.append("log_std")
+    
+    if skipped_keys:
+        print(f"  ✓ Skipped RL-specific parameters: {skipped_keys} (not needed for JS deployment)")
+    
+    print(f"✓ Converted RL PPO model to JavaScript transformer format")
     
     # Validate all matrix dimensions
     validation_result = validate_matrix_dimensions(js_params)
@@ -282,7 +297,7 @@ def convert_state_dict_to_js(state_dict: dict, stored_architecture: dict = None)
     
     return js_params
 
-def save_js_model(js_params: dict, output_path: str, is_rl_model: bool = True):
+def save_js_model(js_params: dict, output_path: str):
     """Save parameters as JavaScript model file"""
     print(f"Saving JavaScript model to {output_path}...")
     
@@ -293,21 +308,21 @@ def save_js_model(js_params: dict, output_path: str, is_rl_model: bool = True):
     
     # Format as JavaScript file
     arch = f"{js_params['d_model']}×{js_params['n_heads']}×{js_params['n_layers']}×{js_params['ffn_hidden']}"
-    model_type = "RL-Trained Transformer" if is_rl_model else "Transformer"
-    js_content = f"""// {model_type} Model Parameters
-// Generated from {'RL (PPO)' if is_rl_model else 'PyTorch'} checkpoint
+    js_content = f"""// RL-Trained Transformer Model Parameters
+// Generated from PPO (Reinforcement Learning) checkpoint
 // Architecture: {arch}
-// Training: {'Reinforcement Learning (PPO fine-tuning)' if is_rl_model else 'Supervised Learning'}
+// Training: PPO fine-tuning from supervised learning checkpoint
 
 window.TRANSFORMER_PARAMS = {json.dumps(js_params, indent=2)};
 
-console.log("Loaded {model_type.lower()} model:");
+console.log("Loaded RL-trained transformer model:");
 console.log("  Architecture: " + window.TRANSFORMER_PARAMS.d_model + "×" + 
            window.TRANSFORMER_PARAMS.n_heads + "×" + 
            window.TRANSFORMER_PARAMS.n_layers + "×" + 
            window.TRANSFORMER_PARAMS.ffn_hidden);
 console.log("  Parameter tensors:", Object.keys(window.TRANSFORMER_PARAMS).length);
-console.log("  Training: {'RL (PPO fine-tuning)' if is_rl_model else 'Supervised Learning'}");
+console.log("  Training: PPO (Reinforcement Learning fine-tuning)");
+console.log("  🎯 This model has been optimized for predator-prey hunting!");
 """
     
     # Write to file
@@ -392,10 +407,10 @@ def main():
     
     try:
         # Load RL checkpoint
-        actor_state_dict, stored_architecture = load_rl_checkpoint(args.checkpoint)
+        model_state_dict, stored_architecture = load_rl_checkpoint(args.checkpoint)
         
         # Convert to JavaScript format
-        js_params = convert_state_dict_to_js(actor_state_dict, stored_architecture)
+        js_params = convert_rl_state_dict_to_js(model_state_dict, stored_architecture)
         
         # Display extracted architecture
         print(f"\nExtracted Architecture:")
@@ -405,7 +420,7 @@ def main():
         print(f"  ffn_hidden: {js_params['ffn_hidden']}")
         
         # Save JavaScript model
-        save_js_model(js_params, args.output, is_rl_model=True)
+        save_js_model(js_params, args.output)
         
         # Show model info
         if args.info:
@@ -413,7 +428,7 @@ def main():
         
         print("\n✅ RL Export completed successfully!")
         print(f"You can now use the RL-trained model in your browser by loading: {args.output}")
-        print("This model has been fine-tuned with reinforcement learning for improved hunting performance!")
+        print("🎯 This model has been fine-tuned with reinforcement learning for improved hunting performance!")
         
     except Exception as e:
         print(f"\n❌ Export failed: {e}")
