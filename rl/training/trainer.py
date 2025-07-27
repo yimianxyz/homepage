@@ -312,7 +312,7 @@ class PPOTrainer:
         
         # Get episode end flag from the last step
         last_step_info = episode_data[-1]['info']  
-        is_episode_end = last_step_info['episode_end']  # True=success, False=timeout
+        is_episode_end = True  # Always True for episode completion (success OR timeout)
         episode_end_type = last_step_info['episode_end_type']
         
         if self.debug:
