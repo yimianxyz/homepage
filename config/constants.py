@@ -34,9 +34,14 @@ class SimulationConstants:
     SEPARATION_MULTIPLIER = 2.0
     COHESION_MULTIPLIER = 1.0
     ALIGNMENT_MULTIPLIER = 1.0
+
     
-    # Reward system constants
-    MAX_RETRO_REWARD_STEPS = 50
+    # Instant reward calculation constants
+    BASE_CATCH_REWARD = 10.0              # Dominant reward per caught boid
+    APPROACHING_PROXIMITY_MULTIPLIER = 0.05  # Proximity reward multiplier
+    APPROACHING_VELOCITY_MULTIPLIER = 0.03   # Velocity convergence multiplier
+    APPROACHING_ALIGNMENT_MULTIPLIER = 0.1   # Action alignment multiplier
+    MIN_DISTANCE_THRESHOLD = 0.001        # Minimum distance threshold
 
 # Global constants instance
 CONSTANTS = SimulationConstants()

@@ -1,10 +1,11 @@
 """
-Rewards Module - Reinforcement Learning Reward Calculation
+Rewards Module - Simple Instant Reward Calculation
 
-This module provides reward calculation for RL training, including:
-- Approaching rewards based on current state
-- Catch retro rewards based on future episode data
-- Lookback logic for retroactive reward assignment
+This module provides instant reward calculation for RL training:
+- Catch rewards: Dominant rewards for catching boids (instant)
+- Approaching rewards: Small rewards for getting closer to boids (instant)
+
+Design principle: Occam's razor - simple, clean, single-step processing
 """
 
 from .reward_processor import RewardProcessor, create_reward_processor
