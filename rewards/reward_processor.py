@@ -24,10 +24,14 @@ class RewardProcessor:
     """Simple reward processor for RL training with instant rewards"""
     
     def __init__(self):
-        # Base catch reward per boid caught (dominant reward)
-        self.base_catch_reward = 10.0
+        # Use centralized constants from config
+        self.base_catch_reward = CONSTANTS.BASE_CATCH_REWARD
+        self.proximity_multiplier = CONSTANTS.APPROACHING_PROXIMITY_MULTIPLIER
+        self.velocity_multiplier = CONSTANTS.APPROACHING_VELOCITY_MULTIPLIER
+        self.alignment_multiplier = CONSTANTS.APPROACHING_ALIGNMENT_MULTIPLIER
+        self.min_distance_threshold = CONSTANTS.MIN_DISTANCE_THRESHOLD
         
-        # Use centralized constants for normalization
+        # Normalization constants
         self.max_distance = CONSTANTS.MAX_DISTANCE
         self.unified_max_velocity = max(
             CONSTANTS.BOID_MAX_SPEED,
@@ -106,7 +110,7 @@ class RewardProcessor:
                 min_distance = distance
                 closest_boid = boid
         
-        if not closest_boid or min_distance < 0.001:
+        if not closest_boid or min_distance < self.min_distance_threshold:
             return 0.0
         
         # Calculate approach direction (normalized)
@@ -115,17 +119,17 @@ class RewardProcessor:
         
         # Action alignment reward - how well action aligns with approach direction
         action_alignment = action[0] * approach_dir_x + action[1] * approach_dir_y
-        alignment_reward = max(0, action_alignment) * 0.1
+        alignment_reward = max(0, action_alignment) * self.alignment_multiplier
         
         # Proximity reward - closer is better (max reward at distance 0)
-        proximity_reward = max(0, 1 - min_distance) * 0.05
+        proximity_reward = max(0, 1 - min_distance) * self.proximity_multiplier
         
         # Velocity convergence reward - predator and boid moving toward each other
         predator_vel = state['predator']
         relative_vel_x = closest_boid['velX'] - predator_vel['velX']
         relative_vel_y = closest_boid['velY'] - predator_vel['velY']
         convergence_rate = -(relative_vel_x * approach_dir_x + relative_vel_y * approach_dir_y)
-        velocity_reward = max(0, convergence_rate) * 0.03
+        velocity_reward = max(0, convergence_rate) * self.velocity_multiplier
         
         return proximity_reward + velocity_reward + alignment_reward
     

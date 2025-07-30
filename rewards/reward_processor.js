@@ -13,10 +13,14 @@
  * @constructor
  */
 function RewardProcessor() {
-    // Base catch reward per boid caught (dominant reward)
-    this.baseCatchReward = 10.0;
+    // Use centralized constants from config
+    this.baseCatchReward = window.SIMULATION_CONSTANTS.BASE_CATCH_REWARD;
+    this.proximityMultiplier = window.SIMULATION_CONSTANTS.APPROACHING_PROXIMITY_MULTIPLIER;
+    this.velocityMultiplier = window.SIMULATION_CONSTANTS.APPROACHING_VELOCITY_MULTIPLIER;  
+    this.alignmentMultiplier = window.SIMULATION_CONSTANTS.APPROACHING_ALIGNMENT_MULTIPLIER;
+    this.minDistanceThreshold = window.SIMULATION_CONSTANTS.MIN_DISTANCE_THRESHOLD;
     
-    // Use centralized constants for normalization
+    // Normalization constants
     this.maxDistance = window.SIMULATION_CONSTANTS.MAX_DISTANCE;
     this.unifiedMaxVelocity = Math.max(
         window.SIMULATION_CONSTANTS.BOID_MAX_SPEED,
@@ -92,7 +96,7 @@ RewardProcessor.prototype._calculateApproachingReward = function(state, action) 
         }
     }
     
-    if (!closestBoid || minDistance < 0.001) {
+    if (!closestBoid || minDistance < this.minDistanceThreshold) {
         return 0.0;
     }
     
@@ -102,17 +106,17 @@ RewardProcessor.prototype._calculateApproachingReward = function(state, action) 
     
     // Action alignment reward - how well action aligns with approach direction
     var actionAlignment = action[0] * approachDirX + action[1] * approachDirY;
-    var alignmentReward = Math.max(0, actionAlignment) * 0.1;
+    var alignmentReward = Math.max(0, actionAlignment) * this.alignmentMultiplier;
     
     // Proximity reward - closer is better (max reward at distance 0)
-    var proximityReward = Math.max(0, 1 - minDistance) * 0.05;
+    var proximityReward = Math.max(0, 1 - minDistance) * this.proximityMultiplier;
     
     // Velocity convergence reward - predator and boid moving toward each other
     var predatorVel = state.predator;
     var relativeVelX = closestBoid.velX - predatorVel.velX;
     var relativeVelY = closestBoid.velY - predatorVel.velY;
     var convergenceRate = -(relativeVelX * approachDirX + relativeVelY * approachDirY);
-    var velocityReward = Math.max(0, convergenceRate) * 0.03;
+    var velocityReward = Math.max(0, convergenceRate) * this.velocityMultiplier;
     
     return proximityReward + velocityReward + alignmentReward;
 };
