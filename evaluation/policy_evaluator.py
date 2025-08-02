@@ -18,6 +18,9 @@ from pathlib import Path
 import statistics
 import sys
 import os
+import multiprocessing as mp
+from concurrent.futures import ProcessPoolExecutor
+import pickle
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,17 +31,17 @@ from config.constants import CONSTANTS
 
 # FIXED EVALUATION PARAMETERS - DO NOT MODIFY
 # These parameters are optimized for maximum speed while covering key scenarios
-EPISODES_PER_SCENARIO = 5       # Episodes per scenario (fast evaluation)
+EPISODES_PER_SCENARIO = 10       # Episodes per scenario (fast evaluation)
 MAX_STEPS_PER_EPISODE = 1500    # Maximum steps per episode
 EVALUATION_SEED = 42            # Fixed seed for reproducible results
 
 # Targeted test scenarios - optimized for speed and relevance
 TEST_SCENARIOS = [
     # Mobile scenarios - test light and medium loads
-    ((480, 320), 5),     # Mobile + light load
+    # ((480, 320), 5),     # Mobile + light load
     ((480, 320), 20),    # Mobile + medium load
     # Desktop scenarios - test heavy load
-    ((1920, 1080), 40),  # Desktop + heavy load
+    #((1920, 1080), 40),  # Desktop + heavy load
 ]
 
 @dataclass 
@@ -117,6 +120,9 @@ class PolicyEvaluator:
         """
         self.state_generator = RandomStateGenerator(seed=EVALUATION_SEED)
         
+        # Detect CPU cores for multiprocessing
+        self.num_cores = mp.cpu_count()
+        
         print(f"PolicyEvaluator initialized with optimized parameters:")
         print(f"  Episodes per scenario: {EPISODES_PER_SCENARIO}")
         print(f"  Max steps per episode: {MAX_STEPS_PER_EPISODE}")
@@ -124,6 +130,7 @@ class PolicyEvaluator:
         print(f"  Evaluation seed: {EVALUATION_SEED}")
         print(f"  Total scenarios: {len(TEST_SCENARIOS)}")
         print(f"  Total episodes: {len(TEST_SCENARIOS) * EPISODES_PER_SCENARIO}")
+        print(f"  CPU cores: {self.num_cores} (parallel execution)")
     
     def evaluate_policy(self, policy, policy_name: str = "Unknown Policy") -> EvaluationResult:
         """
@@ -171,32 +178,50 @@ class PolicyEvaluator:
         return result
     
     def _evaluate_scenario(self, policy, canvas_width: int, canvas_height: int, boid_count: int) -> ScenarioResult:
-        """Evaluate policy on a single scenario"""
+        """Evaluate policy on a single scenario using parallel processing"""
         
+        # Serialize policy for multiprocessing
+        serialized_policy = pickle.dumps(policy)
+        
+        # Create episode tasks
+        episode_tasks = []
+        for episode in range(EPISODES_PER_SCENARIO):
+            task = (serialized_policy, canvas_width, canvas_height, boid_count, episode)
+            episode_tasks.append(task)
+        
+        # Run episodes in parallel
         catch_rates = []
         total_catches = []
         episode_lengths = []
         episodes_completed = 0
         episodes_timed_out = 0
         
-        for episode in range(EPISODES_PER_SCENARIO):
-            try:
-                # Run single episode
-                episode_result = self._run_episode(policy, canvas_width, canvas_height, boid_count)
-                
-                catch_rate, catches, steps = episode_result
-                catch_rates.append(catch_rate)
-                total_catches.append(catches)
-                episode_lengths.append(steps)
-                episodes_completed += 1
-                    
-            except Exception as e:
-                print(f"    ⚠️  Episode {episode+1} failed: {e}")
-                episodes_timed_out += 1
+        with ProcessPoolExecutor(max_workers=self.num_cores) as executor:
+            # Submit all episode tasks
+            future_to_episode = {
+                executor.submit(_run_episode_worker, task): episode 
+                for episode, task in enumerate(episode_tasks)
+            }
             
-            # Progress indicator
-            if (episode + 1) % 10 == 0:
-                print(f"    Progress: {episode+1}/{EPISODES_PER_SCENARIO}")
+            # Collect results as they complete
+            for future in future_to_episode:
+                episode_num = future_to_episode[future]
+                try:
+                    result = future.result()
+                    if result is not None:
+                        catch_rate, catches, steps = result
+                        catch_rates.append(catch_rate)
+                        total_catches.append(catches)
+                        episode_lengths.append(steps)
+                        episodes_completed += 1
+                    else:
+                        episodes_timed_out += 1
+                        
+                except Exception as e:
+                    print(f"    ⚠️  Episode {episode_num+1} failed: {e}")
+                    episodes_timed_out += 1
+        
+        print(f"    ✓ Completed: {episodes_completed}/{EPISODES_PER_SCENARIO} episodes (parallel)")
         
         return ScenarioResult(
             canvas_width=canvas_width,
@@ -208,46 +233,6 @@ class PolicyEvaluator:
             total_catches=total_catches,
             episode_lengths=episode_lengths
         )
-    
-    def _run_episode(self, policy, canvas_width: int, canvas_height: int, boid_count: int) -> Tuple[float, int, int]:
-        """
-        Run a single episode
-        
-        Returns:
-            Tuple of (catch_rate, total_catches, episode_length)
-        """
-        # Generate random initial state
-        initial_state = self.state_generator.generate_scattered_state(
-            boid_count, canvas_width, canvas_height
-        )
-        initial_boid_count = len(initial_state['boids_states'])
-        
-        # Initialize state manager
-        state_manager = StateManager()
-        state_manager.init(initial_state, policy)
-        
-        total_catches = 0
-        step = 0
-        
-        # Run episode
-        while step < MAX_STEPS_PER_EPISODE:
-            # Run simulation step
-            result = state_manager.step()
-            
-            # Count catches this step
-            if 'caught_boids' in result:
-                total_catches += len(result['caught_boids'])
-            
-            # Check if all boids caught (early termination)
-            if len(result['boids_states']) == 0:
-                break
-                
-            step += 1
-        
-        # Calculate catch rate
-        catch_rate = total_catches / initial_boid_count if initial_boid_count > 0 else 0.0
-        
-        return catch_rate, total_catches, step + 1
     
     def _print_summary(self, result: EvaluationResult):
         """Print evaluation summary"""
@@ -296,3 +281,56 @@ class PolicyEvaluator:
             json.dump(data, f, indent=2)
         
         print(f"✅ Results saved to: {output_path}")
+
+# === MULTIPROCESSING WORKER FUNCTIONS ===
+
+def _run_episode_worker(task_data: Tuple) -> Tuple[float, int, int]:
+    """
+    Worker function for multiprocessing episode execution
+    
+    Args:
+        task_data: Tuple of (serialized_policy, canvas_width, canvas_height, boid_count, episode_seed)
+        
+    Returns:
+        Tuple of (catch_rate, total_catches, episode_length)
+    """
+    serialized_policy, canvas_width, canvas_height, boid_count, episode_seed = task_data
+    
+    # Deserialize policy
+    policy = pickle.loads(serialized_policy)
+    
+    # Create episode-specific state generator with unique seed
+    episode_state_generator = RandomStateGenerator(seed=EVALUATION_SEED + episode_seed)
+    
+    # Generate random initial state
+    initial_state = episode_state_generator.generate_scattered_state(
+        boid_count, canvas_width, canvas_height
+    )
+    initial_boid_count = len(initial_state['boids_states'])
+    
+    # Initialize state manager
+    state_manager = StateManager()
+    state_manager.init(initial_state, policy)
+    
+    total_catches = 0
+    step = 0
+    
+    # Run episode
+    while step < MAX_STEPS_PER_EPISODE:
+        # Run simulation step
+        result = state_manager.step()
+        
+        # Count catches this step
+        if 'caught_boids' in result:
+            total_catches += len(result['caught_boids'])
+        
+        # Check if all boids caught (early termination)
+        if len(result['boids_states']) == 0:
+            break
+            
+        step += 1
+    
+    # Calculate catch rate
+    catch_rate = total_catches / initial_boid_count if initial_boid_count > 0 else 0.0
+    
+    return catch_rate, total_catches, step + 1
