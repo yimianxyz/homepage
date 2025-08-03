@@ -93,7 +93,7 @@ class TransformerRLPolicy(nn.Module):
         
         # Load weights
         self.transformer.load_state_dict(checkpoint['model_state_dict'])
-        self.transformer.eval()  # Set to eval mode initially
+        # Don't set to eval mode - let the training loop control this
         
         print(f"✓ Loaded transformer: {arch['d_model']}×{arch['n_heads']}×{arch['n_layers']}×{arch['ffn_hidden']}")
     
@@ -118,12 +118,8 @@ class TransformerRLPolicy(nn.Module):
         
         batch_size = observation.shape[0]
         
-        # Convert flat observations to structured format
-        structured_inputs = self._tensor_to_structured_batch(observation)
-        
-        # Get transformer features (before final projection)
-        # We need to modify this to get intermediate features
-        cls_features = self._get_transformer_features(structured_inputs)
+        # Get transformer features directly from flat tensor without conversion
+        cls_features = self._get_transformer_features_from_tensor(observation)
         
         # Get action from transformer's output projection
         action_mean = self.transformer.output_projection(cls_features)
@@ -138,53 +134,66 @@ class TransformerRLPolicy(nn.Module):
         
         return action_mean, value
     
-    def _get_transformer_features(self, structured_inputs: list) -> torch.Tensor:
-        """Get intermediate features from transformer (CLS token after all layers)"""
+    def _get_transformer_features_from_tensor(self, observations: torch.Tensor) -> torch.Tensor:
+        """Get transformer features directly from flat tensor observations"""
         
-        batch_size = len(structured_inputs)
+        batch_size = observations.shape[0]
+        device = observations.device
         
-        # Build token sequences for each sample
+        # Build token sequences for each sample in batch
         all_sequences = []
         all_masks = []
         
-        for sample in structured_inputs:
+        for b in range(batch_size):
+            obs = observations[b]  # [obs_dim]
             tokens = []
             
             # CLS token
             cls_token = self.transformer.cls_embedding + self.transformer.type_embeddings['cls']
             tokens.append(cls_token)
             
-            # Context token
-            ctx_input = torch.tensor(
-                [sample['context']['canvasWidth'], sample['context']['canvasHeight']],
-                dtype=torch.float32, device=self.device
-            )
+            # Context token - extract canvas dimensions (first 2 elements)
+            ctx_input = obs[:2]  # [canvas_w_norm, canvas_h_norm]
             ctx_token = self.transformer.ctx_projection(ctx_input) + self.transformer.type_embeddings['ctx']
             tokens.append(ctx_token)
             
-            # Predator token
-            predator_input = torch.tensor(
-                [sample['predator']['velX'], sample['predator']['velY'], 0.0, 0.0],
-                dtype=torch.float32, device=self.device
-            )
-            predator_token = self.transformer.predator_projection(predator_input) + self.transformer.type_embeddings['predator']
+            # Predator token - extract predator velocities (next 2 elements, pad to 4D)
+            pred_vel = obs[2:4]  # [pred_vx_norm, pred_vy_norm]
+            pred_input = torch.cat([pred_vel, torch.zeros(2, device=device)], dim=0)  # Pad to 4D
+            predator_token = self.transformer.predator_projection(pred_input) + self.transformer.type_embeddings['predator']
             tokens.append(predator_token)
             
-            # Boid tokens
+            # Boid tokens - extract boid data (remaining elements, 4 per boid)
             sample_mask = [False, False, False]  # CLS, CTX, Predator are not padding
+            boid_start = 4
             
-            for boid in sample['boids']:
-                boid_input = torch.tensor(
-                    [boid['relX'], boid['relY'], boid['velX'], boid['velY']],
-                    dtype=torch.float32, device=self.device
-                )
-                boid_token = self.transformer.boid_projection(boid_input) + self.transformer.type_embeddings['boid']
-                tokens.append(boid_token)
-                sample_mask.append(False)
+            for i in range(self.transformer.max_boids):
+                boid_idx = boid_start + i * 4
+                
+                if boid_idx + 3 < obs.shape[0]:
+                    boid_data = obs[boid_idx:boid_idx + 4]  # [rel_x, rel_y, vel_x, vel_y]
+                    
+                    # Check if this is padding (all zeros) - use small epsilon for floating point comparison
+                    is_padding = torch.all(torch.abs(boid_data) < 1e-6)
+                    
+                    if not is_padding:
+                        boid_token = self.transformer.boid_projection(boid_data) + self.transformer.type_embeddings['boid']
+                        tokens.append(boid_token)
+                        sample_mask.append(False)
+                    else:
+                        # This is padding
+                        padding_token = torch.zeros(self.transformer.d_model, device=device)
+                        tokens.append(padding_token)
+                        sample_mask.append(True)
+                else:
+                    # Beyond observation size - add padding
+                    padding_token = torch.zeros(self.transformer.d_model, device=device)
+                    tokens.append(padding_token)
+                    sample_mask.append(True)
             
-            # Pad to max_boids + 3
+            # Pad to max_boids + 3 if needed
             while len(tokens) < self.transformer.max_boids + 3:
-                padding_token = torch.zeros(self.transformer.d_model, device=self.device)
+                padding_token = torch.zeros(self.transformer.d_model, device=device)
                 tokens.append(padding_token)
                 sample_mask.append(True)
             
@@ -193,7 +202,7 @@ class TransformerRLPolicy(nn.Module):
         
         # Stack sequences
         x = torch.stack(all_sequences)  # [batch_size, seq_len, d_model]
-        padding_mask = torch.tensor(all_masks, dtype=torch.bool, device=self.device)
+        padding_mask = torch.tensor(all_masks, dtype=torch.bool, device=device)
         
         # Pass through transformer layers
         for layer in self.transformer.transformer_layers:
@@ -203,26 +212,28 @@ class TransformerRLPolicy(nn.Module):
         return x[:, 0]  # [batch_size, d_model]
     
     def _tensor_to_structured_batch(self, observations: torch.Tensor) -> list:
-        """Convert batch of flat tensor observations to structured format"""
+        """Convert batch of flat tensor observations to structured format (for evaluation only)"""
         
         batch_size = observations.shape[0]
         structured_batch = []
         
-        for i in range(batch_size):
-            obs = observations[i]
-            structured = self._tensor_to_structured(obs)
-            structured_batch.append(structured)
+        with torch.no_grad():  # Only used for evaluation, safe to detach
+            for i in range(batch_size):
+                obs = observations[i]
+                structured = self._tensor_to_structured(obs)
+                structured_batch.append(structured)
         
         return structured_batch
     
     def _tensor_to_structured(self, observation: torch.Tensor) -> Dict[str, Any]:
-        """Convert single flat tensor observation to structured format"""
+        """Convert single flat tensor observation to structured format (for evaluation only)"""
         
-        # Extract components from flat observation
-        canvas_w_norm = observation[0].item()
-        canvas_h_norm = observation[1].item()
-        pred_vx_norm = observation[2].item()
-        pred_vy_norm = observation[3].item()
+        # Extract components from flat observation (detach for evaluation)
+        obs_cpu = observation.detach().cpu()
+        canvas_w_norm = obs_cpu[0].item()
+        canvas_h_norm = obs_cpu[1].item()
+        pred_vx_norm = obs_cpu[2].item()
+        pred_vy_norm = obs_cpu[3].item()
         
         # Build structured format
         structured = {
@@ -242,18 +253,19 @@ class TransformerRLPolicy(nn.Module):
         for i in range(self.transformer.max_boids):
             idx = boid_start_idx + i * 4
             
-            # Check if this is padding (all zeros)
-            if (observation[idx] == 0 and observation[idx+1] == 0 and 
-                observation[idx+2] == 0 and observation[idx+3] == 0):
-                continue
-            
-            boid = {
-                'relX': observation[idx].item(),
-                'relY': observation[idx+1].item(),
-                'velX': observation[idx+2].item(),
-                'velY': observation[idx+3].item()
-            }
-            structured['boids'].append(boid)
+            if idx + 3 < len(obs_cpu):
+                # Check if this is padding (all zeros) with epsilon for floating point
+                boid_data = obs_cpu[idx:idx+4]
+                if torch.all(torch.abs(boid_data) < 1e-6):
+                    continue
+                
+                boid = {
+                    'relX': boid_data[0].item(),
+                    'relY': boid_data[1].item(),
+                    'velX': boid_data[2].item(),
+                    'velY': boid_data[3].item()
+                }
+                structured['boids'].append(boid)
         
         return structured
 
@@ -287,19 +299,20 @@ def create_rl_modules(
     
     # Create actor module
     class ActorNet(nn.Module):
-        def __init__(self, policy):
+        def __init__(self, policy, action_std):
             super().__init__()
             self.policy = policy
             self.log_std = nn.Parameter(torch.log(torch.tensor(action_std)))
         
         def forward(self, observation):
             action_mean, _ = self.policy(observation)
-            # Expand log_std to match batch size
+            # Expand log_std to match batch size and convert to scale (std dev)
             batch_size = action_mean.shape[0] if action_mean.dim() > 1 else 1
             log_std = self.log_std.expand(batch_size, 2)
-            return action_mean, log_std
+            scale = torch.exp(log_std)  # Convert log_std to std (scale)
+            return action_mean, scale
     
-    actor_net = ActorNet(policy)
+    actor_net = ActorNet(policy, action_std)
     
     # Create actor module with TanhNormal distribution
     actor_module = TensorDictModule(

@@ -58,6 +58,9 @@ class BoidsEnvironment(EnvBase):
         self.max_steps = max_steps
         self.max_boids_for_model = max_boids_for_model
         
+        # Store device for consistent usage
+        self._device = device if device is not None else torch.device('cpu')
+        
         # Initialize components (NO StateManager!)
         self.state_generator = RandomStateGenerator(seed=seed)
         self.input_processor = InputProcessor()
@@ -85,20 +88,22 @@ class BoidsEnvironment(EnvBase):
             high=1.0,
             shape=(2,),
             dtype=torch.float32,
-            device=self.device,
+            device=self._device,
         )
         
-        # Observation spec: We'll use a flat tensor representation
-        # that can be reconstructed into structured format for the policy
+        # Observation spec: Normalized observations bounded in reasonable ranges
         # Format: [canvas_w, canvas_h, pred_vx, pred_vy, boid1_data, boid2_data, ...]
         # Each boid: [rel_x, rel_y, vel_x, vel_y]
+        # All values are normalized, most should be in [-1, 1] range
         obs_size = 4 + (self.max_boids_for_model * 4)  # context(2) + predator(2) + boids
         
         self.observation_spec = Composite(
-            observation=Unbounded(
+            observation=Bounded(
+                low=-2.0,  # Allow some range beyond [-1,1] for safety
+                high=2.0,
                 shape=(obs_size,),
                 dtype=torch.float32,
-                device=self.device,
+                device=self._device,
             ),
             shape=(),
         )
@@ -107,24 +112,24 @@ class BoidsEnvironment(EnvBase):
         self.reward_spec = Unbounded(
             shape=(1,),
             dtype=torch.float32,
-            device=self.device,
+            device=self._device,
         )
         
         self.done_spec = Composite(
             done=Unbounded(
                 shape=(1,),
                 dtype=torch.bool,
-                device=self.device,
+                device=self._device,
             ),
             terminated=Unbounded(
                 shape=(1,),
                 dtype=torch.bool,
-                device=self.device,
+                device=self._device,
             ),
             truncated=Unbounded(
                 shape=(1,),
                 dtype=torch.bool,
-                device=self.device,
+                device=self._device,
             ),
             shape=(),
         )
@@ -151,26 +156,38 @@ class BoidsEnvironment(EnvBase):
         return TensorDict(
             {
                 "observation": obs_tensor,
-                "done": torch.tensor([False], dtype=torch.bool, device=self.device),
-                "terminated": torch.tensor([False], dtype=torch.bool, device=self.device),
-                "truncated": torch.tensor([False], dtype=torch.bool, device=self.device),
+                "done": torch.tensor([False], dtype=torch.bool, device=self._device),
+                "terminated": torch.tensor([False], dtype=torch.bool, device=self._device),
+                "truncated": torch.tensor([False], dtype=torch.bool, device=self._device),
             },
             batch_size=(),
-            device=self.device,
+            device=self._device,
         )
     
     def _step(self, tensordict: TensorDict) -> TensorDict:
-        """Execute one step in the environment - CLEAN AND SIMPLE!"""
+        """Execute one step in the environment - handles both single and batch processing"""
         
-        # Extract action from tensordict
+        # Extract action from tensordict - handle both single env and batch
         action = tensordict["action"]
-        if action.dim() > 1:
-            action = action.squeeze(0)
         
-        # Convert RL action to predator action format
+        # For single environment (non-parallel), action should be 1D
+        if action.dim() == 1:
+            # Single action case
+            batch_size = 1
+            action = action.unsqueeze(0)  # Add batch dimension for consistency
+        else:
+            # Batch case (parallel environments) - not supported yet, but prepare for it
+            batch_size = action.shape[0]
+            if batch_size > 1:
+                raise NotImplementedError("Batch processing not yet supported in this environment")
+        
+        # Process single action (squeeze back to 1D for compatibility)
+        action = action.squeeze(0)
+        
+        # Convert RL action to predator action format (keep on device, avoid .item() for efficiency)
         predator_action = {
-            'force_x': action[0].item() * CONSTANTS.PREDATOR_MAX_FORCE,
-            'force_y': action[1].item() * CONSTANTS.PREDATOR_MAX_FORCE
+            'force_x': (action[0] * CONSTANTS.PREDATOR_MAX_FORCE).item(),
+            'force_y': (action[1] * CONSTANTS.PREDATOR_MAX_FORCE).item()
         }
         
         # Store pre-step state for reward calculation
@@ -190,21 +207,25 @@ class BoidsEnvironment(EnvBase):
         self.current_predator_state = result['predator_state']
         caught_boids_indices = result['caught_boids']
         
-        # Remove caught boids and get their IDs
+        # Extract caught boid IDs BEFORE modifying the list
         caught_boid_ids = []
-        for i in reversed(caught_boids_indices):  # Reverse to maintain indices
+        for i in caught_boids_indices:
             if i < len(self.current_boids_states):
                 caught_boid_ids.append(self.current_boids_states[i]['id'])
+        
+        # Now safely remove caught boids (in reverse order to maintain indices)
+        for i in reversed(sorted(caught_boids_indices)):
+            if i < len(self.current_boids_states):
                 self.current_boids_states.pop(i)
         
-        # Calculate reward
+        # Calculate reward - avoid unnecessary tensor conversions during forward pass
         reward_input = {
             'state': pre_step_structured,
-            'action': action.detach().cpu().numpy().tolist(),
+            'action': [action[0].item(), action[1].item()],  # Convert to list more efficiently
             'caughtBoids': caught_boid_ids
         }
         reward_result = self.reward_processor.calculate_step_reward(reward_input)
-        reward = torch.tensor([reward_result['total']], dtype=torch.float32, device=self.device)
+        reward = torch.tensor([reward_result['total']], dtype=torch.float32, device=self._device)
         
         # Update step count
         self.current_step += 1
@@ -222,12 +243,12 @@ class BoidsEnvironment(EnvBase):
             {
                 "observation": obs_tensor,
                 "reward": reward,
-                "done": torch.tensor([done], dtype=torch.bool, device=self.device),
-                "terminated": torch.tensor([terminated], dtype=torch.bool, device=self.device),
-                "truncated": torch.tensor([truncated], dtype=torch.bool, device=self.device),
+                "done": torch.tensor([done], dtype=torch.bool, device=self._device),
+                "terminated": torch.tensor([terminated], dtype=torch.bool, device=self._device),
+                "truncated": torch.tensor([truncated], dtype=torch.bool, device=self._device),
             },
             batch_size=(),
-            device=self.device,
+            device=self._device,
         )
     
     def _state_to_tensor(self) -> torch.Tensor:
@@ -267,7 +288,7 @@ class BoidsEnvironment(EnvBase):
         while len(obs) < 4 + (self.max_boids_for_model * 4):
             obs.extend([0.0, 0.0, 0.0, 0.0])
         
-        return torch.tensor(obs, dtype=torch.float32, device=self.device)
+        return torch.tensor(obs, dtype=torch.float32, device=self._device)
     
     def _get_structured_state(self) -> Dict[str, Any]:
         """Convert current state to structured format for reward calculation"""

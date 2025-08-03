@@ -14,7 +14,9 @@ import numpy as np
 from tensordict import TensorDict
 from torchrl.collectors import SyncDataCollector
 from torchrl.data import ReplayBuffer, LazyTensorStorage
-from torchrl.envs import ParallelEnv
+from torchrl.envs import ParallelEnv, TransformedEnv
+from torchrl.envs.transforms import ObservationNorm, DoubleToFloat, StepCounter
+from torchrl.envs.utils import check_env_specs
 from torchrl.modules import ProbabilisticActor
 from torchrl.objectives import ClipPPOLoss
 from torchrl.objectives.value import GAE
@@ -38,16 +40,17 @@ class PPOTrainer:
         # Setup directories
         self.setup_directories()
         
-        # Create environments
+        # Create environments with validation and transforms
         self.train_env = self.create_parallel_env(config.num_envs)
-        self.eval_env = BoidsEnvironment(
-            canvas_width=config.canvas_width,
-            canvas_height=config.canvas_height,
-            num_boids=config.num_boids,
-            max_steps=config.max_steps_per_episode,
-            max_boids_for_model=config.max_boids_for_model,
-            device=self.device,
-        )
+        self.eval_env = self.create_eval_env(config)
+        
+        # Validate environment specs
+        try:
+            check_env_specs(self.eval_env)
+            print("✓ Environment specs validation passed")
+        except Exception as e:
+            print(f"⚠️  Environment specs validation warning: {e}")
+            print("Continuing anyway - this may cause issues during training")
         
         # Create policy modules
         self.actor_module, self.value_module = create_rl_modules(
@@ -105,19 +108,47 @@ class PPOTrainer:
         
         print(f"✓ Experiment directory: {self.experiment_dir}")
     
+    def create_eval_env(self, config):
+        """Create single evaluation environment with transforms"""
+        base_env = BoidsEnvironment(
+            canvas_width=config.canvas_width,
+            canvas_height=config.canvas_height,
+            num_boids=config.num_boids,
+            max_steps=config.max_steps_per_episode,
+            max_boids_for_model=config.max_boids_for_model,
+            device=self.device,
+        )
+        
+        # Add transforms for better training stability
+        transformed_env = TransformedEnv(
+            base_env,
+            # Add step counter for episode length tracking
+            StepCounter(max_steps=config.max_steps_per_episode),
+        )
+        
+        return transformed_env
+
     def create_parallel_env(self, num_envs: int):
         """Create parallel environments for training"""
         
         def make_env(seed: int):
-            return lambda: BoidsEnvironment(
-                canvas_width=self.config.canvas_width,
-                canvas_height=self.config.canvas_height,
-                num_boids=self.config.num_boids,
-                max_steps=self.config.max_steps_per_episode,
-                max_boids_for_model=self.config.max_boids_for_model,
-                device=self.device,
-                seed=seed,
-            )
+            def _make():
+                base_env = BoidsEnvironment(
+                    canvas_width=self.config.canvas_width,
+                    canvas_height=self.config.canvas_height,
+                    num_boids=self.config.num_boids,
+                    max_steps=self.config.max_steps_per_episode,
+                    max_boids_for_model=self.config.max_boids_for_model,
+                    device=self.device,
+                    seed=seed,
+                )
+                
+                # Add transforms for training stability
+                return TransformedEnv(
+                    base_env,
+                    StepCounter(max_steps=self.config.max_steps_per_episode),
+                )
+            return _make
         
         # Create parallel environment
         parallel_env = ParallelEnv(
@@ -141,10 +172,11 @@ class PPOTrainer:
             normalize_advantage=True,
         )
         
-        # Create optimizer
-        self.optimizer = torch.optim.Adam(
+        # Create optimizer - use AdamW for better regularization
+        self.optimizer = torch.optim.AdamW(
             self.ppo_loss.parameters(),
             lr=self.config.learning_rate,
+            weight_decay=1e-5,  # Add weight decay for regularization
         )
         
         # Create advantage module
@@ -221,27 +253,36 @@ class PPOTrainer:
                 # Optimization step
                 self.optimizer.zero_grad()
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(
+                
+                # Monitor gradient norm before clipping
+                grad_norm = torch.nn.utils.clip_grad_norm_(
                     self.ppo_loss.parameters(),
                     self.config.max_grad_norm
                 )
+                
                 self.optimizer.step()
                 
                 # Record stats
                 policy_losses.append(loss_vals["loss_objective"].item())
                 value_losses.append(loss_vals["loss_critic"].item())
                 entropy_bonuses.append(loss_vals["entropy_bonus"].item())
+                
+                # Monitor additional metrics for debugging
+                if hasattr(loss_vals, "clip_fraction"):
+                    clip_fraction = loss_vals.get("clip_fraction", torch.tensor(0.0)).item()
+                else:
+                    clip_fraction = 0.0
         
         # Clear replay buffer
         self.replay_buffer.empty()
         
-        # Compute batch statistics
+        # Compute batch statistics - fix TensorDict key access
         stats = {
             'policy_loss': np.mean(policy_losses),
             'value_loss': np.mean(value_losses),
             'entropy_bonus': np.mean(entropy_bonuses),
-            'mean_reward': batch["next", "reward"].mean().item(),
-            'mean_episode_length': batch["next", "done"].float().sum().item() / self.config.num_envs,
+            'mean_reward': batch["reward"].mean().item(),
+            'mean_episode_length': batch["done"].float().sum().item() / self.config.num_envs,
         }
         
         # Update tracking
@@ -274,24 +315,30 @@ class PPOTrainer:
                 return action.tolist()
             
             def _structured_to_tensor(self, structured):
-                # This is a simplified conversion - in practice you'd match
-                # the exact format from BoidsEnvironment._state_to_tensor
+                # Match exact format from BoidsEnvironment._state_to_tensor
                 obs = []
+                
+                # Context information (canvas dimensions)
                 obs.extend([structured['context']['canvasWidth'], 
                            structured['context']['canvasHeight']])
+                
+                # Predator information (velocities)
                 obs.extend([structured['predator']['velX'], 
                            structured['predator']['velY']])
                 
-                # Add boids (simplified - would need proper implementation)
-                for i in range(50):  # max_boids
-                    if i < len(structured['boids']):
-                        boid = structured['boids'][i]
-                        obs.extend([boid['relX'], boid['relY'], 
-                                   boid['velX'], boid['velY']])
-                    else:
-                        obs.extend([0.0, 0.0, 0.0, 0.0])
+                # Boid information - use max_boids_for_model from config
+                num_boids_to_add = min(len(structured['boids']), self.actor_module[0].policy.transformer.max_boids)
                 
-                return torch.tensor(obs, dtype=torch.float32)
+                for i in range(num_boids_to_add):
+                    boid = structured['boids'][i]
+                    obs.extend([boid['relX'], boid['relY'], 
+                               boid['velX'], boid['velY']])
+                
+                # Pad with zeros if fewer boids than max
+                while len(obs) < 4 + (self.actor_module[0].policy.transformer.max_boids * 4):
+                    obs.extend([0.0, 0.0, 0.0, 0.0])
+                
+                return torch.tensor(obs, dtype=torch.float32, device=self.actor_module.device)
         
         eval_policy = EvalPolicy(self.actor_module)
         
@@ -344,27 +391,37 @@ class PPOTrainer:
         
         # Also save the transformer weights separately for easy loading
         if is_final or self.iteration % 100 == 0:
-            # Extract transformer state dict
-            transformer_checkpoint = {
-                'model_state_dict': {
-                    k.replace('policy.transformer.', ''): v 
-                    for k, v in self.actor_module.state_dict().items() 
-                    if 'policy.transformer.' in k
-                },
-                'architecture': {
-                    'd_model': 128,  # Would need to get from loaded model
-                    'n_heads': 8,
-                    'n_layers': 4,
-                    'ffn_hidden': 512,
-                    'max_boids': 50,
-                },
-                'training_type': 'RL_PPO',
-                'iteration': self.iteration,
-            }
+            # Extract transformer architecture from loaded model
+            transformer = None
+            for name, module in self.actor_module.named_modules():
+                if hasattr(module, 'policy') and hasattr(module.policy, 'transformer'):
+                    transformer = module.policy.transformer
+                    break
             
-            transformer_path = self.checkpoint_dir / f"transformer_rl_iter_{self.iteration}.pt"
-            torch.save(transformer_checkpoint, transformer_path)
-            print(f"✓ Saved transformer checkpoint: {transformer_path}")
+            if transformer is not None:
+                # Extract transformer state dict
+                transformer_checkpoint = {
+                    'model_state_dict': {
+                        k.replace('policy.transformer.', ''): v 
+                        for k, v in self.actor_module.state_dict().items() 
+                        if 'policy.transformer.' in k
+                    },
+                    'architecture': {
+                        'd_model': transformer.d_model,
+                        'n_heads': transformer.n_heads,
+                        'n_layers': transformer.n_layers,
+                        'ffn_hidden': transformer.ffn_hidden,
+                        'max_boids': transformer.max_boids,
+                    },
+                    'training_type': 'RL_PPO',
+                    'iteration': self.iteration,
+                }
+                
+                transformer_path = self.checkpoint_dir / f"transformer_rl_iter_{self.iteration}.pt"
+                torch.save(transformer_checkpoint, transformer_path)
+                print(f"✓ Saved transformer checkpoint: {transformer_path}")
+            else:
+                print("⚠️  Could not extract transformer for separate checkpoint")
 
 
 def main():
