@@ -84,8 +84,10 @@ class StateManager:
         Returns:
             Updated state dict with same structure as input
         """
-        if self.current_state is None or self.policy is None:
+        if self.current_state is None:
             raise ValueError("State manager not initialized. Call init() first.")
+        if self.policy is None:
+            raise ValueError("No policy set. Policy required for step() method.")
         
         # Convert current state to structured format for policy
         structured_inputs = self._convert_state_to_structured_inputs(self.current_state)

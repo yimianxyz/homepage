@@ -1,414 +1,387 @@
 """
-PPO Training Pipeline - Fine-tune pretrained transformer with reinforcement learning
+PPO Training Script for Transformer Policy Finetuning
 
-This script implements the complete PPO training pipeline that:
-1. Loads pretrained transformer weights from best_model.pt
-2. Creates PPO-compatible environment and policy
-3. Fine-tunes the model using PPO
-4. Evaluates using the existing evaluation system
-5. Saves checkpoints and results
-
-Usage:
-    python rl_training/train_ppo.py --pretrained_path checkpoints/best_model.pt --total_timesteps 100000
+This script implements PPO training using TorchRL to finetune
+a transformer policy from supervised learning checkpoint.
 """
 
 import os
-import sys
-import argparse
 import time
-import json
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Any, Optional
-
+from pathlib import Path
 import torch
 import numpy as np
-from stable_baselines3 import PPO
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, EvalCallback
-from stable_baselines3.common.logger import configure
-from stable_baselines3.common.vec_env import VecNormalize, DummyVecEnv
+from tensordict import TensorDict
+from torchrl.collectors import SyncDataCollector
+from torchrl.data import ReplayBuffer, LazyTensorStorage
+from torchrl.envs import ParallelEnv
+from torchrl.modules import ProbabilisticActor
+from torchrl.objectives import ClipPPOLoss
+from torchrl.objectives.value import GAE
 
-# Add parent directory to path for imports
+import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rl_training.ppo_environment import create_boids_environment
-from rl_training.observation_wrapper import create_wrapped_environment, create_custom_policy_class
-from rl_training.ppo_policy_wrapper import create_policy_wrapper, evaluate_ppo_model
+from rl_training.rl_environment import BoidsEnvironment
+from rl_training.rl_policy import create_rl_modules
+from rl_training.ppo_config import PPOConfig, get_default_config
 from evaluation.policy_evaluator import PolicyEvaluator
 
-class EvaluationCallback(BaseCallback):
-    """
-    Custom callback for periodic evaluation using existing evaluation system
-    """
+
+class PPOTrainer:
+    """Clean PPO trainer for transformer policy finetuning"""
     
-    def __init__(self, eval_freq: int = 10000, verbose: int = 1):
-        super().__init__(verbose)
-        self.eval_freq = eval_freq
-        self.evaluations = []
-        self.best_catch_rate = -np.inf
+    def __init__(self, config: PPOConfig):
+        self.config = config
+        self.device = config.device
         
-    def _on_step(self) -> bool:
-        if self.n_calls % self.eval_freq == 0:
-            self._evaluate_model()
-        return True
+        # Setup directories
+        self.setup_directories()
+        
+        # Create environments
+        self.train_env = self.create_parallel_env(config.num_envs)
+        self.eval_env = BoidsEnvironment(
+            canvas_width=config.canvas_width,
+            canvas_height=config.canvas_height,
+            num_boids=config.num_boids,
+            max_steps=config.max_steps_per_episode,
+            max_boids_for_model=config.max_boids_for_model,
+            device=self.device,
+        )
+        
+        # Create policy modules
+        self.actor_module, self.value_module = create_rl_modules(
+            checkpoint_path=config.checkpoint_path,
+            device=self.device,
+            freeze_transformer=config.freeze_transformer,
+            action_std=config.action_std,
+        )
+        
+        # Create data collector
+        self.collector = SyncDataCollector(
+            self.train_env,
+            self.actor_module,
+            frames_per_batch=config.frames_per_batch,
+            total_frames=config.total_frames,
+            device=self.device,
+            storing_device=self.device,
+        )
+        
+        # Create replay buffer for PPO
+        self.replay_buffer = ReplayBuffer(
+            storage=LazyTensorStorage(config.frames_per_batch),
+            batch_size=config.minibatch_size,
+        )
+        
+        # Setup training components
+        self.setup_training()
+        
+        # Setup evaluation
+        self.evaluator = PolicyEvaluator()
+        
+        # Training statistics
+        self.iteration = 0
+        self.total_frames = 0
+        self.training_stats = {
+            'policy_losses': [],
+            'value_losses': [],
+            'entropy_bonuses': [],
+            'mean_rewards': [],
+            'eval_scores': [],
+        }
+        
+        print(f"✓ PPO Trainer initialized")
+        config.print_config()
     
-    def _evaluate_model(self):
-        """Evaluate model using existing evaluation system"""
-        try:
-            # Create policy wrapper
-            policy_wrapper = create_policy_wrapper(self.model, wrapper_type="auto")
-            
-            # Run evaluation
-            evaluator = PolicyEvaluator()
-            results = evaluator.evaluate_policy(
-                policy_wrapper, 
-                f"PPO-Step-{self.n_calls}"
+    def setup_directories(self):
+        """Create directories for logs and checkpoints"""
+        self.experiment_dir = Path(f"experiments/{self.config.experiment_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        self.checkpoint_dir = self.experiment_dir / "checkpoints"
+        self.log_dir = self.experiment_dir / "logs"
+        
+        self.experiment_dir.mkdir(parents=True, exist_ok=True)
+        self.checkpoint_dir.mkdir(exist_ok=True)
+        self.log_dir.mkdir(exist_ok=True)
+        
+        print(f"✓ Experiment directory: {self.experiment_dir}")
+    
+    def create_parallel_env(self, num_envs: int):
+        """Create parallel environments for training"""
+        
+        def make_env(seed: int):
+            return lambda: BoidsEnvironment(
+                canvas_width=self.config.canvas_width,
+                canvas_height=self.config.canvas_height,
+                num_boids=self.config.num_boids,
+                max_steps=self.config.max_steps_per_episode,
+                max_boids_for_model=self.config.max_boids_for_model,
+                device=self.device,
+                seed=seed,
             )
-            
-            # Track results
-            catch_rate = results.overall_catch_rate
-            self.evaluations.append({
-                'step': self.n_calls,
-                'catch_rate': catch_rate,
-                'std_catch_rate': results.overall_std_catch_rate,
-                'episodes': results.successful_episodes,
-                'evaluation_time': results.evaluation_time_seconds
-            })
-            
-            # Save best model
-            if catch_rate > self.best_catch_rate:
-                self.best_catch_rate = catch_rate
-                best_path = os.path.join(self.logger.get_dir(), "best_ppo_model.zip")
-                self.model.save(best_path)
-                print(f"🎯 New best model saved: catch_rate={catch_rate:.4f}")
-            
-            # Log to tensorboard/logger
-            self.logger.record("eval/catch_rate", catch_rate)
-            self.logger.record("eval/std_catch_rate", results.overall_std_catch_rate)
-            self.logger.record("eval/successful_episodes", results.successful_episodes)
-            
-            print(f"📊 Evaluation at step {self.n_calls}: catch_rate={catch_rate:.4f}±{results.overall_std_catch_rate:.4f}")
-            
-        except Exception as e:
-            print(f"❌ Evaluation failed: {e}")
-
-def create_training_environment(config: Dict[str, Any]) -> DummyVecEnv:
-    """
-    Create vectorized training environment
-    
-    Args:
-        config: Environment configuration
         
-    Returns:
-        Vectorized environment
-    """
-    def make_env():
-        return create_wrapped_environment(config)
-    
-    # Create vectorized environment
-    env = DummyVecEnv([make_env])
-    
-    print(f"✓ Training environment created:")
-    print(f"  Config: {config}")
-    print(f"  Vectorized: {env.num_envs} environment(s)")
-    
-    return env
-
-def setup_ppo_model(
-    env, 
-    pretrained_path: str,
-    learning_rate: float = 3e-4,
-    n_steps: int = 2048,
-    batch_size: int = 64,
-    n_epochs: int = 10,
-    gamma: float = 0.99,
-    gae_lambda: float = 0.95,
-    clip_range: float = 0.2,
-    ent_coef: float = 0.01,
-    vf_coef: float = 0.5,
-    verbose: int = 1
-) -> PPO:
-    """
-    Setup PPO model with pretrained transformer policy
-    
-    Args:
-        env: Training environment
-        pretrained_path: Path to pretrained transformer checkpoint
-        Additional PPO hyperparameters
+        # Create parallel environment
+        parallel_env = ParallelEnv(
+            num_workers=num_envs,
+            create_env_fn=[make_env(i) for i in range(num_envs)],
+            device=self.device,
+        )
         
-    Returns:
-        Configured PPO model
-    """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+        return parallel_env
     
-    # Create custom policy class with pretrained weights
-    PolicyClass = create_custom_policy_class(pretrained_path)
-    
-    # Create PPO model
-    model = PPO(
-        policy=PolicyClass,
-        env=env,
-        learning_rate=learning_rate,
-        n_steps=n_steps,
-        batch_size=batch_size,
-        n_epochs=n_epochs,
-        gamma=gamma,
-        gae_lambda=gae_lambda,
-        clip_range=clip_range,
-        ent_coef=ent_coef,
-        vf_coef=vf_coef,
-        verbose=verbose,
-        device=device,
-        tensorboard_log="./tensorboard_logs/"
-    )
-    
-    # Set environment wrapper reference for transformer features extractor
-    if hasattr(model.policy, 'features_extractor'):
-        if hasattr(env, 'envs') and len(env.envs) > 0:
-            model.policy.features_extractor.set_env_wrapper(env.envs[0])
-    
-    print(f"✓ PPO model configured:")
-    print(f"  Policy: Custom transformer policy")
-    print(f"  Pretrained weights: {pretrained_path}")
-    print(f"  Learning rate: {learning_rate}")
-    print(f"  Steps per update: {n_steps}")
-    print(f"  Batch size: {batch_size}")
-    
-    return model
-
-def train_ppo_model(
-    pretrained_path: str = "checkpoints/best_model.pt",
-    total_timesteps: int = 100000,
-    eval_freq: int = 10000,
-    save_freq: int = 25000,
-    log_dir: str = "ppo_logs",
-    env_config: Optional[Dict[str, Any]] = None
-):
-    """
-    Main training function
-    
-    Args:
-        pretrained_path: Path to pretrained transformer checkpoint
-        total_timesteps: Total training timesteps
-        eval_freq: Evaluation frequency
-        save_freq: Checkpoint save frequency
-        log_dir: Logging directory
-        env_config: Environment configuration
-    """
-    
-    print("🚀 Starting PPO Training Pipeline")
-    print("=" * 60)
-    
-    # Create timestamped log directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_dir = f"{log_dir}_{timestamp}"
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # Default environment configuration
-    if env_config is None:
-        env_config = {
-            'canvas_width': 800,
-            'canvas_height': 600,
-            'initial_boids': 20,
-            'max_steps': 1500,
-            'seed': 42
-        }
-    
-    print(f"📁 Log directory: {log_dir}")
-    print(f"🎯 Training configuration:")
-    print(f"  Pretrained model: {pretrained_path}")
-    print(f"  Total timesteps: {total_timesteps:,}")
-    print(f"  Evaluation frequency: {eval_freq:,}")
-    print(f"  Environment: {env_config}")
-    
-    # Verify pretrained model exists
-    if not os.path.exists(pretrained_path):
-        raise FileNotFoundError(f"Pretrained model not found: {pretrained_path}")
-    
-    try:
-        # Create training environment
-        print(f"\n📦 Setting up environment...")
-        env = create_training_environment(env_config)
+    def setup_training(self):
+        """Setup PPO loss and optimizer"""
         
-        # Setup PPO model
-        print(f"\n🤖 Setting up PPO model...")
-        model = setup_ppo_model(env, pretrained_path)
+        # Create PPO loss module
+        self.ppo_loss = ClipPPOLoss(
+            actor_network=self.actor_module,
+            critic_network=self.value_module,
+            clip_epsilon=self.config.clip_epsilon,
+            entropy_coef=self.config.entropy_coef,
+            critic_coef=self.config.value_loss_coef,
+            normalize_advantage=True,
+        )
         
-        # Configure logging
-        model.set_logger(configure(log_dir, ["stdout", "csv", "tensorboard"]))
+        # Create optimizer
+        self.optimizer = torch.optim.Adam(
+            self.ppo_loss.parameters(),
+            lr=self.config.learning_rate,
+        )
         
-        # Create callbacks
-        print(f"\n📊 Setting up callbacks...")
-        callbacks = [
-            EvaluationCallback(eval_freq=eval_freq, verbose=1),
-            CheckpointCallback(save_freq=save_freq, save_path=log_dir, name_prefix="ppo_checkpoint")
-        ]
+        # Create advantage module
+        self.advantage_module = GAE(
+            gamma=self.config.discount_gamma,
+            lmbda=self.config.gae_lambda,
+            value_network=self.value_module,
+            average_gae=True,
+        )
         
-        # Baseline evaluation
-        print(f"\n📈 Running baseline evaluation...")
-        baseline_results = evaluate_ppo_model(model, "PPO-Baseline (Pretrained)")
-        baseline_catch_rate = baseline_results.overall_catch_rate
+        print(f"✓ Training components setup")
+    
+    def train(self):
+        """Main training loop"""
         
-        print(f"🎯 Baseline performance: {baseline_catch_rate:.4f}±{baseline_results.overall_std_catch_rate:.4f}")
-        
-        # Save baseline results
-        baseline_path = os.path.join(log_dir, "baseline_evaluation.json")
-        baseline_results_dict = {
-            'policy_name': baseline_results.policy_name,
-            'overall_catch_rate': baseline_results.overall_catch_rate,
-            'overall_std_catch_rate': baseline_results.overall_std_catch_rate,
-            'total_episodes': baseline_results.total_episodes,
-            'successful_episodes': baseline_results.successful_episodes,
-            'evaluation_time_seconds': baseline_results.evaluation_time_seconds
-        }
-        
-        with open(baseline_path, 'w') as f:
-            json.dump(baseline_results_dict, f, indent=2)
-        
-        # Start training
-        print(f"\n🎓 Starting PPO training...")
+        print(f"\n🚀 Starting PPO training for {self.config.total_frames:,} frames")
         print("=" * 60)
         
         start_time = time.time()
-        model.learn(
-            total_timesteps=total_timesteps,
-            callback=callbacks,
-            log_interval=10,
-            tb_log_name="ppo_transformer"
-        )
-        training_time = time.time() - start_time
         
+        # Training loop
+        for i, batch in enumerate(self.collector):
+            self.iteration = i
+            self.total_frames = (i + 1) * self.config.frames_per_batch
+            
+            # Process batch
+            training_stats = self.train_batch(batch)
+            
+            # Log progress
+            if i % self.config.log_frequency == 0:
+                self.log_training_progress(training_stats)
+            
+            # Evaluate
+            if i % self.config.eval_frequency == 0 and i > 0:
+                self.evaluate()
+            
+            # Save checkpoint
+            if i % self.config.save_frequency == 0 and i > 0:
+                self.save_checkpoint()
+        
+        # Final evaluation and save
+        self.evaluate()
+        self.save_checkpoint(is_final=True)
+        
+        total_time = time.time() - start_time
         print(f"\n✅ Training completed!")
-        print(f"⏱️  Training time: {training_time:.1f} seconds")
+        print(f"  Total time: {total_time/3600:.1f} hours")
+        print(f"  Frames per second: {self.config.total_frames/total_time:.1f}")
+    
+    def train_batch(self, batch: TensorDict) -> dict:
+        """Train on a single batch using PPO"""
         
-        # Final evaluation
-        print(f"\n📈 Running final evaluation...")
-        final_results = evaluate_ppo_model(model, "PPO-Final")
-        final_catch_rate = final_results.overall_catch_rate
+        # Compute advantages
+        with torch.no_grad():
+            self.advantage_module(batch)
         
-        improvement = final_catch_rate - baseline_catch_rate
-        print(f"🎯 Final performance: {final_catch_rate:.4f}±{final_results.overall_std_catch_rate:.4f}")
-        print(f"📊 Improvement: {improvement:+.4f} ({improvement/baseline_catch_rate*100:+.1f}%)")
+        # Store batch in replay buffer
+        batch = batch.reshape(-1)  # Flatten batch and time dimensions
+        self.replay_buffer.extend(batch)
         
-        # Save final model and results
-        final_model_path = os.path.join(log_dir, "final_ppo_model.zip")
-        model.save(final_model_path)
+        # Training stats
+        policy_losses = []
+        value_losses = []
+        entropy_bonuses = []
         
-        final_results_path = os.path.join(log_dir, "final_evaluation.json")
-        final_results_dict = {
-            'policy_name': final_results.policy_name,
-            'overall_catch_rate': final_results.overall_catch_rate,
-            'overall_std_catch_rate': final_results.overall_std_catch_rate,
-            'total_episodes': final_results.total_episodes,
-            'successful_episodes': final_results.successful_episodes,
-            'evaluation_time_seconds': final_results.evaluation_time_seconds,
-            'baseline_catch_rate': baseline_catch_rate,
-            'improvement': improvement,
-            'improvement_percentage': improvement/baseline_catch_rate*100,
-            'training_time_seconds': training_time,
-            'total_timesteps': total_timesteps
+        # PPO epochs
+        for epoch in range(self.config.num_epochs):
+            # Sample minibatches
+            for minibatch in self.replay_buffer:
+                # Compute loss
+                loss_vals = self.ppo_loss(minibatch)
+                loss = loss_vals["loss"]
+                
+                # Optimization step
+                self.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(
+                    self.ppo_loss.parameters(),
+                    self.config.max_grad_norm
+                )
+                self.optimizer.step()
+                
+                # Record stats
+                policy_losses.append(loss_vals["loss_objective"].item())
+                value_losses.append(loss_vals["loss_critic"].item())
+                entropy_bonuses.append(loss_vals["entropy_bonus"].item())
+        
+        # Clear replay buffer
+        self.replay_buffer.empty()
+        
+        # Compute batch statistics
+        stats = {
+            'policy_loss': np.mean(policy_losses),
+            'value_loss': np.mean(value_losses),
+            'entropy_bonus': np.mean(entropy_bonuses),
+            'mean_reward': batch["next", "reward"].mean().item(),
+            'mean_episode_length': batch["next", "done"].float().sum().item() / self.config.num_envs,
         }
         
-        with open(final_results_path, 'w') as f:
-            json.dump(final_results_dict, f, indent=2)
+        # Update tracking
+        self.training_stats['policy_losses'].append(stats['policy_loss'])
+        self.training_stats['value_losses'].append(stats['value_loss'])
+        self.training_stats['entropy_bonuses'].append(stats['entropy_bonus'])
+        self.training_stats['mean_rewards'].append(stats['mean_reward'])
         
-        print(f"\n💾 Results saved:")
-        print(f"  Final model: {final_model_path}")
-        print(f"  Evaluation: {final_results_path}")
-        print(f"  Logs: {log_dir}")
+        return stats
+    
+    def evaluate(self):
+        """Evaluate current policy"""
         
-        print(f"\n🎉 PPO training pipeline completed successfully!")
-        print("=" * 60)
+        print(f"\n📊 Evaluating at iteration {self.iteration}...")
         
-        return model, final_results
+        # Create evaluation policy wrapper
+        class EvalPolicy:
+            def __init__(self, actor_module):
+                self.actor_module = actor_module
+            
+            def get_action(self, structured_inputs):
+                # Convert to tensor observation
+                obs = self._structured_to_tensor(structured_inputs)
+                with torch.no_grad():
+                    self.actor_module.eval()
+                    td = TensorDict({"observation": obs}, batch_size=())
+                    td = self.actor_module(td)
+                    action = td["action"].cpu().numpy()
+                    self.actor_module.train()
+                return action.tolist()
+            
+            def _structured_to_tensor(self, structured):
+                # This is a simplified conversion - in practice you'd match
+                # the exact format from BoidsEnvironment._state_to_tensor
+                obs = []
+                obs.extend([structured['context']['canvasWidth'], 
+                           structured['context']['canvasHeight']])
+                obs.extend([structured['predator']['velX'], 
+                           structured['predator']['velY']])
+                
+                # Add boids (simplified - would need proper implementation)
+                for i in range(50):  # max_boids
+                    if i < len(structured['boids']):
+                        boid = structured['boids'][i]
+                        obs.extend([boid['relX'], boid['relY'], 
+                                   boid['velX'], boid['velY']])
+                    else:
+                        obs.extend([0.0, 0.0, 0.0, 0.0])
+                
+                return torch.tensor(obs, dtype=torch.float32)
         
-    except Exception as e:
-        print(f"\n❌ Training failed: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
+        eval_policy = EvalPolicy(self.actor_module)
+        
+        # Run evaluation
+        result = self.evaluator.evaluate_policy(
+            eval_policy,
+            policy_name=f"PPO_iter_{self.iteration}"
+        )
+        
+        # Record results
+        self.training_stats['eval_scores'].append({
+            'iteration': self.iteration,
+            'catch_rate': result.overall_catch_rate,
+            'std': result.overall_std_catch_rate,
+        })
+        
+        print(f"  Overall catch rate: {result.overall_catch_rate:.3f} ± {result.overall_std_catch_rate:.3f}")
+    
+    def log_training_progress(self, stats: dict):
+        """Log training progress"""
+        
+        print(f"\nIteration {self.iteration}/{self.config.num_iterations} "
+              f"(Frames: {self.total_frames:,}/{self.config.total_frames:,})")
+        print(f"  Policy loss: {stats['policy_loss']:.4f}")
+        print(f"  Value loss: {stats['value_loss']:.4f}")
+        print(f"  Entropy: {stats['entropy_bonus']:.4f}")
+        print(f"  Mean reward: {stats['mean_reward']:.4f}")
+        print(f"  Episode length: {stats['mean_episode_length']:.1f}")
+    
+    def save_checkpoint(self, is_final: bool = False):
+        """Save training checkpoint"""
+        
+        checkpoint = {
+            'iteration': self.iteration,
+            'total_frames': self.total_frames,
+            'actor_state_dict': self.actor_module.state_dict(),
+            'value_state_dict': self.value_module.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'training_stats': self.training_stats,
+            'config': self.config,
+        }
+        
+        if is_final:
+            path = self.checkpoint_dir / "final_checkpoint.pt"
+        else:
+            path = self.checkpoint_dir / f"checkpoint_iter_{self.iteration}.pt"
+        
+        torch.save(checkpoint, path)
+        print(f"✓ Saved checkpoint: {path}")
+        
+        # Also save the transformer weights separately for easy loading
+        if is_final or self.iteration % 100 == 0:
+            # Extract transformer state dict
+            transformer_checkpoint = {
+                'model_state_dict': {
+                    k.replace('policy.transformer.', ''): v 
+                    for k, v in self.actor_module.state_dict().items() 
+                    if 'policy.transformer.' in k
+                },
+                'architecture': {
+                    'd_model': 128,  # Would need to get from loaded model
+                    'n_heads': 8,
+                    'n_layers': 4,
+                    'ffn_hidden': 512,
+                    'max_boids': 50,
+                },
+                'training_type': 'RL_PPO',
+                'iteration': self.iteration,
+            }
+            
+            transformer_path = self.checkpoint_dir / f"transformer_rl_iter_{self.iteration}.pt"
+            torch.save(transformer_checkpoint, transformer_path)
+            print(f"✓ Saved transformer checkpoint: {transformer_path}")
+
 
 def main():
-    """Command line interface"""
-    parser = argparse.ArgumentParser(description="PPO Training Pipeline")
+    """Main training entry point"""
     
-    parser.add_argument(
-        "--pretrained_path", 
-        type=str, 
-        default="checkpoints/best_model.pt",
-        help="Path to pretrained transformer checkpoint"
-    )
-    parser.add_argument(
-        "--total_timesteps", 
-        type=int, 
-        default=100000,
-        help="Total training timesteps"
-    )
-    parser.add_argument(
-        "--eval_freq", 
-        type=int, 
-        default=10000,
-        help="Evaluation frequency"
-    )
-    parser.add_argument(
-        "--save_freq", 
-        type=int, 
-        default=25000,
-        help="Checkpoint save frequency"
-    )
-    parser.add_argument(
-        "--log_dir", 
-        type=str, 
-        default="ppo_logs",
-        help="Logging directory prefix"
-    )
-    parser.add_argument(
-        "--canvas_width", 
-        type=int, 
-        default=800,
-        help="Canvas width"
-    )
-    parser.add_argument(
-        "--canvas_height", 
-        type=int, 
-        default=600,
-        help="Canvas height"
-    )
-    parser.add_argument(
-        "--initial_boids", 
-        type=int, 
-        default=20,
-        help="Initial number of boids"
-    )
-    parser.add_argument(
-        "--max_steps", 
-        type=int, 
-        default=1500,
-        help="Maximum steps per episode"
-    )
+    # Get configuration
+    config = get_default_config()
     
-    args = parser.parse_args()
+    # For testing, you might want to use a smaller config
+    # config = get_fast_config()
     
-    # Environment configuration
-    env_config = {
-        'canvas_width': args.canvas_width,
-        'canvas_height': args.canvas_height,
-        'initial_boids': args.initial_boids,
-        'max_steps': args.max_steps,
-        'seed': 42
-    }
+    # Create trainer
+    trainer = PPOTrainer(config)
     
     # Run training
-    train_ppo_model(
-        pretrained_path=args.pretrained_path,
-        total_timesteps=args.total_timesteps,
-        eval_freq=args.eval_freq,
-        save_freq=args.save_freq,
-        log_dir=args.log_dir,
-        env_config=env_config
-    )
+    trainer.train()
+
 
 if __name__ == "__main__":
     main()

@@ -6,5 +6,7 @@ between Python and JavaScript implementations.
 """
 
 from .processors import InputProcessor, ActionProcessor
+from .state_manager import StateManager
+from .random_state_generator import RandomStateGenerator
 
-__all__ = ['InputProcessor', 'ActionProcessor'] 
+__all__ = ['InputProcessor', 'ActionProcessor', 'StateManager', 'RandomStateGenerator'] 
