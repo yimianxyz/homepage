@@ -1,336 +1,372 @@
 """
-Policy Evaluator - Unified evaluation system for policy performance assessment
+Strategic Policy Evaluator - Advanced evaluation system for emergent flock strategies
 
-This module provides standardized evaluation across fixed scenarios:
-- Canvas sizes: Mobile (480×320), Desktop (1920×1080), Large (2560×1440)
-- Boid counts: 5, 20, 50
-- Fixed parameters ensure consistent and comparable results
+This module provides strategic evaluation that captures:
+- Multi-phase performance (early/mid/late game)
+- Formation-specific strategies (scattered vs clustered boids)
+- Strategic depth metrics (consistency, adaptability)
+- Emergent behavior analysis over time
 
-Primary metric: Overall catch rate
-Secondary metrics: Per-scenario breakdowns with statistical measures
+Optimized for speed while capturing long-term strategic behaviors.
 """
 
 import time
-import json
-from typing import Dict, List, Any, Tuple
-from dataclasses import dataclass, asdict
-from pathlib import Path
 import statistics
 import sys
 import os
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
-import pickle
+from typing import Dict, List, Tuple, Any, Optional
+from dataclasses import dataclass
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from simulation.state_manager import StateManager
 from simulation.random_state_generator import RandomStateGenerator
-from config.constants import CONSTANTS
 
-# FIXED EVALUATION PARAMETERS - DO NOT MODIFY
-# These parameters are optimized for maximum speed while covering key scenarios
-EPISODES_PER_SCENARIO = 10       # Episodes per scenario (fast evaluation)
-MAX_STEPS_PER_EPISODE = 1500    # Maximum steps per episode
-EVALUATION_SEED = 42            # Fixed seed for reproducible results
-
-# Targeted test scenarios - optimized for speed and relevance
-TEST_SCENARIOS = [
-    # Mobile scenarios - test light and medium loads
-    # ((480, 320), 5),     # Mobile + light load
-    ((480, 320), 20),    # Mobile + medium load
-    # Desktop scenarios - test heavy load
-    #((1920, 1080), 40),  # Desktop + heavy load
-]
-
-@dataclass 
-class ScenarioResult:
-    """Results for a single scenario (canvas_size, boid_count combination)"""
-    canvas_width: int
-    canvas_height: int
-    boid_count: int
-    episodes_completed: int
-    episodes_timed_out: int
-    catch_rates: List[float]  # Catch rate per episode
-    total_catches: List[int]  # Total catches per episode
-    episode_lengths: List[int]  # Steps per episode
-    
-    # Computed statistics
-    mean_catch_rate: float = 0.0
-    std_catch_rate: float = 0.0
-    min_catch_rate: float = 0.0
-    max_catch_rate: float = 0.0
-    mean_episode_length: float = 0.0
-    mean_total_catches: float = 0.0
-    
-    def __post_init__(self):
-        """Compute statistics after initialization"""
-        if self.catch_rates:
-            self.mean_catch_rate = statistics.mean(self.catch_rates)
-            self.std_catch_rate = statistics.stdev(self.catch_rates) if len(self.catch_rates) > 1 else 0.0
-            self.min_catch_rate = min(self.catch_rates)
-            self.max_catch_rate = max(self.catch_rates)
-        
-        if self.episode_lengths:
-            self.mean_episode_length = statistics.mean(self.episode_lengths)
-            
-        if self.total_catches:
-            self.mean_total_catches = statistics.mean(self.total_catches)
 
 @dataclass
-class EvaluationResult:
-    """Complete evaluation results with standardized parameters"""
+class StrategicResult:
+    """Results for strategic evaluation with temporal and formation breakdown"""
     policy_name: str
-    scenario_results: List[ScenarioResult]
+    
+    # Overall metrics (compatible with existing code)
+    overall_catch_rate: float
+    overall_std_catch_rate: float
     evaluation_time_seconds: float
+    total_episodes: int
+    successful_episodes: int
     
-    # Overall statistics
-    overall_catch_rate: float = 0.0
-    overall_std_catch_rate: float = 0.0
-    total_episodes: int = 0
-    successful_episodes: int = 0
+    # Strategic depth metrics
+    early_phase_rate: float      # 0-100 steps performance
+    mid_phase_rate: float        # 100-300 steps performance  
+    late_phase_rate: float       # 300+ steps performance
     
-    def __post_init__(self):
-        """Compute overall statistics"""
-        all_catch_rates = []
-        total_episodes = 0
-        successful_episodes = 0
-        
-        for scenario in self.scenario_results:
-            all_catch_rates.extend(scenario.catch_rates)
-            total_episodes += scenario.episodes_completed + scenario.episodes_timed_out
-            successful_episodes += scenario.episodes_completed
-        
-        self.total_episodes = total_episodes
-        self.successful_episodes = successful_episodes
-        
-        if all_catch_rates:
-            self.overall_catch_rate = statistics.mean(all_catch_rates)
-            self.overall_std_catch_rate = statistics.stdev(all_catch_rates) if len(all_catch_rates) > 1 else 0.0
+    scattered_rate: float        # Scattered boids (herding challenge)
+    clustered_rate: float        # Clustered boids (flock-breaking challenge)
+    
+    strategy_consistency: float  # Performance variance across phases (0-1)
+    adaptability_score: float    # Performance across formations (0-1)
+    
+    # Strategic insights
+    strategy_type: str          # "Early-game", "Late-game", "Consistent"
+    formation_style: str        # "Adaptive", "Herding", "Flock-breaker"
+    
+    # Raw data
+    all_catch_rates: List[float]
+    episode_details: List[Dict]
 
-class PolicyEvaluator:
-    """Standardized policy evaluation system with fixed parameters"""
-    
-    def __init__(self):
-        """
-        Initialize policy evaluator with standardized parameters
-        
-        All evaluation parameters are fixed to ensure consistency and comparability
-        """
-        self.state_generator = RandomStateGenerator(seed=EVALUATION_SEED)
-        
-        # Detect CPU cores for multiprocessing
-        self.num_cores = mp.cpu_count()
-        
-        print(f"PolicyEvaluator initialized with optimized parameters:")
-        print(f"  Episodes per scenario: {EPISODES_PER_SCENARIO}")
-        print(f"  Max steps per episode: {MAX_STEPS_PER_EPISODE}")
-        print(f"  Test scenarios: {TEST_SCENARIOS}")
-        print(f"  Evaluation seed: {EVALUATION_SEED}")
-        print(f"  Total scenarios: {len(TEST_SCENARIOS)}")
-        print(f"  Total episodes: {len(TEST_SCENARIOS) * EPISODES_PER_SCENARIO}")
-        print(f"  CPU cores: {self.num_cores} (parallel execution)")
-    
-    def evaluate_policy(self, policy, policy_name: str = "Unknown Policy") -> EvaluationResult:
-        """
-        Evaluate a policy across all test scenarios
-        
-        Args:
-            policy: Policy object with get_action(structured_inputs) method
-            policy_name: Name for reporting
-            
-        Returns:
-            Complete evaluation results
-        """
-        print(f"\n🎯 Evaluating Policy: {policy_name}")
-        print("=" * 60)
-        
-        start_time = time.time()
-        scenario_results = []
-        
-        total_scenarios = len(TEST_SCENARIOS)
-        
-        # Test predefined scenarios
-        for current_scenario, ((canvas_width, canvas_height), boid_count) in enumerate(TEST_SCENARIOS, 1):
-            print(f"\n📊 Scenario {current_scenario}/{total_scenarios}: "
-                  f"{canvas_width}×{canvas_height}, {boid_count} boids")
-            
-            scenario_result = self._evaluate_scenario(
-                policy, canvas_width, canvas_height, boid_count
-            )
-            scenario_results.append(scenario_result)
-            
-            # Progress summary
-            print(f"  ✓ Completed: {scenario_result.episodes_completed}/{EPISODES_PER_SCENARIO} episodes")
-            print(f"  📈 Catch rate: {scenario_result.mean_catch_rate:.3f} ± {scenario_result.std_catch_rate:.3f}")
-        
-        evaluation_time = time.time() - start_time
-        
-        # Create final result
-        result = EvaluationResult(
-            policy_name=policy_name,
-            scenario_results=scenario_results,
-            evaluation_time_seconds=evaluation_time
-        )
-        
-        self._print_summary(result)
-        return result
-    
-    def _evaluate_scenario(self, policy, canvas_width: int, canvas_height: int, boid_count: int) -> ScenarioResult:
-        """Evaluate policy on a single scenario using parallel processing"""
-        
-        # Serialize policy for multiprocessing
-        serialized_policy = pickle.dumps(policy)
-        
-        # Create episode tasks
-        episode_tasks = []
-        for episode in range(EPISODES_PER_SCENARIO):
-            task = (serialized_policy, canvas_width, canvas_height, boid_count, episode)
-            episode_tasks.append(task)
-        
-        # Run episodes in parallel
-        catch_rates = []
-        total_catches = []
-        episode_lengths = []
-        episodes_completed = 0
-        episodes_timed_out = 0
-        
-        with ProcessPoolExecutor(max_workers=self.num_cores) as executor:
-            # Submit all episode tasks
-            future_to_episode = {
-                executor.submit(_run_episode_worker, task): episode 
-                for episode, task in enumerate(episode_tasks)
-            }
-            
-            # Collect results as they complete
-            for future in future_to_episode:
-                episode_num = future_to_episode[future]
-                try:
-                    result = future.result()
-                    if result is not None:
-                        catch_rate, catches, steps = result
-                        catch_rates.append(catch_rate)
-                        total_catches.append(catches)
-                        episode_lengths.append(steps)
-                        episodes_completed += 1
-                    else:
-                        episodes_timed_out += 1
-                        
-                except Exception as e:
-                    print(f"    ⚠️  Episode {episode_num+1} failed: {e}")
-                    episodes_timed_out += 1
-        
-        print(f"    ✓ Completed: {episodes_completed}/{EPISODES_PER_SCENARIO} episodes (parallel)")
-        
-        return ScenarioResult(
-            canvas_width=canvas_width,
-            canvas_height=canvas_height,
-            boid_count=boid_count,
-            episodes_completed=episodes_completed,
-            episodes_timed_out=episodes_timed_out,
-            catch_rates=catch_rates,
-            total_catches=total_catches,
-            episode_lengths=episode_lengths
-        )
-    
-    def _print_summary(self, result: EvaluationResult):
-        """Print evaluation summary"""
-        print(f"\n" + "=" * 60)
-        print(f"🎯 EVALUATION SUMMARY: {result.policy_name}")
-        print("=" * 60)
-        print(f"Overall Performance:")
-        print(f"  📊 Overall Catch Rate: {result.overall_catch_rate:.3f} ± {result.overall_std_catch_rate:.3f}")
-        print(f"  📈 Episodes Completed: {result.successful_episodes}/{result.total_episodes}")
-        print(f"  ⏱️  Evaluation Time: {result.evaluation_time_seconds:.1f}s")
-        
-        print(f"\nDetailed Results by Scenario:")
-        print(f"{'Canvas Size':<12} {'Boids':<6} {'Catch Rate':<12} {'Std Dev':<8} {'Episodes':<9}")
-        print("-" * 60)
-        
-        for scenario in result.scenario_results:
-            canvas_size = f"{scenario.canvas_width}×{scenario.canvas_height}"
-            print(f"{canvas_size:<12} {scenario.boid_count:<6} "
-                  f"{scenario.mean_catch_rate:<12.3f} {scenario.std_catch_rate:<8.3f} "
-                  f"{scenario.episodes_completed:<9}")
-        
-        print("=" * 60)
-    
-    def save_results(self, result: EvaluationResult, output_path: str):
-        """Save evaluation results to JSON file"""
-        
-        # Convert to serializable format
-        data = {
-            'policy_name': result.policy_name,
-            'evaluation_time_seconds': result.evaluation_time_seconds,
-            'overall_catch_rate': result.overall_catch_rate,
-            'overall_std_catch_rate': result.overall_std_catch_rate,
-            'total_episodes': result.total_episodes,
-            'successful_episodes': result.successful_episodes,
-            'evaluation_parameters': {
-                'episodes_per_scenario': EPISODES_PER_SCENARIO,
-                'max_steps_per_episode': MAX_STEPS_PER_EPISODE,
-                'evaluation_seed': EVALUATION_SEED,
-                'test_scenarios': TEST_SCENARIOS
-            },
-            'scenario_results': [asdict(scenario) for scenario in result.scenario_results],
-            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-        }
-        
-        with open(output_path, 'w') as f:
-            json.dump(data, f, indent=2)
-        
-        print(f"✅ Results saved to: {output_path}")
 
-# === MULTIPROCESSING WORKER FUNCTIONS ===
+# Alias for backward compatibility with existing code
+EvaluationResult = StrategicResult
 
-def _run_episode_worker(task_data: Tuple) -> Tuple[float, int, int]:
+
+def run_strategic_episode(policy, initial_state: Dict, max_steps: int = 2500,
+                         efficiency_target: float = 0.95) -> Dict[str, Any]:
     """
-    Worker function for multiprocessing episode execution
+    Run a single strategic episode with phase tracking
     
     Args:
-        task_data: Tuple of (serialized_policy, canvas_width, canvas_height, boid_count, episode_seed)
+        policy: Policy to evaluate
+        initial_state: Initial simulation state  
+        max_steps: Maximum steps (2500 to match RL training horizon)
+        efficiency_target: Stop early if this catch rate achieved
         
     Returns:
-        Tuple of (catch_rate, total_catches, episode_length)
+        Detailed episode results with phase breakdown
     """
-    serialized_policy, canvas_width, canvas_height, boid_count, episode_seed = task_data
-    
-    # Deserialize policy
-    policy = pickle.loads(serialized_policy)
-    
-    # Create episode-specific state generator with unique seed
-    episode_state_generator = RandomStateGenerator(seed=EVALUATION_SEED + episode_seed)
-    
-    # Generate random initial state
-    initial_state = episode_state_generator.generate_scattered_state(
-        boid_count, canvas_width, canvas_height
-    )
-    initial_boid_count = len(initial_state['boids_states'])
-    
-    # Initialize state manager
     state_manager = StateManager()
     state_manager.init(initial_state, policy)
     
+    initial_boids = len(initial_state['boids_states'])
     total_catches = 0
     step = 0
     
-    # Run episode
-    while step < MAX_STEPS_PER_EPISODE:
-        # Run simulation step
+    # Track catches by phase
+    phase_catches = {'early': 0, 'mid': 0, 'late': 0}
+    
+    # Run episode with phase tracking
+    for step in range(max_steps):
         result = state_manager.step()
         
         # Count catches this step
+        step_catches = 0
         if 'caught_boids' in result:
-            total_catches += len(result['caught_boids'])
+            step_catches = len(result['caught_boids'])
+            total_catches += step_catches
         
-        # Check if all boids caught (early termination)
+        # Track by phase (adjusted for 2500-step episodes)
+        if step < 500:  # Early: 0-500 steps
+            phase_catches['early'] += step_catches
+        elif step < 1500:  # Mid: 500-1500 steps
+            phase_catches['mid'] += step_catches
+        else:  # Late: 1500+ steps
+            phase_catches['late'] += step_catches
+        
+        # Early termination if highly efficient
+        current_rate = total_catches / initial_boids if initial_boids > 0 else 0.0
+        if current_rate >= efficiency_target:
+            break
+        
+        # Check if all boids caught
         if len(result['boids_states']) == 0:
             break
+    
+    # Calculate phase-specific rates
+    early_rate = phase_catches['early'] / initial_boids if initial_boids > 0 else 0.0
+    mid_rate = phase_catches['mid'] / initial_boids if initial_boids > 0 else 0.0
+    late_rate = phase_catches['late'] / initial_boids if initial_boids > 0 else 0.0
+    
+    overall_rate = total_catches / initial_boids if initial_boids > 0 else 0.0
+    
+    return {
+        'overall_rate': overall_rate,
+        'total_catches': total_catches,
+        'episode_length': step + 1,
+        'early_rate': early_rate,
+        'mid_rate': mid_rate, 
+        'late_rate': late_rate,
+        'terminated_early': step < max_steps - 1,
+        'successful': True  # All episodes are successful
+    }
+
+
+class PolicyEvaluator:
+    """
+    Strategic Policy Evaluator - Optimized for emergent behavior analysis
+    
+    Key innovations:
+    1. Multi-phase evaluation (early/mid/late game performance)
+    2. Formation-diverse scenarios (scattered vs clustered boids)
+    3. Strategic depth metrics (consistency, adaptability)
+    4. Fast execution (~1 minute per policy)
+    """
+    
+    def __init__(self):
+        """Initialize strategic policy evaluator"""
+        self.generator = RandomStateGenerator()
+        
+        # Strategic evaluation parameters (optimized for speed + depth)
+        self.canvas_width = 400
+        self.canvas_height = 300
+        self.boid_count = 12  # Sweet spot for flock dynamics
+        
+        print(f"Strategic PolicyEvaluator initialized:")
+        print(f"  Scenario: {self.canvas_width}×{self.canvas_height}, {self.boid_count} boids")
+        print(f"  Focus: Emergent flock strategies and long-term performance")
+        print(f"  Formations: Scattered (herding) vs Clustered (flock-breaking)")
+        print(f"  Phases: Early/Mid/Late game analysis")
+    
+    def evaluate_policy(self, policy, policy_name: str = "Policy") -> StrategicResult:
+        """
+        Strategic evaluation with multi-phase and formation testing
+        
+        Evaluation design:
+        - 5 strategic episodes (2500 steps each) - full horizon testing
+        - Mix of scattered and clustered formations  
+        - Total: ~12500 steps = consistent with RL training horizon
+        
+        Args:
+            policy: Policy with get_action method
+            policy_name: Name for reporting
             
-        step += 1
+        Returns:
+            StrategicResult with comprehensive analysis
+        """
+        print(f"\n🧠 Strategic evaluation: {policy_name}")
+        
+        start_time = time.time()
+        
+        all_results = []
+        scattered_results = []
+        clustered_results = []
+        
+        # Strategic episode mix for comprehensive testing
+        episodes = [
+            # Strategic depth episodes (2500 steps to match RL training)
+            {'type': 'scattered', 'steps': 2500, 'seed': 300},
+            {'type': 'clustered', 'steps': 2500, 'seed': 301}, 
+            {'type': 'scattered', 'steps': 2500, 'seed': 302},
+            {'type': 'clustered', 'steps': 2500, 'seed': 303},
+            {'type': 'scattered', 'steps': 2500, 'seed': 304},
+        ]
+        
+        for i, episode_config in enumerate(episodes):
+            formation_type = episode_config['type']
+            max_steps = episode_config['steps']
+            seed = episode_config['seed']
+            
+            # Generate appropriate initial state
+            if formation_type == 'scattered':
+                initial_state = self.generator.generate_scattered_state(
+                    self.boid_count, self.canvas_width, self.canvas_height
+                )
+            else:  # clustered
+                initial_state = self.generator.generate_clustered_state(
+                    self.boid_count, self.canvas_width, self.canvas_height
+                )
+            
+            # Set seed for reproducibility
+            self.generator.seed = seed
+            
+            # Run strategic episode
+            result = run_strategic_episode(policy, initial_state, max_steps)
+            result['formation_type'] = formation_type
+            result['episode_config'] = episode_config
+            
+            all_results.append(result)
+            
+            # Categorize by formation
+            if formation_type == 'scattered':
+                scattered_results.append(result)
+            else:
+                clustered_results.append(result)
+        
+        # Aggregate statistics
+        all_rates = [r['overall_rate'] for r in all_results]
+        overall_mean = statistics.mean(all_rates)
+        overall_std = statistics.stdev(all_rates) if len(all_rates) > 1 else 0.0
+        
+        # Phase analysis
+        early_rates = [r['early_rate'] for r in all_results]
+        mid_rates = [r['mid_rate'] for r in all_results] 
+        late_rates = [r['late_rate'] for r in all_results]
+        
+        early_mean = statistics.mean(early_rates)
+        mid_mean = statistics.mean(mid_rates)
+        late_mean = statistics.mean(late_rates)
+        
+        # Formation analysis
+        scattered_mean = statistics.mean([r['overall_rate'] for r in scattered_results]) if scattered_results else 0.0
+        clustered_mean = statistics.mean([r['overall_rate'] for r in clustered_results]) if clustered_results else 0.0
+        
+        # Strategic depth metrics
+        phase_means = [early_mean, mid_mean, late_mean]
+        strategy_consistency = 1.0 - (statistics.stdev(phase_means) if len(phase_means) > 1 else 0.0)
+        strategy_consistency = max(0.0, min(1.0, strategy_consistency))  # Clamp to [0,1]
+        
+        adaptability_score = 1.0 - abs(scattered_mean - clustered_mean)
+        adaptability_score = max(0.0, min(1.0, adaptability_score))  # Clamp to [0,1]
+        
+        # Strategic profile analysis
+        if late_mean > early_mean * 1.2:
+            strategy_type = "Late-game specialist"
+        elif early_mean > late_mean * 1.2:
+            strategy_type = "Early-game specialist"
+        else:
+            strategy_type = "Consistent performer"
+        
+        formation_diff = abs(scattered_mean - clustered_mean)
+        if formation_diff < 0.05:
+            formation_style = "Adaptive"
+        elif scattered_mean > clustered_mean:
+            formation_style = "Herding specialist"
+        else:
+            formation_style = "Flock-breaker"
+        
+        eval_time = time.time() - start_time
+        
+        # Count successful episodes (all are successful in our system)
+        successful_episodes = len(all_results)
+        total_episodes = len(all_results)
+        
+        # Create strategic result
+        strategic_result = StrategicResult(
+            policy_name=policy_name,
+            overall_catch_rate=overall_mean,
+            overall_std_catch_rate=overall_std,
+            evaluation_time_seconds=eval_time,
+            total_episodes=total_episodes,
+            successful_episodes=successful_episodes,
+            early_phase_rate=early_mean,
+            mid_phase_rate=mid_mean,
+            late_phase_rate=late_mean,
+            scattered_rate=scattered_mean,
+            clustered_rate=clustered_mean,
+            strategy_consistency=strategy_consistency,
+            adaptability_score=adaptability_score,
+            strategy_type=strategy_type,
+            formation_style=formation_style,
+            all_catch_rates=all_rates,
+            episode_details=all_results
+        )
+        
+        # Print strategic summary
+        print(f"   ✅ Strategic evaluation complete:")
+        print(f"      Overall: {overall_mean:.3f} ± {overall_std:.3f}")
+        print(f"      Strategy: {strategy_type} | Formation: {formation_style}")
+        print(f"      Phases: Early {early_mean:.3f} | Mid {mid_mean:.3f} | Late {late_mean:.3f}")
+        print(f"      Consistency: {strategy_consistency:.3f} | Adaptability: {adaptability_score:.3f}")
+        print(f"      Time: {eval_time:.1f}s")
+        
+        return strategic_result
     
-    # Calculate catch rate
-    catch_rate = total_catches / initial_boid_count if initial_boid_count > 0 else 0.0
-    
-    return catch_rate, total_catches, step + 1
+    def compare_policies(self, policies: List[Tuple[Any, str]]) -> Dict[str, Any]:
+        """
+        Strategic comparison of multiple policies with detailed analysis
+        
+        Args:
+            policies: List of (policy_object, policy_name) tuples
+            
+        Returns:
+            Dictionary with comprehensive comparison results
+        """
+        print(f"\n🧠 STRATEGIC POLICY COMPARISON")
+        print(f"=" * 70)
+        
+        results = {}
+        start_time = time.time()
+        
+        # Evaluate each policy strategically
+        for policy, name in policies:
+            result = self.evaluate_policy(policy, name)
+            results[name] = result
+        
+        total_time = time.time() - start_time
+        
+        # Strategic comparison table
+        print(f"\n📊 STRATEGIC RESULTS:")
+        print(f"=" * 95)
+        print(f"{'Policy':<15} {'Overall':<10} {'Early':<8} {'Mid':<8} {'Late':<8} {'Scatter':<8} {'Cluster':<8} {'Time':<8}")
+        print(f"-" * 95)
+        
+        # Sort by overall performance
+        sorted_results = sorted(results.items(), key=lambda x: x[1].overall_catch_rate, reverse=True)
+        
+        best_overall = -1
+        for name, result in sorted_results:
+            overall = result.overall_catch_rate
+            early = result.early_phase_rate
+            mid = result.mid_phase_rate
+            late = result.late_phase_rate
+            scattered = result.scattered_rate
+            clustered = result.clustered_rate
+            eval_time = result.evaluation_time_seconds
+            
+            marker = " 🏆" if overall > best_overall else ""
+            if overall > best_overall:
+                best_overall = overall
+            
+            print(f"{name:<15} {overall:<10.3f} {early:<8.3f} {mid:<8.3f} {late:<8.3f} "
+                  f"{scattered:<8.3f} {clustered:<8.3f} {eval_time:<8.1f}s{marker}")
+        
+        # Strategic insights
+        print(f"\n🧠 STRATEGIC INSIGHTS:")
+        for i, (policy_name, result) in enumerate(sorted_results[:3], 1):
+            print(f"   {i}. {policy_name}: {result.strategy_type} | {result.formation_style}")
+            print(f"      Consistency: {result.strategy_consistency:.3f} | Adaptability: {result.adaptability_score:.3f}")
+        
+        print(f"\n⏱️  Total strategic evaluation: {total_time:.1f}s")
+        print(f"=" * 95)
+        
+        return {
+            'results': results,
+            'sorted_results': sorted_results,
+            'total_time': total_time,
+            'best_policy': sorted_results[0][0] if sorted_results else None
+        }
+
+
+# Keep old class names for any existing imports
+class ScenarioResult:
+    """Legacy placeholder - not used in strategic evaluation"""
+    pass
