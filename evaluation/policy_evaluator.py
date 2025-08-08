@@ -1,21 +1,24 @@
 """
-Strategic Policy Evaluator - Advanced evaluation system for emergent flock strategies
+Low-Variance Policy Evaluator - Statistically robust evaluation system
 
-This module provides strategic evaluation that captures:
-- Multi-phase performance (early/mid/late game)
-- Formation-specific strategies (scattered vs clustered boids)
-- Strategic depth metrics (consistency, adaptability)
-- Emergent behavior analysis over time
+This module provides evaluation with:
+- Configurable episode count for time/variance tradeoff
+- 95% confidence interval reporting
+- Fixed seed protocol for reproducibility
+- Balanced formation testing
+- Statistical comparison capabilities
 
-Optimized for speed while capturing long-term strategic behaviors.
+Default: 15 episodes for <9% minimum detectable improvement in ~90s
 """
 
 import time
 import statistics
+import numpy as np
 import sys
 import os
 from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
+from scipy import stats
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,34 +29,43 @@ from simulation.random_state_generator import RandomStateGenerator
 
 @dataclass
 class StrategicResult:
-    """Results for strategic evaluation with temporal and formation breakdown"""
+    """Results with statistical confidence measures"""
     policy_name: str
     
-    # Overall metrics (compatible with existing code)
+    # Core metrics with confidence
     overall_catch_rate: float
     overall_std_catch_rate: float
+    std_error: float
+    confidence_95_lower: float
+    confidence_95_upper: float
+    confidence_interval_width: float
+    
+    # Evaluation metadata
     evaluation_time_seconds: float
     total_episodes: int
     successful_episodes: int
     
-    # Strategic depth metrics
-    early_phase_rate: float      # 0-100 steps performance
-    mid_phase_rate: float        # 100-300 steps performance  
-    late_phase_rate: float       # 300+ steps performance
+    # Phase analysis
+    early_phase_rate: float      # 0-500 steps performance
+    mid_phase_rate: float        # 500-1500 steps performance  
+    late_phase_rate: float       # 1500+ steps performance
     
+    # Formation analysis
     scattered_rate: float        # Scattered boids (herding challenge)
     clustered_rate: float        # Clustered boids (flock-breaking challenge)
     
+    # Strategic metrics
     strategy_consistency: float  # Performance variance across phases (0-1)
     adaptability_score: float    # Performance across formations (0-1)
     
     # Strategic insights
-    strategy_type: str          # "Early-game", "Late-game", "Consistent"
-    formation_style: str        # "Adaptive", "Herding", "Flock-breaker"
+    primary_strategy: str        # Phase-based strategy profile
+    formation_preference: str    # Formation-based preference
+    strategic_insights: List[str]
     
-    # Raw data
-    all_catch_rates: List[float]
-    episode_details: List[Dict]
+    # Raw data for further analysis
+    all_performances: List[float]
+    detailed_results: List[Dict]
 
 
 # Alias for backward compatibility with existing code
@@ -132,68 +144,82 @@ def run_strategic_episode(policy, initial_state: Dict, max_steps: int = 2500,
 
 class PolicyEvaluator:
     """
-    Strategic Policy Evaluator - Optimized for emergent behavior analysis
+    Low-Variance Policy Evaluator - Statistically robust evaluation
     
-    Key innovations:
-    1. Multi-phase evaluation (early/mid/late game performance)
-    2. Formation-diverse scenarios (scattered vs clustered boids)
-    3. Strategic depth metrics (consistency, adaptability)
-    4. Fast execution (~1 minute per policy)
+    Key features:
+    1. Configurable episode count (default: 15 for optimal tradeoff)
+    2. 95% confidence interval reporting
+    3. Fixed seed protocol for reproducibility
+    4. Balanced formation testing
+    5. Statistical comparison capabilities
+    
+    Time/precision tradeoffs:
+    - 5 episodes: ~30s, detects >15% changes (legacy mode)
+    - 10 episodes: ~60s, detects >11% changes (quick mode)
+    - 15 episodes: ~90s, detects >9% changes (recommended)
+    - 30 episodes: ~180s, detects >6% changes (high precision)
     """
     
-    def __init__(self):
-        """Initialize strategic policy evaluator"""
-        self.generator = RandomStateGenerator()
+    def __init__(self, num_episodes: int = 15, base_seed: int = 1000):
+        """
+        Initialize low-variance policy evaluator
         
-        # Strategic evaluation parameters (optimized for speed + depth)
+        Args:
+            num_episodes: Number of episodes to run (default: 15)
+            base_seed: Starting seed for reproducibility (default: 1000)
+        """
+        self.generator = RandomStateGenerator()
+        self.num_episodes = num_episodes
+        self.base_seed = base_seed
+        
+        # Evaluation parameters
         self.canvas_width = 400
         self.canvas_height = 300
-        self.boid_count = 12  # Sweet spot for flock dynamics
+        self.boid_count = 12
+        self.episode_length = 2500
         
-        print(f"Strategic PolicyEvaluator initialized:")
-        print(f"  Scenario: {self.canvas_width}×{self.canvas_height}, {self.boid_count} boids")
-        print(f"  Focus: Emergent flock strategies and long-term performance")
-        print(f"  Formations: Scattered (herding) vs Clustered (flock-breaking)")
-        print(f"  Phases: Early/Mid/Late game analysis")
+        # Calculate expected precision
+        population_std_estimate = 0.089  # From empirical analysis
+        expected_std_error = population_std_estimate / np.sqrt(self.num_episodes)
+        expected_min_detectable = 1.96 * expected_std_error * 2
+        
+        print(f"Low-Variance PolicyEvaluator initialized:")
+        print(f"  Episodes: {self.num_episodes} (balanced formations)")
+        print(f"  Expected precision: ±{expected_std_error:.3f} (can detect >{expected_min_detectable*100:.1f}% changes)")
+        print(f"  Base seed: {self.base_seed}")
+        print(f"  Estimated time: ~{self.num_episodes * 6}s")
     
     def evaluate_policy(self, policy, policy_name: str = "Policy") -> StrategicResult:
         """
-        Strategic evaluation with multi-phase and formation testing
+        Evaluate policy with statistical confidence measures
         
-        Evaluation design:
-        - 5 strategic episodes (2500 steps each) - full horizon testing
-        - Mix of scattered and clustered formations  
-        - Total: ~12500 steps = consistent with RL training horizon
+        Uses fixed seed protocol and balanced formations for reproducibility.
+        Reports mean performance with 95% confidence intervals.
         
         Args:
             policy: Policy with get_action method
             policy_name: Name for reporting
             
         Returns:
-            StrategicResult with comprehensive analysis
+            StrategicResult with confidence intervals and detailed analysis
         """
-        print(f"\n🧠 Strategic evaluation: {policy_name}")
+        print(f"\n📊 Evaluating {policy_name} ({self.num_episodes} episodes)...")
         
         start_time = time.time()
         
         all_results = []
         scattered_results = []
         clustered_results = []
+        performances = []
         
-        # Strategic episode mix for comprehensive testing
-        episodes = [
-            # Strategic depth episodes (2500 steps to match RL training)
-            {'type': 'scattered', 'steps': 2500, 'seed': 300},
-            {'type': 'clustered', 'steps': 2500, 'seed': 301}, 
-            {'type': 'scattered', 'steps': 2500, 'seed': 302},
-            {'type': 'clustered', 'steps': 2500, 'seed': 303},
-            {'type': 'scattered', 'steps': 2500, 'seed': 304},
-        ]
-        
-        for i, episode_config in enumerate(episodes):
-            formation_type = episode_config['type']
-            max_steps = episode_config['steps']
-            seed = episode_config['seed']
+        # Generate balanced episode set
+        for i in range(self.num_episodes):
+            # Alternate formations for balance
+            formation_type = 'scattered' if i % 2 == 0 else 'clustered'
+            seed = self.base_seed + i
+            
+            # Set seed for reproducibility
+            self.generator.seed = seed
             
             # Generate appropriate initial state
             if formation_type == 'scattered':
@@ -205,26 +231,34 @@ class PolicyEvaluator:
                     self.boid_count, self.canvas_width, self.canvas_height
                 )
             
-            # Set seed for reproducibility
-            self.generator.seed = seed
-            
             # Run strategic episode
-            result = run_strategic_episode(policy, initial_state, max_steps)
+            result = run_strategic_episode(policy, initial_state, self.episode_length)
             result['formation_type'] = formation_type
-            result['episode_config'] = episode_config
+            result['seed'] = seed
             
             all_results.append(result)
+            performances.append(result['overall_rate'])
             
             # Categorize by formation
             if formation_type == 'scattered':
                 scattered_results.append(result)
             else:
                 clustered_results.append(result)
+            
+            # Progress indicator
+            if (i + 1) % 5 == 0:
+                print(f"   Progress: {i+1}/{self.num_episodes} episodes")
         
-        # Aggregate statistics
-        all_rates = [r['overall_rate'] for r in all_results]
-        overall_mean = statistics.mean(all_rates)
-        overall_std = statistics.stdev(all_rates) if len(all_rates) > 1 else 0.0
+        # Calculate statistics with confidence intervals
+        overall_mean = np.mean(performances)
+        overall_std = np.std(performances, ddof=1)  # Sample standard deviation
+        std_error = overall_std / np.sqrt(self.num_episodes)
+        
+        # 95% confidence interval
+        ci_margin = 1.96 * std_error
+        ci_lower = overall_mean - ci_margin
+        ci_upper = overall_mean + ci_margin
+        ci_width = ci_margin * 2
         
         # Phase analysis
         early_rates = [r['early_rate'] for r in all_results]
@@ -242,26 +276,37 @@ class PolicyEvaluator:
         # Strategic depth metrics
         phase_means = [early_mean, mid_mean, late_mean]
         strategy_consistency = 1.0 - (statistics.stdev(phase_means) if len(phase_means) > 1 else 0.0)
-        strategy_consistency = max(0.0, min(1.0, strategy_consistency))  # Clamp to [0,1]
+        strategy_consistency = max(0.0, min(1.0, strategy_consistency))
         
         adaptability_score = 1.0 - abs(scattered_mean - clustered_mean)
-        adaptability_score = max(0.0, min(1.0, adaptability_score))  # Clamp to [0,1]
+        adaptability_score = max(0.0, min(1.0, adaptability_score))
         
-        # Strategic profile analysis
-        if late_mean > early_mean * 1.2:
-            strategy_type = "Late-game specialist"
-        elif early_mean > late_mean * 1.2:
-            strategy_type = "Early-game specialist"
+        # Determine primary strategy
+        if late_mean > early_mean * 1.2 and late_mean > mid_mean:
+            primary_strategy = "Late-game specialist"
+        elif early_mean > late_mean * 1.2 and early_mean > mid_mean:
+            primary_strategy = "Early-game specialist"
         else:
-            strategy_type = "Consistent performer"
+            primary_strategy = "Consistent performer"
         
-        formation_diff = abs(scattered_mean - clustered_mean)
-        if formation_diff < 0.05:
-            formation_style = "Adaptive"
-        elif scattered_mean > clustered_mean:
-            formation_style = "Herding specialist"
+        # Determine formation preference  
+        if scattered_mean > clustered_mean * 1.1:
+            formation_preference = "Herding specialist"
+        elif clustered_mean > scattered_mean * 1.1:
+            formation_preference = "Flock-breaker"
         else:
-            formation_style = "Flock-breaker"
+            formation_preference = "Adaptive"
+        
+        # Strategic insights
+        max_phase = max(early_mean, mid_mean, late_mean)
+        weakest_phase = "early" if early_mean == min(phase_means) else "mid" if mid_mean == min(phase_means) else "late"
+        
+        strategic_insights = [
+            f"Primary strategy: {primary_strategy}",
+            f"Formation preference: {formation_preference}",
+            f"Strongest phase: {'early' if early_mean == max_phase else 'mid' if mid_mean == max_phase else 'late'}",
+            f"Improvement opportunity: {weakest_phase} phase"
+        ]
         
         eval_time = time.time() - start_time
         
@@ -269,11 +314,15 @@ class PolicyEvaluator:
         successful_episodes = len(all_results)
         total_episodes = len(all_results)
         
-        # Create strategic result
+        # Create result with confidence intervals
         strategic_result = StrategicResult(
             policy_name=policy_name,
             overall_catch_rate=overall_mean,
             overall_std_catch_rate=overall_std,
+            std_error=std_error,
+            confidence_95_lower=ci_lower,
+            confidence_95_upper=ci_upper,
+            confidence_interval_width=ci_width,
             evaluation_time_seconds=eval_time,
             total_episodes=total_episodes,
             successful_episodes=successful_episodes,
@@ -284,79 +333,100 @@ class PolicyEvaluator:
             clustered_rate=clustered_mean,
             strategy_consistency=strategy_consistency,
             adaptability_score=adaptability_score,
-            strategy_type=strategy_type,
-            formation_style=formation_style,
-            all_catch_rates=all_rates,
-            episode_details=all_results
+            primary_strategy=primary_strategy,
+            formation_preference=formation_preference,
+            strategic_insights=strategic_insights,
+            all_performances=performances,
+            detailed_results=all_results
         )
         
-        # Print strategic summary
-        print(f"   ✅ Strategic evaluation complete:")
-        print(f"      Overall: {overall_mean:.3f} ± {overall_std:.3f}")
-        print(f"      Strategy: {strategy_type} | Formation: {formation_style}")
+        # Print summary with confidence intervals
+        print(f"\n   ✅ Evaluation complete:")
+        print(f"      Performance: {overall_mean:.4f} ± {ci_margin:.4f} (95% CI)")
+        print(f"      Confidence interval: [{ci_lower:.4f}, {ci_upper:.4f}]")
+        print(f"      Std error: {std_error:.4f} ({std_error/overall_mean*100:.1f}% relative)")
+        print(f"      Strategy: {primary_strategy} | Formation: {formation_preference}")
         print(f"      Phases: Early {early_mean:.3f} | Mid {mid_mean:.3f} | Late {late_mean:.3f}")
-        print(f"      Consistency: {strategy_consistency:.3f} | Adaptability: {adaptability_score:.3f}")
         print(f"      Time: {eval_time:.1f}s")
         
         return strategic_result
     
     def compare_policies(self, policies: List[Tuple[Any, str]]) -> Dict[str, Any]:
         """
-        Strategic comparison of multiple policies with detailed analysis
+        Compare policies with statistical significance testing
         
         Args:
             policies: List of (policy_object, policy_name) tuples
             
         Returns:
-            Dictionary with comprehensive comparison results
+            Dictionary with comparison results including p-values
         """
-        print(f"\n🧠 STRATEGIC POLICY COMPARISON")
+        print(f"\n🔬 STATISTICAL POLICY COMPARISON")
         print(f"=" * 70)
         
         results = {}
         start_time = time.time()
         
-        # Evaluate each policy strategically
+        # Evaluate each policy
         for policy, name in policies:
             result = self.evaluate_policy(policy, name)
             results[name] = result
         
         total_time = time.time() - start_time
         
-        # Strategic comparison table
-        print(f"\n📊 STRATEGIC RESULTS:")
-        print(f"=" * 95)
-        print(f"{'Policy':<15} {'Overall':<10} {'Early':<8} {'Mid':<8} {'Late':<8} {'Scatter':<8} {'Cluster':<8} {'Time':<8}")
-        print(f"-" * 95)
+        # Results table with confidence intervals
+        print(f"\n📊 RESULTS WITH 95% CONFIDENCE INTERVALS:")
+        print(f"=" * 100)
+        print(f"{'Policy':<20} {'Performance':<20} {'CI Lower':<10} {'CI Upper':<10} {'Phases (E/M/L)':<20}")
+        print(f"-" * 100)
         
         # Sort by overall performance
         sorted_results = sorted(results.items(), key=lambda x: x[1].overall_catch_rate, reverse=True)
         
-        best_overall = -1
         for name, result in sorted_results:
-            overall = result.overall_catch_rate
-            early = result.early_phase_rate
-            mid = result.mid_phase_rate
-            late = result.late_phase_rate
-            scattered = result.scattered_rate
-            clustered = result.clustered_rate
-            eval_time = result.evaluation_time_seconds
+            perf_str = f"{result.overall_catch_rate:.4f} ± {result.confidence_interval_width/2:.4f}"
+            phases_str = f"{result.early_phase_rate:.2f}/{result.mid_phase_rate:.2f}/{result.late_phase_rate:.2f}"
             
-            marker = " 🏆" if overall > best_overall else ""
-            if overall > best_overall:
-                best_overall = overall
+            print(f"{name:<20} {perf_str:<20} {result.confidence_95_lower:<10.4f} "
+                  f"{result.confidence_95_upper:<10.4f} {phases_str:<20}")
+        
+        # Statistical comparisons for pairs
+        if len(policies) == 2:
+            print(f"\n📈 STATISTICAL COMPARISON:")
+            name1, name2 = list(results.keys())
+            result1, result2 = results[name1], results[name2]
             
-            print(f"{name:<15} {overall:<10.3f} {early:<8.3f} {mid:<8.3f} {late:<8.3f} "
-                  f"{scattered:<8.3f} {clustered:<8.3f} {eval_time:<8.1f}s{marker}")
+            # Two-sample t-test
+            t_stat, p_value = stats.ttest_ind(
+                result2.all_performances,
+                result1.all_performances,
+                equal_var=False  # Welch's t-test
+            )
+            
+            # Effect size (Cohen's d)
+            pooled_std = np.sqrt((np.var(result1.all_performances, ddof=1) + 
+                                 np.var(result2.all_performances, ddof=1)) / 2)
+            cohens_d = (result2.overall_catch_rate - result1.overall_catch_rate) / pooled_std
+            
+            # Improvement
+            improvement = (result2.overall_catch_rate - result1.overall_catch_rate) / result1.overall_catch_rate * 100
+            
+            print(f"   Baseline ({name1}): {result1.overall_catch_rate:.4f}")
+            print(f"   Compared ({name2}): {result2.overall_catch_rate:.4f}")
+            print(f"   Improvement: {improvement:+.1f}%")
+            print(f"   p-value: {p_value:.4f} {'✅ (significant at α=0.05)' if p_value < 0.05 else '❌ (not significant)'}")
+            print(f"   Effect size (Cohen's d): {cohens_d:.2f} ", end="")
+            if abs(cohens_d) < 0.2:
+                print("(negligible)")
+            elif abs(cohens_d) < 0.5:
+                print("(small)")
+            elif abs(cohens_d) < 0.8:
+                print("(medium)")
+            else:
+                print("(large)")
         
-        # Strategic insights
-        print(f"\n🧠 STRATEGIC INSIGHTS:")
-        for i, (policy_name, result) in enumerate(sorted_results[:3], 1):
-            print(f"   {i}. {policy_name}: {result.strategy_type} | {result.formation_style}")
-            print(f"      Consistency: {result.strategy_consistency:.3f} | Adaptability: {result.adaptability_score:.3f}")
-        
-        print(f"\n⏱️  Total strategic evaluation: {total_time:.1f}s")
-        print(f"=" * 95)
+        print(f"\n⏱️  Total evaluation time: {total_time:.1f}s")
+        print(f"=" * 100)
         
         return {
             'results': results,
