@@ -1,0 +1,104 @@
+{
+  "sl_baseline_data": {
+    "performances": [
+      0.7333333333333333,
+      0.8666666666666667,
+      0.8
+    ],
+    "mean": 0.8000000000000002,
+    "std": 0.06666666666666671,
+    "n": 3
+  },
+  "early_peaking_diagnosis": {
+    "performance_curve": [
+      {
+        "iteration": 1,
+        "performance": 0.5
+      },
+      {
+        "iteration": 2,
+        "performance": 0.48333333333333334
+      },
+      {
+        "iteration": 3,
+        "performance": 0.5833333333333334
+      },
+      {
+        "iteration": 4,
+        "performance": 0.5333333333333333
+      },
+      {
+        "iteration": 5,
+        "performance": 0.48333333333333334
+      },
+      {
+        "iteration": 6,
+        "performance": 0.7333333333333333
+      },
+      {
+        "iteration": 7,
+        "performance": 0.6
+      }
+    ],
+    "training_metrics": [
+      {
+        "iteration": 1,
+        "estimated_policy_loss": 0.04781151904264189,
+        "estimated_value_loss": 2.917811007691005
+      },
+      {
+        "iteration": 2,
+        "estimated_policy_loss": 0.00972592698802903,
+        "estimated_value_loss": 2.307743181156436
+      },
+      {
+        "iteration": 3,
+        "estimated_policy_loss": 0.02182063552919114,
+        "estimated_value_loss": 3.610592806483972
+      },
+      {
+        "iteration": 4,
+        "estimated_policy_loss": 0.002495739631936147,
+        "estimated_value_loss": 2.698855656523812
+      },
+      {
+        "iteration": 5,
+        "estimated_policy_loss": 0.001955621605244611,
+        "estimated_value_loss": 0.7854776439852327
+      },
+      {
+        "iteration": 6,
+        "estimated_policy_loss": 0.020274373902611456,
+        "estimated_value_loss": 0.5870228816384846
+      },
+      {
+        "iteration": 7,
+        "estimated_policy_loss": 0.034571490770975745,
+        "estimated_value_loss": 2.3324342614156
+      }
+    ],
+    "best_iteration": "6",
+    "best_performance": 0.7333333333333333,
+    "early_peak_detected": "False",
+    "performance_instability": true,
+    "performance_drops": 4,
+    "learning_pattern": "late_peak_improving"
+  },
+  "hyperparameter_fixes": null,
+  "statistical_analysis": {
+    "sl_baseline_mean": 0.8000000000000002,
+    "ppo_single_result": 0.8333,
+    "improvement_percent": 4.1624999999999845,
+    "z_score": 0.8651593783806506,
+    "p_value_approximate": 0.3869513176968207,
+    "likely_significant": "False",
+    "statistical_power": "low",
+    "recommendation": "Insufficient data - need at least 10-15 runs for reliable statistics"
+  },
+  "analysis_time_minutes": 18.47310716311137,
+  "key_conclusions": [
+    "\u274c STATISTICAL: +4.2% improvement NOT statistically convincing",
+    "\u2705 NORMAL: PPO learning curve appears reasonable",
+    "\ud83d\udcca INCONCLUSIVE: Normal learning but need more data for significance"
+  ]
+}

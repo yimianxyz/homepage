@@ -1,0 +1,123 @@
+{
+  "true_random_baseline": 0.4636,
+  "final_performance": 0.55,
+  "final_improvement": 18.6367558239862,
+  "performance_curve": [
+    {
+      "iteration": 1,
+      "performance": 0.6666666666666666,
+      "improvement": 43.80212827149841
+    },
+    {
+      "iteration": 2,
+      "performance": 0.8333333333333334,
+      "improvement": 79.75266033937302
+    },
+    {
+      "iteration": 3,
+      "performance": 0.7166666666666667,
+      "improvement": 54.58728789186079
+    },
+    {
+      "iteration": 4,
+      "performance": 0.5833333333333334,
+      "improvement": 25.826862237561123
+    },
+    {
+      "iteration": 5,
+      "performance": 0.65,
+      "improvement": 40.207075064710956
+    },
+    {
+      "iteration": 6,
+      "performance": 0.6666666666666667,
+      "improvement": 43.80212827149843
+    },
+    {
+      "iteration": 7,
+      "performance": 0.6,
+      "improvement": 29.421915444348567
+    },
+    {
+      "iteration": 8,
+      "performance": 0.7666666666666667,
+      "improvement": 65.37244751222319
+    },
+    {
+      "iteration": 12,
+      "performance": 0.55,
+      "improvement": 18.6367558239862
+    },
+    {
+      "iteration": 16,
+      "performance": 0.3833333333333333,
+      "improvement": -17.31377624388842
+    },
+    {
+      "iteration": 20,
+      "performance": 0.55,
+      "improvement": 18.6367558239862
+    }
+  ],
+  "value_loss_curve": [
+    3.939838060708477,
+    3.0780145396000522,
+    3.6737116518370843,
+    4.683649267151004,
+    3.15798325394709,
+    1.1097289435770172,
+    1.5663242353803168,
+    1.9894034074125175,
+    1.5840491907002054,
+    1.905415422644619,
+    1.1810548565927577,
+    1.6805760095599491,
+    1.0164533141415206,
+    0.831754090195537,
+    1.2906954266124488,
+    1.9580525649066285,
+    1.5193999487193772,
+    0.686915177264375,
+    1.032482783728242,
+    1.0733567082909723
+  ],
+  "policy_loss_curve": [
+    0.01688334882293603,
+    0.043160826947342835,
+    0.029452487827942936,
+    0.020740618372491755,
+    0.01666185948989579,
+    0.00762427630615943,
+    0.005001363253478269,
+    0.017004933465581136,
+    0.007111939102182485,
+    0.016370408328950484,
+    0.006071498316412889,
+    0.010083254960651728,
+    0.008163984460203734,
+    0.010792098330848151,
+    0.015308160045719749,
+    0.010300132423822883,
+    0.008955238004705917,
+    0.016013449854962676,
+    0.019153089451615198,
+    0.01881684131552824
+  ],
+  "success_criteria": {
+    "beats_random": true,
+    "significant_improvement": false,
+    "excellent_improvement": false,
+    "learning_trend_positive": false,
+    "consistent_improvement": false
+  },
+  "success_score": 1,
+  "overall_success": false,
+  "value_learning_success": "True",
+  "fixes_applied": {
+    "separate_learning_rates": true,
+    "value_lr_reduction": true,
+    "optimal_gae_config": true,
+    "gradient_clipping": true,
+    "conservative_updates": true
+  }
+}

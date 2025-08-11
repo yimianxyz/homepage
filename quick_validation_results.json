@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "functional_test_passed": true,
+  "shows_improvement": false,
+  "sl_baseline": 0.8833333333333333,
+  "final_performance": 0.6833333333333333,
+  "improvement_pct": -22.64150943396226,
+  "total_time_seconds": 49.09344172477722
+}

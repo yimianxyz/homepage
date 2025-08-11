@@ -1,0 +1,29 @@
+[2025-08-06 08:49:59] Production PPO Training Started
+[2025-08-06 08:49:59] Configuration: {
+  "episode_length": 5000,
+  "value_pretrain_iterations": 20,
+  "learning_rate": 3e-05,
+  "eval_frequency": 10,
+  "checkpoint_frequency": 10,
+  "plateau_patience": 30,
+  "plateau_threshold": 0.002,
+  "device": "cpu",
+  "rollout_steps": 512,
+  "ppo_epochs": 2,
+  "mini_batch_size": 64,
+  "clip_epsilon": 0.1,
+  "value_loss_coef": 0.5,
+  "entropy_coef": 0.01,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "max_grad_norm": 0.5
+}
+[2025-08-06 08:49:59] 
+🏃 Training PPO until plateau (max 300 iterations)...
+[2025-08-06 08:49:59] 
+📊 Establishing SL baseline...
+[2025-08-06 09:03:12] Baseline performance: 0.7389
+[2025-08-06 09:03:12] 95% CI: [0.6734, 0.8044]
+[2025-08-06 09:03:12] Std error: 0.0334
+[2025-08-06 09:03:12] 
+🎓 Pre-training value function (20 iterations)...

@@ -1,0 +1,139 @@
+{
+  "evidence_analysis": {
+    "evidence_summary": {
+      "value_function_failure": true,
+      "statistical_insignificance": true,
+      "inconsistent_behavior": true,
+      "training_instability": true
+    },
+    "root_causes": {
+      "primary": {
+        "cause": "Value Function Learning Catastrophic Failure",
+        "evidence": [
+          "Value losses increasing over time (10.871 \u2192 18.243)",
+          "Learning effectiveness decreasing (0.084 \u2192 0.052)",
+          "Value function cannot estimate returns properly"
+        ],
+        "impact": "Destroys advantage estimation \u2192 unstable policy updates \u2192 inconsistent learning",
+        "confidence": "very_high"
+      },
+      "secondary": {
+        "cause": "SL Checkpoint Initialization Mismatch",
+        "evidence": [
+          "Policy starts pre-trained (good performance)",
+          "Value function starts random (poor estimation)",
+          "Mismatched learning rates create instability"
+        ],
+        "impact": "Creates unstable learning dynamics from the start",
+        "confidence": "high"
+      },
+      "tertiary": [
+        {
+          "cause": "Insufficient Statistical Validation",
+          "evidence": [
+            "p=0.387 (not significant)",
+            "Sample size too small"
+          ],
+          "impact": "Results appear significant but are not statistically valid"
+        },
+        {
+          "cause": "Hyperparameter Suboptimality",
+          "evidence": [
+            "High variance in training metrics",
+            "4 performance drops"
+          ],
+          "impact": "Exacerbates underlying value function issues"
+        }
+      ],
+      "causal_chain": [
+        "1. PPO starts from SL checkpoint (policy pre-trained, value random)",
+        "2. Value function cannot learn properly (losses 10\u219218, getting worse)",
+        "3. Poor value estimates \u2192 bad advantage computation",
+        "4. Bad advantages \u2192 unstable policy updates",
+        "5. Unstable updates \u2192 inconsistent learning curves",
+        "6. Inconsistent learning \u2192 statistically unreliable results",
+        "7. Small sample size masks the underlying instability"
+      ]
+    },
+    "confidence_level": "very_high"
+  },
+  "solutions": {
+    "immediate_fixes": [
+      "Fix value function learning: Reduce value LR to 0.000001 (100x smaller)",
+      "Use separate optimizers for policy and value function",
+      "Start value function from SL value estimates, not random",
+      "Implement proper statistical validation (15+ runs)"
+    ],
+    "systematic_fixes": [
+      "Test PPO from random initialization vs SL initialization",
+      "Implement gradual fine-tuning: freeze policy, train value first",
+      "Add value function learning monitoring and early stopping",
+      "Create proper confidence intervals and effect size analysis"
+    ],
+    "architectural_fixes": [
+      "Pre-train value function on SL demonstrations",
+      "Use shared backbone with separate heads (current) but matched learning",
+      "Implement value function regularization",
+      "Add gradient clipping specifically for value function"
+    ]
+  },
+  "effectiveness_predictions": {
+    "fix_value_function_learning": 0.85,
+    "separate_optimizers": 0.75,
+    "proper_statistical_validation": 0.95,
+    "gradual_fine_tuning": 0.7,
+    "random_initialization_test": 0.9
+  },
+  "action_plan": {
+    "phase_1_critical": {
+      "duration": "1-2 days",
+      "actions": [
+        "Implement ultra-conservative value function learning (LR=0.000001)",
+        "Add separate optimizers for policy and value",
+        "Run 15+ statistical validation runs",
+        "Compare random vs SL initialization (3 runs each)"
+      ],
+      "success_criteria": [
+        "Value losses decrease over time (not increase)",
+        "Statistical significance p<0.05 achieved",
+        "Consistent learning curves across runs"
+      ]
+    },
+    "phase_2_validation": {
+      "duration": "3-5 days",
+      "actions": [
+        "Implement proper confidence intervals and effect sizes",
+        "Test gradual fine-tuning approach",
+        "Pre-train value function on SL demonstrations",
+        "Add comprehensive training monitoring"
+      ],
+      "success_criteria": [
+        "Robust statistical evidence PPO > SL",
+        "Value function learning stability confirmed",
+        "Reproducible results across multiple runs"
+      ]
+    },
+    "phase_3_optimization": {
+      "duration": "1 week",
+      "actions": [
+        "Optimize hyperparameters systematically",
+        "Implement production-ready PPO system",
+        "Create automated validation framework",
+        "Document best practices"
+      ],
+      "success_criteria": [
+        "Reliable PPO improvement over SL baseline",
+        "Consistent performance in production",
+        "Validated statistical methodology"
+      ]
+    }
+  },
+  "final_diagnosis": {
+    "primary_root_cause": "Value Function Learning Catastrophic Failure",
+    "underlying_cause": "SL Checkpoint Initialization Creates Mismatched Learning Dynamics",
+    "manifestation": "Statistically Insignificant and Inconsistent PPO Performance",
+    "confidence_level": "Very High (Multiple Lines of Evidence)",
+    "critical_issue": "Value function getting worse over time (losses 10\u219218), not better"
+  },
+  "recommended_next_step": "Implement ultra-conservative value function learning (LR=0.000001) with separate optimizers and run 15+ validation runs to confirm statistical significance"
+}

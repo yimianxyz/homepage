@@ -1,0 +1,79 @@
+2025-08-04 17:23:43,264 - PPOProduction - INFO - ================================================================================
+2025-08-04 17:23:43,264 - PPOProduction - INFO - PPO PRODUCTION TRAINER INITIALIZED
+2025-08-04 17:23:43,264 - PPOProduction - INFO - ================================================================================
+2025-08-04 17:23:43,264 - PPOProduction - INFO - Config: {
+  "sl_checkpoint_path": "checkpoints/best_model.pt",
+  "checkpoint_dir": "production_checkpoints",
+  "max_iterations": 150,
+  "value_pretrain_iterations": 20,
+  "checkpoint_interval": 5,
+  "keep_best_k": 5,
+  "validation_interval": 5,
+  "validation_runs": 3,
+  "patience": 25,
+  "min_delta": 0.0005,
+  "confidence_level": 0.95,
+  "plateau_threshold": 3,
+  "learning_rate": 5e-05,
+  "value_learning_rate": 0.0005,
+  "clip_epsilon": 0.1,
+  "ppo_epochs": 2,
+  "rollout_steps": 256,
+  "gamma": 0.95,
+  "gae_lambda": 0.9,
+  "device": "cpu",
+  "log_level": "INFO",
+  "enable_tensorboard": true
+}
+2025-08-04 17:23:43,264 - PPOProduction - INFO - 
+🚀 STARTING PRODUCTION TRAINING
+2025-08-04 17:23:43,265 - PPOProduction - INFO - 
+📊 ESTABLISHING SL BASELINE
+2025-08-04 17:27:51,721 - PPOProduction - INFO -   Run 1: 0.7667
+2025-08-04 17:31:33,379 - PPOProduction - INFO -   Run 2: 0.8333
+2025-08-04 17:35:23,839 - PPOProduction - INFO -   Run 3: 0.7333
+2025-08-04 17:39:07,831 - PPOProduction - INFO -   Run 4: 0.7333
+2025-08-04 17:43:29,337 - PPOProduction - INFO -   Run 5: 0.7333
+2025-08-04 17:47:31,715 - PPOProduction - INFO -   Run 6: 0.7167
+2025-08-04 17:47:31,716 - PPOProduction - INFO - 
+✅ SL Baseline: 0.7528 ± 0.0174
+2025-08-04 17:47:31,716 - PPOProduction - INFO -    95% CI: [0.7080, 0.7976]
+2025-08-04 17:47:31,716 - PPOProduction - INFO - 
+🆕 CREATING NEW TRAINER
+2025-08-04 17:47:32,488 - PPOProduction - INFO - 
+🎯 VALUE FUNCTION PRE-TRAINING
+2025-08-04 17:47:32,488 - PPOProduction - INFO - ✅ Value pre-training complete in 0.0 minutes
+2025-08-04 17:47:32,488 - PPOProduction - INFO -    Initial loss: 7.949
+2025-08-04 17:47:32,488 - PPOProduction - INFO -    Final loss: 0.500
+2025-08-04 17:47:32,488 - PPOProduction - INFO - 
+📍 ITERATION 1/150
+2025-08-04 17:47:39,822 - PPOProduction - INFO -    Policy loss: 0.0000
+2025-08-04 17:47:39,822 - PPOProduction - INFO -    Value loss: 0.0000
+2025-08-04 17:47:39,825 - PPOProduction - INFO -    Time: 7.3s
+2025-08-04 17:47:39,825 - PPOProduction - INFO - 
+📊 VALIDATION AT ITERATION 1
+2025-08-04 17:48:30,415 - PPOProduction - ERROR - 
+❌ Training error: 'StrategicResult' object has no attribute 'phase_performance'
+Traceback (most recent call last):
+  File "/home/iotcat/homepage2/ppo_production_trainer.py", line 494, in run_production_training
+    validation_stats = self.validate_performance(iteration)
+  File "/home/iotcat/homepage2/ppo_production_trainer.py", line 284, in validate_performance
+    'phases': result.phase_performance,
+AttributeError: 'StrategicResult' object has no attribute 'phase_performance'
+2025-08-04 17:48:30,416 - PPOProduction - INFO - 
+================================================================================
+2025-08-04 17:48:30,416 - PPOProduction - INFO - PRODUCTION TRAINING COMPLETE
+2025-08-04 17:48:30,416 - PPOProduction - INFO - ================================================================================
+2025-08-04 17:48:30,416 - PPOProduction - INFO - 
+📊 SUMMARY:
+2025-08-04 17:48:30,416 - PPOProduction - INFO -    SL Baseline: 0.7528
+2025-08-04 17:48:30,416 - PPOProduction - INFO -    Best Performance: 0.0000 (iteration 0)
+2025-08-04 17:48:30,416 - PPOProduction - INFO -    Improvement: -100.0%
+2025-08-04 17:48:30,416 - PPOProduction - INFO -    Total Iterations: 1
+2025-08-04 17:48:30,416 - PPOProduction - INFO -    Training Time: 0.0 minutes
+2025-08-04 17:48:30,416 - PPOProduction - INFO -    Early Stop: NO - Completed all iterations
+2025-08-04 17:48:30,417 - PPOProduction - INFO - 
+📈 PERFORMANCE TRAJECTORY:
+2025-08-04 17:48:30,417 - PPOProduction - INFO - 
+✅ Final report saved: production_checkpoints/final_report_20250804_174830.json
+2025-08-04 17:48:30,417 - PPOProduction - INFO - ✅ Best model: production_checkpoints/best/best_model.pt

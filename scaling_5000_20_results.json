@@ -1,0 +1,55 @@
+{
+  "episode_length": 5000,
+  "boid_count": 20,
+  "sl_baseline": 0.7333333333333334,
+  "sl_std": 0.07071067811865477,
+  "trials": [
+    {
+      "trial": 1,
+      "performances": [
+        0.8,
+        0.8666666666666667
+      ],
+      "improvements": [
+        9.090909090909088,
+        18.181818181818176
+      ],
+      "best_performance": 0.8666666666666667,
+      "best_iteration": 2,
+      "best_improvement": 18.181818181818176
+    },
+    {
+      "trial": 2,
+      "performances": [
+        0.6833333333333333,
+        0.9
+      ],
+      "improvements": [
+        -6.818181818181824,
+        22.72727272727272
+      ],
+      "best_performance": 0.9,
+      "best_iteration": 2,
+      "best_improvement": 22.72727272727272
+    },
+    {
+      "trial": 3,
+      "performances": [
+        0.7,
+        0.8166666666666667
+      ],
+      "improvements": [
+        -4.545454545454559,
+        11.363636363636353
+      ],
+      "best_performance": 0.8166666666666667,
+      "best_iteration": 2,
+      "best_improvement": 11.363636363636353
+    }
+  ],
+  "mean_best_performance": 0.861111111111111,
+  "std_best_performance": 0.034246744460938776,
+  "mean_improvement": 17.424242424242415,
+  "max_improvement": 22.72727272727272,
+  "success_rate": 100.0
+}

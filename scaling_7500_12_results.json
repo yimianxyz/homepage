@@ -1,0 +1,65 @@
+{
+  "episode_length": 7500,
+  "boid_count": 12,
+  "sl_baseline": 0.7277777777777777,
+  "sl_std": 0.05665577237325315,
+  "trials": [
+    {
+      "trial": 1,
+      "performances": [
+        0.7833333333333333,
+        0.85
+      ],
+      "improvements": [
+        7.633587786259547,
+        16.793893129770996
+      ],
+      "best_performance": 0.85,
+      "best_iteration": 2,
+      "best_improvement": 16.793893129770996
+    },
+    {
+      "trial": 2,
+      "performances": [
+        0.65,
+        0.8333333333333334
+      ],
+      "improvements": [
+        -10.68702290076335,
+        14.50381679389314
+      ],
+      "best_performance": 0.8333333333333334,
+      "best_iteration": 2,
+      "best_improvement": 14.50381679389314
+    },
+    {
+      "trial": 3,
+      "performances": [
+        0.7166666666666667,
+        0.6833333333333333,
+        0.6833333333333333,
+        0.75,
+        0.75,
+        0.7333333333333334,
+        0.75
+      ],
+      "improvements": [
+        -1.526717557251903,
+        -6.106870229007627,
+        -6.106870229007627,
+        3.053435114503821,
+        3.053435114503821,
+        0.7633587786259668,
+        3.053435114503821
+      ],
+      "best_performance": 0.75,
+      "best_iteration": 6,
+      "best_improvement": 3.053435114503821
+    }
+  ],
+  "mean_best_performance": 0.8111111111111112,
+  "std_best_performance": 0.04374448818895451,
+  "mean_improvement": 11.450381679389318,
+  "max_improvement": 16.793893129770996,
+  "success_rate": 100.0
+}

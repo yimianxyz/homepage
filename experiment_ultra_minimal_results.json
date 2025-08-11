@@ -1,0 +1,32 @@
+{
+  "experiment": "ultra_minimal",
+  "timestamp": "2025-08-06T18:06:21.594026",
+  "baseline": 0.85,
+  "config": {
+    "learning_rate": 3e-05,
+    "clip_epsilon": 0.01,
+    "value_pretrain_iterations": 10,
+    "episode_length": 2500,
+    "rollout_steps": 256
+  },
+  "results": [
+    {
+      "ppo_iterations": 1,
+      "performance": 0.7166666666666666,
+      "improvement": -15.686274509803933,
+      "confidence_interval": [
+        0.5333254547147435,
+        0.9000078786185897
+      ]
+    },
+    {
+      "ppo_iterations": 2,
+      "performance": 0.6333333333333334,
+      "improvement": -25.49019607843136,
+      "confidence_interval": [
+        0.5353333333333334,
+        0.7313333333333334
+      ]
+    }
+  ]
+}

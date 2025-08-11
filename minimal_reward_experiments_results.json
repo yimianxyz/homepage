@@ -1,0 +1,71 @@
+{
+  "sl_baseline": 0.09523809523809523,
+  "best_result": {
+    "name": "MinimalShaping",
+    "performance": 0.11904761904761904,
+    "improvement": 25.0,
+    "config": {
+      "catch_reward": 1.0,
+      "approaching_reward": 0.01,
+      "exploration_bonus": 0.0,
+      "hypothesis": "Minimal reward shaping avoids local optima while providing guidance"
+    }
+  },
+  "successful_count": 2,
+  "all_results": [
+    {
+      "name": "CatchOnly",
+      "performance": 0.10714285714285714,
+      "improvement": 12.5,
+      "beats_baseline": true,
+      "config": {
+        "catch_reward": 1.0,
+        "approaching_reward": 0.0,
+        "exploration_bonus": 0.0,
+        "hypothesis": "Pure catch reward is sufficient for RL improvement"
+      },
+      "training_time": 26.275660753250122
+    },
+    {
+      "name": "CatchPlusDistance",
+      "performance": 0.07142857142857142,
+      "improvement": -25.0,
+      "beats_baseline": false,
+      "config": {
+        "catch_reward": 1.0,
+        "approaching_reward": 0.1,
+        "exploration_bonus": 0.0,
+        "hypothesis": "Distance-based reward shaping improves learning efficiency"
+      },
+      "training_time": 30.968807220458984
+    },
+    {
+      "name": "CatchPlusVelocity",
+      "performance": 0.047619047619047616,
+      "improvement": -50.0,
+      "beats_baseline": false,
+      "config": {
+        "catch_reward": 1.0,
+        "approaching_reward": 0.0,
+        "velocity_alignment": 0.1,
+        "exploration_bonus": 0.0,
+        "hypothesis": "Velocity alignment reward improves strategic movement"
+      },
+      "training_time": 29.667648553848267
+    },
+    {
+      "name": "MinimalShaping",
+      "performance": 0.11904761904761904,
+      "improvement": 25.0,
+      "beats_baseline": true,
+      "config": {
+        "catch_reward": 1.0,
+        "approaching_reward": 0.01,
+        "exploration_bonus": 0.0,
+        "hypothesis": "Minimal reward shaping avoids local optima while providing guidance"
+      },
+      "training_time": 36.89081406593323
+    }
+  ],
+  "total_time_minutes": 2.6871333916982016
+}

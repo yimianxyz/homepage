@@ -1,0 +1,37 @@
+{
+  "configuration": {
+    "episode_length": 5000,
+    "value_pretrain_iterations": 20,
+    "learning_rate": 3e-05,
+    "eval_frequency": 10,
+    "checkpoint_frequency": 10,
+    "plateau_patience": 30,
+    "plateau_threshold": 0.002,
+    "device": "cpu",
+    "rollout_steps": 512,
+    "ppo_epochs": 2,
+    "mini_batch_size": 64,
+    "clip_epsilon": 0.1,
+    "value_loss_coef": 0.5,
+    "entropy_coef": 0.01,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "max_grad_norm": 0.5
+  },
+  "training_summary": {
+    "total_iterations": 300,
+    "total_timesteps": 153600,
+    "training_time_minutes": 237.2719995776812,
+    "plateau_detected": true
+  },
+  "baseline": {
+    "mean": 0.7722222222222221,
+    "confidence_lower": 0.7075402843537588,
+    "confidence_upper": 0.8369041600906855
+  },
+  "final_performance": {
+    "mean": 0.4666666666666667,
+    "confidence_lower": 0.39506331764362546,
+    "confidence_upper": 0.5382700156897079,
+    "improvement_percent": -39.568345323741,
+    "is_significant": 

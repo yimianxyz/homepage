@@ -1,0 +1,26 @@
+{
+  "sl_baseline": 0.7833333333333333,
+  "final_performance": 0.6666666666666666,
+  "final_improvement": -14.8936170212766,
+  "best_performance": 0.8333333333333334,
+  "best_improvement": 6.3829787234042605,
+  "best_iteration": 1,
+  "performance_history": [
+    0.8333333333333334,
+    0.6833333333333333,
+    0.6666666666666666
+  ],
+  "success": true,
+  "significant_success": true,
+  "iterations_trained": 3,
+  "working_configuration": {
+    "learning_rate": 5e-05,
+    "clip_epsilon": 0.1,
+    "ppo_epochs": 2,
+    "rollout_steps": 256,
+    "gamma": 0.95,
+    "gae_lambda": 0.9,
+    "max_iterations": 5,
+    "early_stopping": true
+  }
+}

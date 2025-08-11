@@ -1,0 +1,45 @@
+🚀 COMPREHENSIVE PPO TRAINING WITH PLATEAU DETECTION
+======================================================================
+Using optimal configuration from extensive experiments
+======================================================================
+🚀 Initializing PPO Comprehensive Trainer
+   Save directory: checkpoints/ppo_comprehensive_20250806_083000
+   Episode length: 5000
+   Value pre-train: 20 iterations
+   ✓ Loaded SL checkpoint from checkpoints/best_model.pt
+Low-Variance PolicyEvaluator initialized:
+  Episodes: 5 (balanced formations)
+  Expected precision: ±0.040 (can detect >15.6% changes)
+  Base seed: 8000
+  Estimated time: ~30s
+Low-Variance PolicyEvaluator initialized:
+  Episodes: 15 (balanced formations)
+  Expected precision: ±0.023 (can detect >9.0% changes)
+  Base seed: 9000
+  Estimated time: ~90s
+
+🏃 Training PPO until plateau (max 200 iterations)...
+
+📊 Establishing SL baseline...
+Created TransformerPolicy:
+  Checkpoint: checkpoints/best_model.pt
+  Architecture: 128×8×4×512
+  Parameters: 1,059,842
+  Device: cpu
+
+📊 Evaluating SL_Baseline (15 episodes)...
+   Progress: 5/15 episodes
+   Progress: 10/15 episodes
+   Progress: 15/15 episodes
+
+   ✅ Evaluation complete:
+      Performance: 0.7944 ± 0.0615 (95% CI)
+      Confidence interval: [0.7330, 0.8559]
+      Std error: 0.0314 (3.9% relative)
+      Strategy: Consistent performer | Formation: Herding specialist
+      Phases: Early 0.228 | Mid 0.317 | Late 0.250
+      Time: 671.7s
+   Baseline: 0.7944
+   95% CI: [0.7330, 0.8559]
+
+🎓 Pre-training value function (20 iterations)...

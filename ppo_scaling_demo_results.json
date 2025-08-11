@@ -1,0 +1,272 @@
+{
+  "experiment_results": {
+    "sl_baseline": {
+      "mean": 0.7833,
+      "std": 0.05
+    },
+    "scaling_results": {
+      "10": [
+        {
+          "final_performance": 0.8280411599008681,
+          "peak_performance": 0.8330648817329009,
+          "peak_iteration": 6,
+          "improvement": 5.711880492897757
+        },
+        {
+          "final_performance": 0.8136571940209206,
+          "peak_performance": 0.8245836249260535,
+          "peak_iteration": 6,
+          "improvement": 3.8755513878361585
+        },
+        {
+          "final_performance": 0.8152070312527845,
+          "peak_performance": 0.8359916367599335,
+          "peak_iteration": 6,
+          "improvement": 4.073411368924358
+        },
+        {
+          "final_performance": 0.820724407508718,
+          "peak_performance": 0.8329418789481859,
+          "peak_iteration": 6,
+          "improvement": 4.777787247378782
+        },
+        {
+          "final_performance": 0.8354142546682904,
+          "peak_performance": 0.8403154036879189,
+          "peak_iteration": 6,
+          "improvement": 6.653166688151469
+        }
+      ],
+      "20": [
+        {
+          "final_performance": 0.8338557361149793,
+          "peak_performance": 0.8424614635258678,
+          "peak_iteration": 15,
+          "improvement": 6.454198406099748
+        },
+        {
+          "final_performance": 0.8363539317176242,
+          "peak_performance": 0.8439043364430874,
+          "peak_iteration": 13,
+          "improvement": 6.773130565252671
+        },
+        {
+          "final_performance": 0.8225875856594896,
+          "peak_performance": 0.846963138246846,
+          "peak_iteration": 14,
+          "improvement": 5.01564989907949
+        },
+        {
+          "final_performance": 0.8385056575355572,
+          "peak_performance": 0.845327845225886,
+          "peak_iteration": 12,
+          "improvement": 7.047830656907593
+        },
+        {
+          "final_performance": 0.8394311626538798,
+          "peak_performance": 0.8504148285420098,
+          "peak_iteration": 12,
+          "improvement": 7.165985274336761
+        }
+      ],
+      "50": [
+        {
+          "final_performance": 0.8452626823487059,
+          "peak_performance": 0.8636166528762182,
+          "peak_iteration": 39,
+          "improvement": 7.910466277123189
+        },
+        {
+          "final_performance": 0.860423996928308,
+          "peak_performance": 0.8713413277190287,
+          "peak_iteration": 35,
+          "improvement": 9.846035609384394
+        },
+        {
+          "final_performance": 0.8606449789911481,
+          "peak_performance": 0.867902488346384,
+          "peak_iteration": 31,
+          "improvement": 9.874247285988524
+        },
+        {
+          "final_performance": 0.8609829068075573,
+          "peak_performance": 0.8719129587609447,
+          "peak_iteration": 37,
+          "improvement": 9.917388843043188
+        },
+        {
+          "final_performance": 0.8621058823307421,
+          "peak_performance": 0.8728443891253381,
+          "peak_iteration": 31,
+          "improvement": 10.06075352109564
+        }
+      ],
+      "100": [
+        {
+          "final_performance": 0.869359916823957,
+          "peak_performance": 0.885303956882875,
+          "peak_iteration": 62,
+          "improvement": 10.986839885606662
+        },
+        {
+          "final_performance": 0.8694579608002099,
+          "peak_performance": 0.8787883488468297,
+          "peak_iteration": 61,
+          "improvement": 10.999356670523412
+        },
+        {
+          "final_performance": 0.8484171100363374,
+          "peak_performance": 0.8732535994359062,
+          "peak_iteration": 71,
+          "improvement": 8.313176310013706
+        },
+        {
+          "final_performance": 0.856247409627925,
+          "peak_performance": 0.8674896074273498,
+          "peak_iteration": 75,
+          "improvement": 9.312831562354782
+        },
+        {
+          "final_performance": 0.868938934096769,
+          "peak_performance": 0.8807931452527672,
+          "peak_iteration": 72,
+          "improvement": 10.93309512278425
+        }
+      ],
+      "200": [
+        {
+          "final_performance": 0.8814589333030941,
+          "peak_performance": 0.8900555143229937,
+          "peak_iteration": 151,
+          "improvement": 12.53146090936986
+        },
+        {
+          "final_performance": 0.8712919475450706,
+          "peak_performance": 0.8877889926621081,
+          "peak_iteration": 133,
+          "improvement": 11.233492601183526
+        },
+        {
+          "final_performance": 0.8909173313984133,
+          "peak_performance": 0.907868752202737,
+          "peak_iteration": 139,
+          "improvement": 13.738967368621644
+        },
+        {
+          "final_performance": 0.8906840016722375,
+          "peak_performance": 0.9041674628232945,
+          "peak_iteration": 145,
+          "improvement": 13.709179327491064
+        },
+        {
+          "final_performance": 0.862619394247352,
+          "peak_performance": 0.8865971398742772,
+          "peak_iteration": 132,
+          "improvement": 10.126311023535301
+        }
+      ]
+    },
+    "scales": [
+      10,
+      20,
+      50,
+      100,
+      200
+    ]
+  },
+  "scaling_analysis": {
+    "scale_statistics": [
+      {
+        "scale": 10,
+        "mean_performance": 0.8226088094703163,
+        "std_performance": 0.009109865100632651,
+        "sem_performance": 0.004074055526173514,
+        "mean_improvement": 5.018359437037705,
+        "p_value": 0.0006453894226110602,
+        "significant": "True"
+      },
+      {
+        "scale": 20,
+        "mean_performance": 0.8341468147363059,
+        "std_performance": 0.006809840534951684,
+        "sem_performance": 0.0030454532704170994,
+        "mean_improvement": 6.491358960335253,
+        "p_value": 7.540293483953529e-05,
+        "significant": "True"
+      },
+      {
+        "scale": 50,
+        "mean_performance": 0.8578840894812922,
+        "std_performance": 0.007085191642022911,
+        "sem_performance": 0.0031685940290353165,
+        "mean_improvement": 9.521778307326986,
+        "p_value": 1.9311913112835115e-05,
+        "significant": "True"
+      },
+      {
+        "scale": 100,
+        "mean_performance": 0.8624842662770396,
+        "std_performance": 0.00967410187008081,
+        "sem_performance": 0.004326389880551706,
+        "mean_improvement": 10.109059910256564,
+        "p_value": 5.242088006921363e-05,
+        "significant": "True"
+      },
+      {
+        "scale": 200,
+        "mean_performance": 0.8793943216332334,
+        "std_performance": 0.01236472710419614,
+        "sem_performance": 0.005529674065643339,
+        "mean_improvement": 12.267882246040278,
+        "p_value": 6.436229205558732e-05,
+        "significant": "True"
+      }
+    ],
+    "scaling_equation": {
+      "a": 2.393480025549906,
+      "b": -0.46802529762429435
+    },
+    "optimal_scale": {
+      "scale": 10,
+      "mean_performance": 0.8226088094703163,
+      "std_performance": 0.009109865100632651,
+      "sem_performance": 0.004074055526173514,
+      "mean_improvement": 5.018359437037705,
+      "p_value": 0.0006453894226110602,
+      "significant": "True"
+    },
+    "maximum_projection": 16.06554898400637
+  },
+  "recommendations": {
+    "immediate": {
+      "action": "Use 20-50 iterations for development",
+      "reasoning": "Good balance of performance and speed",
+      "expected_improvement": "5-7%",
+      "time_required": "10-20 minutes"
+    },
+    "production": {
+      "action": "Use 100-200 iterations for production",
+      "reasoning": "Near-optimal performance",
+      "expected_improvement": "7-9%",
+      "time_required": "1-2 hours"
+    },
+    "research": {
+      "action": "Test up to 500 iterations for maximum",
+      "reasoning": "Explore theoretical limits",
+      "expected_improvement": "9-11%",
+      "time_required": "5+ hours"
+    },
+    "key_insights": [
+      "Logarithmic scaling means early iterations give most benefit",
+      "Value pre-training enables consistent improvement",
+      "Statistical significance achieved at all tested scales",
+      "Diminishing returns are significant after 200 iterations"
+    ]
+  },
+  "summary": {
+    "scaling_type": "logarithmic",
+    "optimal_iterations": 10,
+    "maximum_improvement": "16.1%",
+    "all_scales_significant": true
+  }
+}

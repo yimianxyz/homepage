@@ -1,0 +1,49 @@
+{
+  "random_baseline": 0.6,
+  "final_performance": 0.5666666666666667,
+  "improvement_percent": -5.555555462962963,
+  "learning_factor": 0.9444444287037039,
+  "success_level": "LIMITED",
+  "confidence": "LOW",
+  "performance_curve": [
+    {
+      "iteration": 5,
+      "performance": 0.5833333333333334,
+      "improvement_vs_random": -2.7777777314814722
+    },
+    {
+      "iteration": 10,
+      "performance": 0.2833333333333333,
+      "improvement_vs_random": -52.777776898148154
+    },
+    {
+      "iteration": 15,
+      "performance": 0.5,
+      "improvement_vs_random": -16.66666638888889
+    },
+    {
+      "iteration": 20,
+      "performance": 0.5,
+      "improvement_vs_random": -16.66666638888889
+    },
+    {
+      "iteration": 25,
+      "performance": 0.65,
+      "improvement_vs_random": 8.333333194444453
+    },
+    {
+      "iteration": 30,
+      "performance": 0.39999999999999997,
+      "improvement_vs_random": -33.333332777777784
+    }
+  ],
+  "training_time_minutes": 18.4183056473732,
+  "training_iterations": 30,
+  "hyperparameters": {
+    "learning_rate": 0.001,
+    "clip_epsilon": 0.2,
+    "ppo_epochs": 4,
+    "gamma": 0.99,
+    "gae_lambda": 0.95
+  }
+}

@@ -1,0 +1,97 @@
+2025-08-04 17:50:35,225 - PPOProduction - INFO - ================================================================================
+2025-08-04 17:50:35,225 - PPOProduction - INFO - PPO PRODUCTION TRAINER INITIALIZED
+2025-08-04 17:50:35,225 - PPOProduction - INFO - ================================================================================
+2025-08-04 17:50:35,226 - PPOProduction - INFO - Config: {
+  "sl_checkpoint_path": "checkpoints/best_model.pt",
+  "checkpoint_dir": "production_checkpoints",
+  "max_iterations": 150,
+  "value_pretrain_iterations": 20,
+  "checkpoint_interval": 5,
+  "keep_best_k": 5,
+  "validation_interval": 5,
+  "validation_runs": 3,
+  "patience": 25,
+  "min_delta": 0.0005,
+  "confidence_level": 0.95,
+  "plateau_threshold": 3,
+  "learning_rate": 5e-05,
+  "value_learning_rate": 0.0005,
+  "clip_epsilon": 0.1,
+  "ppo_epochs": 2,
+  "rollout_steps": 256,
+  "gamma": 0.95,
+  "gae_lambda": 0.9,
+  "device": "cpu",
+  "log_level": "INFO",
+  "enable_tensorboard": true
+}
+2025-08-04 17:50:35,226 - PPOProduction - INFO - 
+🚀 STARTING PRODUCTION TRAINING
+2025-08-04 17:50:35,226 - PPOProduction - INFO - 
+📊 ESTABLISHING SL BASELINE
+2025-08-04 17:54:28,696 - PPOProduction - INFO -   Run 1: 0.7333
+2025-08-04 17:58:48,577 - PPOProduction - INFO -   Run 2: 0.7833
+2025-08-04 18:03:20,177 - PPOProduction - INFO -   Run 3: 0.7667
+2025-08-04 18:07:42,562 - PPOProduction - INFO -   Run 4: 0.6667
+2025-08-04 18:12:01,793 - PPOProduction - INFO -   Run 5: 0.7167
+2025-08-04 18:16:09,878 - PPOProduction - INFO -   Run 6: 0.7667
+2025-08-04 18:16:09,881 - PPOProduction - INFO - 
+✅ SL Baseline: 0.7389 ± 0.0176
+2025-08-04 18:16:09,881 - PPOProduction - INFO -    95% CI: [0.6937, 0.7840]
+2025-08-04 18:16:09,882 - PPOProduction - INFO - 
+🆕 CREATING NEW TRAINER
+2025-08-04 18:16:11,021 - PPOProduction - INFO - 
+🎯 VALUE FUNCTION PRE-TRAINING
+2025-08-04 18:16:11,027 - PPOProduction - INFO - ✅ Value pre-training complete in 0.0 minutes
+2025-08-04 18:16:11,028 - PPOProduction - INFO -    Initial loss: 7.962
+2025-08-04 18:16:11,028 - PPOProduction - INFO -    Final loss: 0.500
+2025-08-04 18:16:11,028 - PPOProduction - INFO - 
+📍 ITERATION 1/150
+2025-08-04 18:16:18,804 - PPOProduction - INFO -    Policy loss: 0.0000
+2025-08-04 18:16:18,805 - PPOProduction - INFO -    Value loss: 0.0000
+2025-08-04 18:16:18,805 - PPOProduction - INFO -    Time: 7.8s
+2025-08-04 18:16:18,805 - PPOProduction - INFO - 
+📊 VALIDATION AT ITERATION 1
+2025-08-04 18:17:07,352 - PPOProduction - INFO -    Run 1: 0.4333
+2025-08-04 18:17:57,953 - PPOProduction - INFO -    Run 2: 0.4833
+2025-08-04 18:18:53,676 - PPOProduction - INFO -    Run 3: 0.4667
+2025-08-04 18:18:53,685 - PPOProduction - INFO - 
+   Mean: 0.4611 ± 0.0147
+2025-08-04 18:18:53,685 - PPOProduction - INFO -    Improvement: -37.6% vs baseline
+2025-08-04 18:18:53,685 - PPOProduction - INFO -    P-value: 0.0001 ✅
+2025-08-04 18:18:53,715 - PPOProduction - ERROR - 
+❌ Training error: Object of type bool is not JSON serializable
+Traceback (most recent call last):
+  File "/home/iotcat/homepage2/ppo_production_trainer.py", line 505, in run_production_training
+    self.save_checkpoint(iteration, validation_stats, is_scheduled=False)
+  File "/home/iotcat/homepage2/ppo_production_trainer.py", line 359, in save_checkpoint
+    json.dump(asdict(metadata), f, indent=2)
+  File "/usr/lib/python3.9/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+  File "/usr/lib/python3.9/json/encoder.py", line 431, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/usr/lib/python3.9/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/usr/lib/python3.9/json/encoder.py", line 438, in _iterencode
+    o = _default(o)
+  File "/usr/lib/python3.9/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type bool is not JSON serializable
+2025-08-04 18:18:53,717 - PPOProduction - INFO - 
+================================================================================
+2025-08-04 18:18:53,717 - PPOProduction - INFO - PRODUCTION TRAINING COMPLETE
+2025-08-04 18:18:53,717 - PPOProduction - INFO - ================================================================================
+2025-08-04 18:18:53,717 - PPOProduction - INFO - 
+📊 SUMMARY:
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    SL Baseline: 0.7389
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    Best Performance: 0.0000 (iteration 0)
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    Improvement: -100.0%
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    Total Iterations: 1
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    Training Time: 0.0 minutes
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    Early Stop: NO - Completed all iterations
+2025-08-04 18:18:53,717 - PPOProduction - INFO - 
+📈 PERFORMANCE TRAJECTORY:
+2025-08-04 18:18:53,717 - PPOProduction - INFO -    Iter 1: 0.4611 (-37.6%)
+2025-08-04 18:18:53,718 - PPOProduction - INFO - 
+✅ Final report saved: production_checkpoints/final_report_20250804_181853.json
+2025-08-04 18:18:53,718 - PPOProduction - INFO - ✅ Best model: production_checkpoints/best/best_model.pt

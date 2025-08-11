@@ -1,0 +1,236 @@
+[2025-08-06 09:53:01] Production PPO Training Started
+[2025-08-06 09:53:01] Configuration: {
+  "episode_length": 5000,
+  "value_pretrain_iterations": 20,
+  "learning_rate": 3e-05,
+  "eval_frequency": 10,
+  "checkpoint_frequency": 10,
+  "plateau_patience": 30,
+  "plateau_threshold": 0.002,
+  "device": "cpu",
+  "rollout_steps": 512,
+  "ppo_epochs": 2,
+  "mini_batch_size": 64,
+  "clip_epsilon": 0.1,
+  "value_loss_coef": 0.5,
+  "entropy_coef": 0.01,
+  "gamma": 0.99,
+  "gae_lambda": 0.95,
+  "max_grad_norm": 0.5
+}
+[2025-08-06 09:53:01] 
+🏃 Training PPO until plateau (max 300 iterations)...
+[2025-08-06 09:53:01] 
+📊 Establishing SL baseline...
+[2025-08-06 10:04:10] Baseline performance: 0.7722
+[2025-08-06 10:04:10] 95% CI: [0.7075, 0.8369]
+[2025-08-06 10:04:10] Std error: 0.0330
+[2025-08-06 10:04:10] 
+🎓 Pre-training value function (20 iterations)...
+[2025-08-06 10:05:00]   Iteration 5/20: Loss = 0.0050
+[2025-08-06 10:05:55]   Iteration 10/20: Loss = 0.0904
+[2025-08-06 10:06:50]   Iteration 15/20: Loss = 0.1014
+[2025-08-06 10:07:46]   Iteration 20/20: Loss = 0.0867
+[2025-08-06 10:07:46] Value pre-training complete: 0.0592 → 0.0867
+[2025-08-06 10:07:46] 
+📊 Initial evaluation...
+[2025-08-06 10:14:42] Initial performance: 0.7611 (-1.4%)
+[2025-08-06 10:14:42] 
+🔄 Starting training loop...
+[2025-08-06 10:15:39] Iter   5: Loss P:0.012 V:0.023 | Episode: R=1 CR=0.083
+[2025-08-06 10:16:40] Iter  10: Loss P:0.013 V:0.054 | Episode: R=3 CR=0.250
+[2025-08-06 10:16:40] 
+📊 Evaluation at iteration 10:
+[2025-08-06 10:20:19] Performance: 0.5389 [0.4503, 0.6274]
+[2025-08-06 10:20:19] Improvement: -30.2%
+[2025-08-06 10:21:19] Iter  15: Loss P:0.010 V:0.007 | Episode: R=0 CR=0.000
+[2025-08-06 10:22:17] Iter  20: Loss P:0.018 V:0.020 | Episode: R=1 CR=0.083
+[2025-08-06 10:22:17] 
+📊 Evaluation at iteration 20:
+[2025-08-06 10:26:00] Performance: 0.4056 [0.3345, 0.4766]
+[2025-08-06 10:26:00] Improvement: -47.5%
+[2025-08-06 10:26:57] Iter  25: Loss P:0.004 V:0.114 | Episode: R=4 CR=0.333
+[2025-08-06 10:27:59] Iter  30: Loss P:0.004 V:0.004 | Episode: R=0 CR=0.000
+[2025-08-06 10:27:59] 
+📊 Evaluation at iteration 30:
+[2025-08-06 10:35:23] Performance: 0.3889 [0.3271, 0.4507]
+[2025-08-06 10:35:23] Improvement: -49.6%
+[2025-08-06 10:36:20] Iter  35: Loss P:0.008 V:0.009 | Episode: R=0 CR=0.000
+[2025-08-06 10:37:21] Iter  40: Loss P:0.017 V:0.032 | Episode: R=2 CR=0.167
+[2025-08-06 10:37:21] 
+📊 Evaluation at iteration 40:
+[2025-08-06 10:41:06] Performance: 0.3667 [0.2889, 0.4444]
+[2025-08-06 10:41:06] Improvement: -52.5%
+[2025-08-06 10:42:07] Iter  45: Loss P:0.014 V:0.052 | Episode: R=2 CR=0.167
+[2025-08-06 10:43:06] Iter  50: Loss P:0.013 V:0.021 | Episode: R=1 CR=0.083
+[2025-08-06 10:43:06] 
+📊 Evaluation at iteration 50:
+[2025-08-06 10:46:46] Performance: 0.4167 [0.3251, 0.5082]
+[2025-08-06 10:46:46] Improvement: -46.0%
+[2025-08-06 10:47:44] Iter  55: Loss P:0.005 V:0.049 | Episode: R=2 CR=0.167
+[2025-08-06 10:48:43] Iter  60: Loss P:0.000 V:0.005 | Episode: R=0 CR=0.000
+[2025-08-06 10:48:43] 
+📊 Evaluation at iteration 60:
+[2025-08-06 10:56:09] Performance: 0.4972 [0.4310, 0.5634]
+[2025-08-06 10:56:09] Improvement: -35.6%
+[2025-08-06 10:57:08] Iter  65: Loss P:0.015 V:0.055 | Episode: R=3 CR=0.250
+[2025-08-06 10:58:08] Iter  70: Loss P:0.006 V:0.019 | Episode: R=1 CR=0.083
+[2025-08-06 10:58:08] 
+📊 Evaluation at iteration 70:
+[2025-08-06 11:01:49] Performance: 0.4722 [0.3633, 0.5811]
+[2025-08-06 11:01:49] Improvement: -38.8%
+[2025-08-06 11:02:50] Iter  75: Loss P:0.005 V:0.002 | Episode: R=0 CR=0.000
+[2025-08-06 11:03:49] Iter  80: Loss P:0.006 V:0.057 | Episode: R=3 CR=0.250
+[2025-08-06 11:03:49] 
+📊 Evaluation at iteration 80:
+[2025-08-06 11:07:30] Performance: 0.4500 [0.3267, 0.5733]
+[2025-08-06 11:07:30] Improvement: -41.7%
+[2025-08-06 11:08:28] Iter  85: Loss P:0.018 V:0.029 | Episode: R=2 CR=0.167
+[2025-08-06 11:09:28] Iter  90: Loss P:0.009 V:0.030 | Episode: R=2 CR=0.167
+[2025-08-06 11:09:28] 
+📊 Evaluation at iteration 90:
+[2025-08-06 11:16:53] Performance: 0.5583 [0.4848, 0.6319]
+[2025-08-06 11:16:53] Improvement: -27.7%
+[2025-08-06 11:17:52] Iter  95: Loss P:0.007 V:0.038 | Episode: R=3 CR=0.250
+[2025-08-06 11:18:52] Iter 100: Loss P:0.006 V:0.013 | Episode: R=1 CR=0.083
+[2025-08-06 11:18:52] 
+📊 Evaluation at iteration 100:
+[2025-08-06 11:22:33] Performance: 0.4611 [0.3617, 0.5605]
+[2025-08-06 11:22:33] Improvement: -40.3%
+[2025-08-06 11:23:32] Iter 105: Loss P:0.008 V:0.008 | Episode: R=0 CR=0.000
+[2025-08-06 11:24:32] Iter 110: Loss P:0.003 V:0.021 | Episode: R=1 CR=0.083
+[2025-08-06 11:24:32] 
+📊 Evaluation at iteration 110:
+[2025-08-06 11:28:13] Performance: 0.4833 [0.3536, 0.6130]
+[2025-08-06 11:28:13] Improvement: -37.4%
+[2025-08-06 11:29:13] Iter 115: Loss P:-0.000 V:0.018 | Episode: R=2 CR=0.167
+[2025-08-06 11:30:15] Iter 120: Loss P:0.001 V:0.038 | Episode: R=2 CR=0.167
+[2025-08-06 11:30:15] 
+📊 Evaluation at iteration 120:
+[2025-08-06 11:37:44] Performance: 0.4389 [0.3483, 0.5295]
+[2025-08-06 11:37:44] Improvement: -43.2%
+[2025-08-06 11:38:43] Iter 125: Loss P:0.008 V:0.038 | Episode: R=2 CR=0.167
+[2025-08-06 11:39:44] Iter 130: Loss P:-0.000 V:0.029 | Episode: R=2 CR=0.167
+[2025-08-06 11:39:44] 
+📊 Evaluation at iteration 130:
+[2025-08-06 11:43:28] Performance: 0.4278 [0.2936, 0.5620]
+[2025-08-06 11:43:28] Improvement: -44.6%
+[2025-08-06 11:44:30] Iter 135: Loss P:0.003 V:0.025 | Episode: R=1 CR=0.083
+[2025-08-06 11:45:30] Iter 140: Loss P:0.005 V:0.023 | Episode: R=1 CR=0.083
+[2025-08-06 11:45:30] 
+📊 Evaluation at iteration 140:
+[2025-08-06 11:49:11] Performance: 0.5389 [0.4309, 0.6468]
+[2025-08-06 11:49:11] Improvement: -30.2%
+[2025-08-06 11:50:11] Iter 145: Loss P:0.004 V:0.002 | Episode: R=0 CR=0.000
+[2025-08-06 11:51:12] Iter 150: Loss P:0.002 V:0.060 | Episode: R=4 CR=0.333
+[2025-08-06 11:51:12] 
+📊 Evaluation at iteration 150:
+[2025-08-06 11:58:38] Performance: 0.4500 [0.3906, 0.5094]
+[2025-08-06 11:58:38] Improvement: -41.7%
+[2025-08-06 11:59:37] Iter 155: Loss P:0.004 V:0.003 | Episode: R=0 CR=0.000
+[2025-08-06 12:00:39] Iter 160: Loss P:0.002 V:0.019 | Episode: R=1 CR=0.083
+[2025-08-06 12:00:39] 
+📊 Evaluation at iteration 160:
+[2025-08-06 12:04:23] Performance: 0.3889 [0.2992, 0.4786]
+[2025-08-06 12:04:23] Improvement: -49.6%
+[2025-08-06 12:05:21] Iter 165: Loss P:0.002 V:0.022 | Episode: R=1 CR=0.083
+[2025-08-06 12:06:21] Iter 170: Loss P:0.004 V:0.003 | Episode: R=0 CR=0.000
+[2025-08-06 12:06:21] 
+📊 Evaluation at iteration 170:
+[2025-08-06 12:10:09] Performance: 0.5333 [0.4175, 0.6492]
+[2025-08-06 12:10:09] Improvement: -30.9%
+[2025-08-06 12:11:09] Iter 175: Loss P:0.007 V:0.020 | Episode: R=1 CR=0.083
+[2025-08-06 12:12:09] Iter 180: Loss P:0.006 V:0.112 | Episode: R=4 CR=0.333
+[2025-08-06 12:12:09] 
+📊 Evaluation at iteration 180:
+[2025-08-06 12:19:32] Performance: 0.5556 [0.4824, 0.6287]
+[2025-08-06 12:19:32] Improvement: -28.1%
+[2025-08-06 12:20:30] Iter 185: Loss P:0.006 V:0.004 | Episode: R=0 CR=0.000
+[2025-08-06 12:21:31] Iter 190: Loss P:-0.001 V:0.002 | Episode: R=0 CR=0.000
+[2025-08-06 12:21:31] 
+📊 Evaluation at iteration 190:
+[2025-08-06 12:25:15] Performance: 0.4611 [0.3399, 0.5824]
+[2025-08-06 12:25:15] Improvement: -40.3%
+[2025-08-06 12:26:16] Iter 195: Loss P:0.002 V:0.051 | Episode: R=2 CR=0.167
+[2025-08-06 12:27:15] Iter 200: Loss P:-0.004 V:0.111 | Episode: R=4 CR=0.333
+[2025-08-06 12:27:15] 
+📊 Evaluation at iteration 200:
+[2025-08-06 12:31:00] Performance: 0.4778 [0.3478, 0.6077]
+[2025-08-06 12:31:00] Improvement: -38.1%
+[2025-08-06 12:31:59] Iter 205: Loss P:0.002 V:0.028 | Episode: R=2 CR=0.167
+[2025-08-06 12:32:58] Iter 210: Loss P:0.006 V:0.025 | Episode: R=1 CR=0.083
+[2025-08-06 12:32:58] 
+📊 Evaluation at iteration 210:
+[2025-08-06 12:40:18] Performance: 0.5639 [0.4815, 0.6463]
+[2025-08-06 12:40:18] Improvement: -27.0%
+[2025-08-06 12:41:17] Iter 215: Loss P:0.006 V:0.024 | Episode: R=2 CR=0.167
+[2025-08-06 12:42:18] Iter 220: Loss P:0.005 V:0.021 | Episode: R=1 CR=0.083
+[2025-08-06 12:42:18] 
+📊 Evaluation at iteration 220:
+[2025-08-06 12:45:58] Performance: 0.5167 [0.4049, 0.6285]
+[2025-08-06 12:45:58] Improvement: -33.1%
+[2025-08-06 12:46:58] Iter 225: Loss P:0.007 V:0.007 | Episode: R=0 CR=0.000
+[2025-08-06 12:47:57] Iter 230: Loss P:0.008 V:0.005 | Episode: R=1 CR=0.083
+[2025-08-06 12:47:57] 
+📊 Evaluation at iteration 230:
+[2025-08-06 12:51:45] Performance: 0.5278 [0.4132, 0.6424]
+[2025-08-06 12:51:45] Improvement: -31.7%
+[2025-08-06 12:52:47] Iter 235: Loss P:0.003 V:0.060 | Episode: R=4 CR=0.333
+[2025-08-06 12:53:54] Iter 240: Loss P:0.005 V:0.009 | Episode: R=0 CR=0.000
+[2025-08-06 12:53:54] 
+📊 Evaluation at iteration 240:
+[2025-08-06 13:01:35] Performance: 0.4556 [0.3706, 0.5405]
+[2025-08-06 13:01:35] Improvement: -41.0%
+[2025-08-06 13:02:33] Iter 245: Loss P:0.008 V:0.006 | Episode: R=0 CR=0.000
+[2025-08-06 13:03:32] Iter 250: Loss P:0.003 V:0.019 | Episode: R=1 CR=0.083
+[2025-08-06 13:03:32] 
+📊 Evaluation at iteration 250:
+[2025-08-06 13:07:15] Performance: 0.5333 [0.4243, 0.6424]
+[2025-08-06 13:07:15] Improvement: -30.9%
+[2025-08-06 13:08:16] Iter 255: Loss P:0.010 V:0.022 | Episode: R=2 CR=0.167
+[2025-08-06 13:09:16] Iter 260: Loss P:0.002 V:0.090 | Episode: R=3 CR=0.250
+[2025-08-06 13:09:16] 
+📊 Evaluation at iteration 260:
+[2025-08-06 13:12:55] Performance: 0.5222 [0.4046, 0.6399]
+[2025-08-06 13:12:55] Improvement: -32.4%
+[2025-08-06 13:13:52] Iter 265: Loss P:0.001 V:0.004 | Episode: R=0 CR=0.000
+[2025-08-06 13:14:52] Iter 270: Loss P:-0.003 V:0.019 | Episode: R=1 CR=0.083
+[2025-08-06 13:14:52] 
+📊 Evaluation at iteration 270:
+[2025-08-06 13:22:12] Performance: 0.5278 [0.4486, 0.6070]
+[2025-08-06 13:22:12] Improvement: -31.7%
+[2025-08-06 13:23:11] Iter 275: Loss P:0.003 V:0.013 | Episode: R=1 CR=0.083
+[2025-08-06 13:24:10] Iter 280: Loss P:0.004 V:0.031 | Episode: R=2 CR=0.167
+[2025-08-06 13:24:10] 
+📊 Evaluation at iteration 280:
+[2025-08-06 13:27:51] Performance: 0.5278 [0.4154, 0.6401]
+[2025-08-06 13:27:51] Improvement: -31.7%
+[2025-08-06 13:28:50] Iter 285: Loss P:0.003 V:0.007 | Episode: R=0 CR=0.000
+[2025-08-06 13:29:49] Iter 290: Loss P:-0.000 V:0.002 | Episode: R=0 CR=0.000
+[2025-08-06 13:29:49] 
+📊 Evaluation at iteration 290:
+[2025-08-06 13:33:31] Performance: 0.5556 [0.4421, 0.6690]
+[2025-08-06 13:33:31] Improvement: -28.1%
+[2025-08-06 13:34:30] Iter 295: Loss P:0.001 V:0.004 | Episode: R=0 CR=0.000
+[2025-08-06 13:35:30] Iter 300: Loss P:-0.003 V:0.016 | Episode: R=1 CR=0.083
+[2025-08-06 13:35:30] 
+📊 Evaluation at iteration 300:
+[2025-08-06 13:42:55] Performance: 0.5667 [0.4769, 0.6564]
+[2025-08-06 13:42:55] Improvement: -26.6%
+[2025-08-06 13:42:55] 
+🏁 Training plateaued after 300 iterations!
+[2025-08-06 13:42:55] 
+📊 Final evaluation (30 episodes)...
+[2025-08-06 13:50:16] 
+🏆 FINAL RESULTS:
+[2025-08-06 13:50:16] Baseline: 0.7722 ± 0.0647
+[2025-08-06 13:50:16] Final: 0.4667 ± 0.0716
+[2025-08-06 13:50:16] Improvement: -39.6%
+[2025-08-06 13:50:16] Statistically significant: NO ❌
+[2025-08-06 13:50:16] Total iterations: 300
+[2025-08-06 13:50:16] Total timesteps: 153,600
+[2025-08-06 13:50:16] Training time: 237.3 minutes
+[2025-08-06 13:50:16] 💾 Saved best checkpoint: 0.7611
+[2025-08-06 13:50:16] 
+📝 Generating comprehensive report...
+[2025-08-06 13:50:17] 📈 Saved visualization: checkpoints/ppo_production_20250806_095300/training_report.png

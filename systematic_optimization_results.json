@@ -1,0 +1,542 @@
+{
+  "sl_baseline": 0.15476190476190477,
+  "final_performance": 0.14285714285714285,
+  "improvement_percent": -7.692307692307701,
+  "optimal_config": {
+    "learning_rate": 0.01,
+    "rollout_steps": 512,
+    "ppo_epochs": 2,
+    "boids": 12,
+    "canvas_width": 400,
+    "canvas_height": 300,
+    "iterations": 4
+  },
+  "experiment_1": {
+    "best_iterations": 4,
+    "best_config": {
+      "learning_rate": 0.0003,
+      "rollout_steps": 512,
+      "ppo_epochs": 2,
+      "boids": 12,
+      "canvas_width": 400,
+      "canvas_height": 300,
+      "iterations": 4
+    },
+    "best_performance": 0.10714285714285714,
+    "all_results": [
+      [
+        1,
+        "ExperimentResult(experiment_name='EarlyStop_Iter1', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 1}, overall_catch_rate=0.09523809523809523, strategic_insights={'strategy_type': 'Consistent performer', 'formation_style': 'Flock-breaker', 'early_phase_rate': 0.03571428571428571, 'mid_phase_rate': 0.023809523809523808, 'late_phase_rate': 0.03571428571428571, 'adaptability_score': 0.8263888888888888, 'strategy_consistency': 0.9931267825096474}, training_time=8.737083435058594, evaluation_time=7.819427490234375, beats_sl_baseline=False, improvement_over_sl=-38.46153846153847)"
+      ],
+      [
+        2,
+        "ExperimentResult(experiment_name='EarlyStop_Iter2', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 2}, overall_catch_rate=0.09523809523809523, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Flock-breaker', 'early_phase_rate': 0.047619047619047616, 'mid_phase_rate': 0.023809523809523808, 'late_phase_rate': 0.023809523809523808, 'adaptability_score': 0.8263888888888888, 'strategy_consistency': 0.9862535650192946}, training_time=18.31194758415222, evaluation_time=8.064175128936768, beats_sl_baseline=False, improvement_over_sl=-38.46153846153847)"
+      ],
+      [
+        3,
+        "ExperimentResult(experiment_name='EarlyStop_Iter3', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 3}, overall_catch_rate=0.09523809523809523, strategic_insights={'strategy_type': 'Consistent performer', 'formation_style': 'Adaptive', 'early_phase_rate': 0.023809523809523808, 'mid_phase_rate': 0.047619047619047616, 'late_phase_rate': 0.023809523809523808, 'adaptability_score': 0.9791666666666666, 'strategy_consistency': 0.9862535650192946}, training_time=27.443730115890503, evaluation_time=8.871269702911377, beats_sl_baseline=False, improvement_over_sl=-38.46153846153847)"
+      ],
+      [
+        4,
+        "ExperimentResult(experiment_name='EarlyStop_Iter4', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.10714285714285714, strategic_insights={'strategy_type': 'Late-game specialist', 'formation_style': 'Flock-breaker', 'early_phase_rate': 0.011904761904761904, 'mid_phase_rate': 0.05952380952380952, 'late_phase_rate': 0.03571428571428571, 'adaptability_score': 0.9444444444444444, 'strategy_consistency': 0.9761904761904762}, training_time=39.24823713302612, evaluation_time=8.975971221923828, beats_sl_baseline=False, improvement_over_sl=-30.769230769230777)"
+      ],
+      [
+        5,
+        "ExperimentResult(experiment_name='EarlyStop_Iter5', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 5}, overall_catch_rate=0.08333333333333333, strategic_insights={'strategy_type': 'Consistent performer', 'formation_style': 'Flock-breaker', 'early_phase_rate': 0.023809523809523808, 'mid_phase_rate': 0.03571428571428571, 'late_phase_rate': 0.023809523809523808, 'adaptability_score': 0.9027777777777778, 'strategy_consistency': 0.9931267825096474}, training_time=50.57205009460449, evaluation_time=8.872586965560913, beats_sl_baseline=False, improvement_over_sl=-46.15384615384615)"
+      ],
+      [
+        6,
+        "ExperimentResult(experiment_name='EarlyStop_Iter6', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 6}, overall_catch_rate=0.047619047619047616, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.03571428571428571, 'mid_phase_rate': 0.0, 'late_phase_rate': 0.011904761904761904, 'adaptability_score': 0.9652777777777778, 'strategy_consistency': 0.9818151758136673}, training_time=62.43850636482239, evaluation_time=10.253772020339966, beats_sl_baseline=False, improvement_over_sl=-69.23076923076923)"
+      ]
+    ]
+  },
+  "experiment_2": {
+    "best_learning_rate": 0.01,
+    "best_config": {
+      "learning_rate": 0.01,
+      "rollout_steps": 512,
+      "ppo_epochs": 2,
+      "boids": 12,
+      "canvas_width": 400,
+      "canvas_height": 300,
+      "iterations": 4
+    },
+    "best_performance": 0.10714285714285714,
+    "all_results": [
+      [
+        0.0001,
+        "ExperimentResult(experiment_name='LearningRate_1e-04', config={'learning_rate': 0.0001, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.03571428571428571, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.023809523809523808, 'mid_phase_rate': 0.011904761904761904, 'late_phase_rate': 0.0, 'adaptability_score': 0.9861111111111112, 'strategy_consistency': 0.9880952380952381}, training_time=42.21558332443237, evaluation_time=9.562494993209839, beats_sl_baseline=False, improvement_over_sl=-76.92307692307693)"
+      ],
+      [
+        0.0003,
+        "ExperimentResult(experiment_name='LearningRate_3e-04', config={'learning_rate': 0.0003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.08333333333333333, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.03571428571428571, 'mid_phase_rate': 0.047619047619047616, 'late_phase_rate': 0.0, 'adaptability_score': 0.9513888888888888, 'strategy_consistency': 0.9752182619111175}, training_time=40.825953245162964, evaluation_time=9.568044662475586, beats_sl_baseline=False, improvement_over_sl=-46.15384615384615)"
+      ],
+      [
+        0.001,
+        "ExperimentResult(experiment_name='LearningRate_1e-03', config={'learning_rate': 0.001, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.08333333333333333, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.03571428571428571, 'mid_phase_rate': 0.023809523809523808, 'late_phase_rate': 0.023809523809523808, 'adaptability_score': 0.9513888888888888, 'strategy_consistency': 0.9931267825096474}, training_time=41.137393951416016, evaluation_time=9.961068868637085, beats_sl_baseline=False, improvement_over_sl=-46.15384615384615)"
+      ],
+      [
+        0.003,
+        "ExperimentResult(experiment_name='LearningRate_3e-03', config={'learning_rate': 0.003, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.07142857142857142, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.023809523809523808, 'mid_phase_rate': 0.047619047619047616, 'late_phase_rate': 0.0, 'adaptability_score': 0.9791666666666666, 'strategy_consistency': 0.9761904761904762}, training_time=41.78256440162659, evaluation_time=10.020372152328491, beats_sl_baseline=False, improvement_over_sl=-53.846153846153854)"
+      ],
+      [
+        0.01,
+        "ExperimentResult(experiment_name='LearningRate_1e-02', config={'learning_rate': 0.01, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.10714285714285714, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.03571428571428571, 'mid_phase_rate': 0.07142857142857142, 'late_phase_rate': 0.0, 'adaptability_score': 0.9930555555555556, 'strategy_consistency': 0.9642857142857143}, training_time=48.81924533843994, evaluation_time=9.977439880371094, beats_sl_baseline=False, improvement_over_sl=-30.769230769230777)"
+      ]
+    ]
+  },
+  "experiment_3": {
+    "best_rollout_size": 512,
+    "best_config": {
+      "learning_rate": 0.01,
+      "rollout_steps": 512,
+      "ppo_epochs": 2,
+      "boids": 12,
+      "canvas_width": 400,
+      "canvas_height": 300,
+      "iterations": 4
+    },
+    "best_performance": 0.14285714285714285,
+    "all_results": [
+      [
+        128,
+        "ExperimentResult(experiment_name='Rollout_128', config={'learning_rate': 0.01, 'rollout_steps': 128, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.10714285714285714, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.047619047619047616, 'mid_phase_rate': 0.03571428571428571, 'late_phase_rate': 0.023809523809523808, 'adaptability_score': 0.9930555555555556, 'strategy_consistency': 0.9880952380952381}, training_time=10.578316926956177, evaluation_time=9.687228441238403, beats_sl_baseline=False, improvement_over_sl=-30.769230769230777)"
+      ],
+      [
+        256,
+        "ExperimentResult(experiment_name='Rollout_256', config={'learning_rate': 0.01, 'rollout_steps': 256, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.047619047619047616, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.023809523809523808, 'mid_phase_rate': 0.023809523809523808, 'late_phase_rate': 0.0, 'adaptability_score': 0.9861111111111112, 'strategy_consistency': 0.9862535650192946}, training_time=21.833321809768677, evaluation_time=9.699271202087402, beats_sl_baseline=False, improvement_over_sl=-69.23076923076923)"
+      ],
+      [
+        512,
+        "ExperimentResult(experiment_name='Rollout_512', config={'learning_rate': 0.01, 'rollout_steps': 512, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.14285714285714285, strategic_insights={'strategy_type': 'Late-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.011904761904761904, 'mid_phase_rate': 0.09523809523809523, 'late_phase_rate': 0.03571428571428571, 'adaptability_score': 0.9583333333333334, 'strategy_consistency': 0.9570767705301906}, training_time=51.043588161468506, evaluation_time=10.076292037963867, beats_sl_baseline=False, improvement_over_sl=-7.692307692307701)"
+      ],
+      [
+        1024,
+        "ExperimentResult(experiment_name='Rollout_1024', config={'learning_rate': 0.01, 'rollout_steps': 1024, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.05952380952380952, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Adaptive', 'early_phase_rate': 0.047619047619047616, 'mid_phase_rate': 0.011904761904761904, 'late_phase_rate': 0.0, 'adaptability_score': 0.9930555555555556, 'strategy_consistency': 0.9752182619111175}, training_time=90.93005418777466, evaluation_time=11.011287450790405, beats_sl_baseline=False, improvement_over_sl=-61.53846153846154)"
+      ],
+      [
+        2048,
+        "ExperimentResult(experiment_name='Rollout_2048', config={'learning_rate': 0.01, 'rollout_steps': 2048, 'ppo_epochs': 2, 'boids': 12, 'canvas_width': 400, 'canvas_height': 300, 'iterations': 4}, overall_catch_rate=0.023809523809523808, strategic_insights={'strategy_type': 'Early-game specialist', 'formation_style': 'Flock-breaker', 'early_phase_rate': 0.011904761904761904, 'mid_phase_rate': 0.011904761904761904, 'late_phase_rate': 0.0, 'adaptability_score': 0.9444444444444444, 'strategy_consistency': 0.9931267825096474}, training_time=197.03347897529602, evaluation_time=10.770106792449951, beats_sl_baseline=False, improvement_over_sl=-84.61538461538461)"
+      ]
+    ]
+  },
+  "total_time_minutes": 15.769633527596792,
+  "all_experiments": [
+    {
+      "experiment_name": "EarlyStop_Iter1",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 1
+      },
+      "overall_catch_rate": 0.09523809523809523,
+      "strategic_insights": {
+        "strategy_type": "Consistent performer",
+        "formation_style": "Flock-breaker",
+        "early_phase_rate": 0.03571428571428571,
+        "mid_phase_rate": 0.023809523809523808,
+        "late_phase_rate": 0.03571428571428571,
+        "adaptability_score": 0.8263888888888888,
+        "strategy_consistency": 0.9931267825096474
+      },
+      "training_time": 8.737083435058594,
+      "evaluation_time": 7.819427490234375,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -38.46153846153847
+    },
+    {
+      "experiment_name": "EarlyStop_Iter2",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 2
+      },
+      "overall_catch_rate": 0.09523809523809523,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Flock-breaker",
+        "early_phase_rate": 0.047619047619047616,
+        "mid_phase_rate": 0.023809523809523808,
+        "late_phase_rate": 0.023809523809523808,
+        "adaptability_score": 0.8263888888888888,
+        "strategy_consistency": 0.9862535650192946
+      },
+      "training_time": 18.31194758415222,
+      "evaluation_time": 8.064175128936768,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -38.46153846153847
+    },
+    {
+      "experiment_name": "EarlyStop_Iter3",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 3
+      },
+      "overall_catch_rate": 0.09523809523809523,
+      "strategic_insights": {
+        "strategy_type": "Consistent performer",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.023809523809523808,
+        "mid_phase_rate": 0.047619047619047616,
+        "late_phase_rate": 0.023809523809523808,
+        "adaptability_score": 0.9791666666666666,
+        "strategy_consistency": 0.9862535650192946
+      },
+      "training_time": 27.443730115890503,
+      "evaluation_time": 8.871269702911377,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -38.46153846153847
+    },
+    {
+      "experiment_name": "EarlyStop_Iter4",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.10714285714285714,
+      "strategic_insights": {
+        "strategy_type": "Late-game specialist",
+        "formation_style": "Flock-breaker",
+        "early_phase_rate": 0.011904761904761904,
+        "mid_phase_rate": 0.05952380952380952,
+        "late_phase_rate": 0.03571428571428571,
+        "adaptability_score": 0.9444444444444444,
+        "strategy_consistency": 0.9761904761904762
+      },
+      "training_time": 39.24823713302612,
+      "evaluation_time": 8.975971221923828,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -30.769230769230777
+    },
+    {
+      "experiment_name": "EarlyStop_Iter5",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 5
+      },
+      "overall_catch_rate": 0.08333333333333333,
+      "strategic_insights": {
+        "strategy_type": "Consistent performer",
+        "formation_style": "Flock-breaker",
+        "early_phase_rate": 0.023809523809523808,
+        "mid_phase_rate": 0.03571428571428571,
+        "late_phase_rate": 0.023809523809523808,
+        "adaptability_score": 0.9027777777777778,
+        "strategy_consistency": 0.9931267825096474
+      },
+      "training_time": 50.57205009460449,
+      "evaluation_time": 8.872586965560913,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -46.15384615384615
+    },
+    {
+      "experiment_name": "EarlyStop_Iter6",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 6
+      },
+      "overall_catch_rate": 0.047619047619047616,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.03571428571428571,
+        "mid_phase_rate": 0.0,
+        "late_phase_rate": 0.011904761904761904,
+        "adaptability_score": 0.9652777777777778,
+        "strategy_consistency": 0.9818151758136673
+      },
+      "training_time": 62.43850636482239,
+      "evaluation_time": 10.253772020339966,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -69.23076923076923
+    },
+    {
+      "experiment_name": "LearningRate_1e-04",
+      "config": {
+        "learning_rate": 0.0001,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.03571428571428571,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.023809523809523808,
+        "mid_phase_rate": 0.011904761904761904,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9861111111111112,
+        "strategy_consistency": 0.9880952380952381
+      },
+      "training_time": 42.21558332443237,
+      "evaluation_time": 9.562494993209839,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -76.92307692307693
+    },
+    {
+      "experiment_name": "LearningRate_3e-04",
+      "config": {
+        "learning_rate": 0.0003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.08333333333333333,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.03571428571428571,
+        "mid_phase_rate": 0.047619047619047616,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9513888888888888,
+        "strategy_consistency": 0.9752182619111175
+      },
+      "training_time": 40.825953245162964,
+      "evaluation_time": 9.568044662475586,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -46.15384615384615
+    },
+    {
+      "experiment_name": "LearningRate_1e-03",
+      "config": {
+        "learning_rate": 0.001,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.08333333333333333,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.03571428571428571,
+        "mid_phase_rate": 0.023809523809523808,
+        "late_phase_rate": 0.023809523809523808,
+        "adaptability_score": 0.9513888888888888,
+        "strategy_consistency": 0.9931267825096474
+      },
+      "training_time": 41.137393951416016,
+      "evaluation_time": 9.961068868637085,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -46.15384615384615
+    },
+    {
+      "experiment_name": "LearningRate_3e-03",
+      "config": {
+        "learning_rate": 0.003,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.07142857142857142,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.023809523809523808,
+        "mid_phase_rate": 0.047619047619047616,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9791666666666666,
+        "strategy_consistency": 0.9761904761904762
+      },
+      "training_time": 41.78256440162659,
+      "evaluation_time": 10.020372152328491,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -53.846153846153854
+    },
+    {
+      "experiment_name": "LearningRate_1e-02",
+      "config": {
+        "learning_rate": 0.01,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.10714285714285714,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.03571428571428571,
+        "mid_phase_rate": 0.07142857142857142,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9930555555555556,
+        "strategy_consistency": 0.9642857142857143
+      },
+      "training_time": 48.81924533843994,
+      "evaluation_time": 9.977439880371094,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -30.769230769230777
+    },
+    {
+      "experiment_name": "Rollout_128",
+      "config": {
+        "learning_rate": 0.01,
+        "rollout_steps": 128,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.10714285714285714,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.047619047619047616,
+        "mid_phase_rate": 0.03571428571428571,
+        "late_phase_rate": 0.023809523809523808,
+        "adaptability_score": 0.9930555555555556,
+        "strategy_consistency": 0.9880952380952381
+      },
+      "training_time": 10.578316926956177,
+      "evaluation_time": 9.687228441238403,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -30.769230769230777
+    },
+    {
+      "experiment_name": "Rollout_256",
+      "config": {
+        "learning_rate": 0.01,
+        "rollout_steps": 256,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.047619047619047616,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.023809523809523808,
+        "mid_phase_rate": 0.023809523809523808,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9861111111111112,
+        "strategy_consistency": 0.9862535650192946
+      },
+      "training_time": 21.833321809768677,
+      "evaluation_time": 9.699271202087402,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -69.23076923076923
+    },
+    {
+      "experiment_name": "Rollout_512",
+      "config": {
+        "learning_rate": 0.01,
+        "rollout_steps": 512,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.14285714285714285,
+      "strategic_insights": {
+        "strategy_type": "Late-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.011904761904761904,
+        "mid_phase_rate": 0.09523809523809523,
+        "late_phase_rate": 0.03571428571428571,
+        "adaptability_score": 0.9583333333333334,
+        "strategy_consistency": 0.9570767705301906
+      },
+      "training_time": 51.043588161468506,
+      "evaluation_time": 10.076292037963867,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -7.692307692307701
+    },
+    {
+      "experiment_name": "Rollout_1024",
+      "config": {
+        "learning_rate": 0.01,
+        "rollout_steps": 1024,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.05952380952380952,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Adaptive",
+        "early_phase_rate": 0.047619047619047616,
+        "mid_phase_rate": 0.011904761904761904,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9930555555555556,
+        "strategy_consistency": 0.9752182619111175
+      },
+      "training_time": 90.93005418777466,
+      "evaluation_time": 11.011287450790405,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -61.53846153846154
+    },
+    {
+      "experiment_name": "Rollout_2048",
+      "config": {
+        "learning_rate": 0.01,
+        "rollout_steps": 2048,
+        "ppo_epochs": 2,
+        "boids": 12,
+        "canvas_width": 400,
+        "canvas_height": 300,
+        "iterations": 4
+      },
+      "overall_catch_rate": 0.023809523809523808,
+      "strategic_insights": {
+        "strategy_type": "Early-game specialist",
+        "formation_style": "Flock-breaker",
+        "early_phase_rate": 0.011904761904761904,
+        "mid_phase_rate": 0.011904761904761904,
+        "late_phase_rate": 0.0,
+        "adaptability_score": 0.9444444444444444,
+        "strategy_consistency": 0.9931267825096474
+      },
+      "training_time": 197.03347897529602,
+      "evaluation_time": 10.770106792449951,
+      "beats_sl_baseline": false,
+      "improvement_over_sl": -84.61538461538461
+    }
+  ]
+}
