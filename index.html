@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+    <meta name="description" content="Yimian Liu - Engineer and Researcher">
+    <meta name="keywords" content="engineer, researcher, self-adaptive systems, emergent behavior, meta learning, collective learning">
+    <meta name="author" content="Yimian Liu">
+    <meta property="og:title" content="Yimian Liu - Engineer and Researcher">
+    <meta property="og:description" content="I enjoy building self-adaptive systems that learn and evolve autonomously. My research interests include emergent behavior, meta learning, and collective learning.">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Yimian Liu">
+    <title>Yimian Liu | home</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="js/vector.js"></script>
+    <script src="js/boid.js"></script>
+    <script src="js/predator.js"></script>
+    <script src="js/simulation.js"></script>
+    <script src="js/canvas_init.js"></script>
+    <script src="js/boids.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            /* Prevent bounce scrolling on iOS */
+            overscroll-behavior: none;
+            /* Prevent text selection highlighting */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* Allow text selection in content area */
+        .homepage-content {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        
+        #boids1 {
+            margin: 0;
+            padding: 0;
+            top: 0;
+            left: 0;
+            position: fixed;
+            width: 100%;
+            border: 0 dashed;
+            /* Optimize canvas rendering on mobile */
+            image-rendering: optimizeSpeed;
+            image-rendering: -webkit-optimize-contrast;
+        }
+        @import url('https://fonts.googleapis.com/css?family=Source+Code+Pro&display=swap');
+    </style>
+    <script>
+        window.addEventListener("resize", resizeCanvas);
+    </script>
+</head>
+<body>
+    <canvas id="boids1" height="1680" width="1680"></canvas>
+    
+    <main class="container">
+        <header class="homepage-header">
+            <h1>Yimian Liu</h1>
+        </header>
+        
+        <div class="homepage-content">
+            <p>I am an AI Engineer and Researcher.</p>
+            
+            <p>I build production-grade AI systems that learn from feedback, adapt under uncertainty, and solve real-world problems.</p>
+            
+            <p>My research explores LLM agents, reinforcement learning, and where simple ideas scale into real impact.</p>
+            
+            <p>I received my master's degree from Cornell, where I studied Machine Learning and Computer Engineering.</p>
+
+            <p>At <a class="inline-link" href="https://www.linkedin.com/posts/guzman-energy_high-life-jeffrey-liu-meet-jeffrey-liu-activity-7450597494469705730-bjqQ" target="_blank" rel="noopener noreferrer">Guzman Energy</a>, I lead a team building AI quant trading systems that handle over $10M every day.</p>
+            
+            <p>Find me on <a href="mailto:i@yimian.xyz">Email</a> | <a href="https://github.com/yimianxyz" target="_blank" rel="noopener noreferrer">GitHub</a> | <a href="https://www.linkedin.com/in/yimianxyz" target="_blank" rel="noopener noreferrer">LinkedIn</a></p>
+        </div>
+    </main>
+</body>
+</html> 
