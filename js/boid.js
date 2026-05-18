@@ -21,7 +21,7 @@ var PREDATOR_RANGE = getBoidPredatorRange();
 var PREDATOR_TURN_FACTOR = 0.3;
 
 function Boid(x, y, simulation) {
-	var randomAngle = Math.random() * 2 * Math.PI;
+	var randomAngle = simRandom() * 2 * Math.PI;
 	this.velocity = new Vector(Math.cos(randomAngle), Math.sin(randomAngle));
 	this.position = new Vector(x, y);
 	this.acceleration = new Vector(0, 0);

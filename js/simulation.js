@@ -27,8 +27,8 @@ Simulation.prototype = {
 	initialize: function (use_obstacle) {
 		this.obstacles = [];
 		this.boids = [];
-		var start_x = Math.floor(Math.random() * this.canvasWidth);
-		var start_y = Math.floor(Math.random() * this.canvasHeight);
+		var start_x = Math.floor(simRandom() * this.canvasWidth);
+		var start_y = Math.floor(simRandom() * this.canvasHeight);
 		for (var i = 0; i < NUM_BOIDS; i++) {
 			var boid = new Boid(start_x, start_y, this);
 			this.addBoid(boid);
@@ -66,6 +66,10 @@ Simulation.prototype = {
 		
 		// Render predator
 		this.predator.render();
+
+		// Real-time neural activation diagram, drawn on top of the
+		// simulation but underneath the centered text content.
+		renderActivationViz(this.ctx, this);
 	},
 	tick: function () {
 		for (var bi in this.boids) {
@@ -87,8 +91,14 @@ Simulation.prototype = {
 	},
 	run: function () {
 		var self = this;
+		if (typeof setFrameMs === 'function') {
+			setFrameMs(REFRESH_INTERVAL_IN_MS);
+		}
 		self.tick();
 		setInterval(function () {
+			if (typeof simTick === 'function') {
+				simTick();
+			}
 			self.tick();
 			self.render();
 		}, REFRESH_INTERVAL_IN_MS);

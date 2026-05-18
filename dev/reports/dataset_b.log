@@ -1,0 +1,5 @@
+{"phase":"start","seeds":20,"framesPerSeed":5000,"totalRows":100000,"workers":4}
+{"phase":"progress","seed":30,"validRows":5000}
+{"phase":"progress","seed":20,"validRows":5000}
+{"phase":"progress","seed":25,"validRows":5000}
+{"phase":"progress","seed":35,"validRows":5000}

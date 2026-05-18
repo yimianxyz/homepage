@@ -12,5 +12,10 @@ document.addEventListener('DOMContentLoaded', function() {
 		return simulation;
 	};
 
-	initialize_canvas_simulation('boids1', false);
+	// The predator's policy is a trained neural network; wait for its
+	// weights to load before starting the simulation, so the NN drives
+	// the predator from frame 1.
+	window.__predatorReady.then(function () {
+		initialize_canvas_simulation('boids1', false);
+	});
 }); 

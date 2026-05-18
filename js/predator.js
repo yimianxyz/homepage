@@ -1,24 +1,11 @@
 // Predator settings optimized for subtle background presence
 var PREDATOR_MAX_SPEED = 2.5;
 var PREDATOR_MAX_FORCE = 0.05;
-var PREDATOR_TURN_FACTOR = 0.3;
 var PREDATOR_SIZE = 12;
-
-// Dynamic predator range based on device capability
-function getPredatorRange() {
-    // Default values if not defined
-    var mobileRange = (typeof PREDATOR_MOBILE_RANGE !== 'undefined') ? PREDATOR_MOBILE_RANGE : 60;
-    var desktopRange = (typeof PREDATOR_DESKTOP_RANGE !== 'undefined') ? PREDATOR_DESKTOP_RANGE : 80;
-    
-    return (typeof isMobileDevice === 'function' && isMobileDevice()) ? 
-           mobileRange : desktopRange;
-}
-
-var PREDATOR_RANGE = getPredatorRange();
 
 function Predator(x, y, simulation) {
     this.position = new Vector(x, y);
-    this.velocity = new Vector(Math.random() * 2 - 1, Math.random() * 2 - 1); // Start with some velocity
+    this.velocity = new Vector(simRandom() * 2 - 1, simRandom() * 2 - 1); // Start with some velocity
     this.acceleration = new Vector(0, 0);
     this.simulation = simulation;
     this.autonomousTarget = new Vector(x, y);
@@ -36,54 +23,40 @@ function Predator(x, y, simulation) {
 }
 
 Predator.prototype = {
-    
-    seek: function(targetPosition) {
-        var desiredVector = targetPosition.subtract(this.position);
-        desiredVector.iFastSetMagnitude(PREDATOR_MAX_SPEED);
-        var steeringVector = desiredVector.subtract(this.velocity);
-        steeringVector.iFastLimit(PREDATOR_MAX_FORCE);
-        return steeringVector;
-    },
-    
-    // Autonomous movement - hunt boids or patrol randomly
+
+    // Autonomous movement. The steering policy is the trained neural
+    // network in window.__predatorModel; only patrol-target bookkeeping
+    // (regenerating autoTarget on a 5 s timer or 30 px proximity) remains
+    // in plain JS. The simulation is gated on the weights being loaded,
+    // so window.__predatorModel is always present here.
     getAutonomousForce: function(boids) {
-        var currentTime = Date.now();
-        
-        // Find nearest boid within hunting range
-        var nearestBoid = null;
-        var nearestDistance = Infinity;
-        
+        var R = POLICY_R;
+        var currentTime = simNow();
+
+        var anyInRange = false;
         for (var i = 0; i < boids.length; i++) {
-            var distance = this.position.getDistance(boids[i].position);
-            if (distance < PREDATOR_RANGE && distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestBoid = boids[i];
+            if (this.position.getDistance(boids[i].position) < R) {
+                anyInRange = true;
+                break;
             }
         }
-        
-        // If boid found, hunt it
-        if (nearestBoid) {
-            return this.seek(nearestBoid.position);
+        if (!anyInRange) {
+            if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
+                var margin = 50;
+                this.autonomousTarget.x = margin + simRandom() * (this.simulation.canvasWidth - 2 * margin);
+                this.autonomousTarget.y = margin + simRandom() * (this.simulation.canvasHeight - 2 * margin);
+                this.targetChangeTime = currentTime;
+            }
+            if (this.position.getDistance(this.autonomousTarget) < 30) {
+                this.targetChangeTime = 0;
+            }
         }
-        
-        // Otherwise, patrol autonomously
-        if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
-            // Generate new random target within canvas bounds
-            var margin = 50;
-            this.autonomousTarget.x = margin + Math.random() * (this.simulation.canvasWidth - 2 * margin);
-            this.autonomousTarget.y = margin + Math.random() * (this.simulation.canvasHeight - 2 * margin);
-            this.targetChangeTime = currentTime;
-        }
-        
-        // Move towards autonomous target
-        var distanceToTarget = this.position.getDistance(this.autonomousTarget);
-        if (distanceToTarget < 30) {
-            // Close enough to target, generate new one
-            this.targetChangeTime = 0;
-        }
-        
-        return this.seek(this.autonomousTarget);
+
+        var features = buildPredatorFeatures(this.position, this.velocity, boids, this.autonomousTarget);
+        var out = window.__predatorModel.forward(features);
+        return new Vector(out[0], out[1]);
     },
+
     
     // Wrap-around boundary handling (similar to boids)
     bound: function() {
@@ -105,7 +78,7 @@ Predator.prototype = {
     
     // Check for boid collisions and handle feeding
     checkForPrey: function(boids) {
-        var currentTime = Date.now();
+        var currentTime = simNow();
         if (currentTime - this.lastFeedTime < this.feedCooldown) {
             return []; // Still digesting
         }
@@ -128,7 +101,7 @@ Predator.prototype = {
     // Handle feeding - grow predator
     feed: function() {
         this.currentSize = Math.min(this.currentSize + this.growthPerFeed, this.maxSize);
-        this.lastFeedTime = Date.now();
+        this.lastFeedTime = simNow();
     },
     
     // Gradually decay size back to normal
@@ -192,4 +165,16 @@ Predator.prototype = {
         ctx.fillStyle = 'rgba(140, 60, 60, ' + (0.6 + intensity * 0.2) + ')';
         ctx.fill();
     }
-}; 
+};
+
+// Load the trained NN weights at page boot. The simulation start (in
+// boids.js) awaits window.__predatorReady before constructing the
+// Simulation, so the NN is guaranteed to be present from frame 1.
+window.__predatorReady = fetch('js/predator_weights.json', { cache: 'no-cache' })
+    .then(function (r) {
+        if (!r.ok) throw new Error('predator weights fetch failed: ' + r.status);
+        return r.json();
+    })
+    .then(function (json) {
+        window.__predatorModel = PredatorNN.loadModel(json);
+    });
