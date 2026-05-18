@@ -122,6 +122,11 @@
         seekStep(dxA, dyA, vx, vy, out, 31);
         var t = (POLICY_R - d1) / 10 + 0.5;
         out[33] = t < 0 ? 0 : (t > 1 ? 1 : t);
+        // v3 addition: binary in-range indicator. Matches the rule's branch
+        // exactly (d1<R AND a real boid in slot 0, not PAD). Lets the network
+        // model the rule's discontinuity at d1=R precisely, instead of having
+        // to smear it across a finite transition region.
+        out[34] = (d1 < POLICY_R && dx1 !== POLICY_PAD) ? 1 : 0;
 
         return out;
     }
