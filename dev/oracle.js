@@ -41,10 +41,21 @@ function makeStubCtx() {
 
 function buildSandbox(opts) {
     const ctx = makeStubCtx();
+    // Stub fetch so predator.js's load-time `window.__predatorReady = fetch(...)`
+    // doesn't throw. We never await this promise in headless mode; the oracle
+    // overrides predator.getAutonomousForce to call the rule (or nnFn) directly.
+    const stubFetch = function () {
+        return new Promise(function () {}); // forever pending; never resolves
+    };
+    const win = {
+        innerWidth: opts.width,
+        innerHeight: opts.height,
+        matchMedia: function () { return { matches: false, addEventListener: function () {} }; },
+    };
     const sandbox = {
         // Browser shims the JS files reach for.
         navigator: { userAgent: 'NodeOracle' },
-        window: { innerWidth: opts.width, innerHeight: opts.height },
+        window: win,
         document: {
             getElementById: function () {
                 return {
@@ -55,6 +66,11 @@ function buildSandbox(opts) {
             },
             addEventListener: function () {},
         },
+        fetch: stubFetch,
+        // Browser-only viz that simulation.render calls; stub as no-op in
+        // headless mode so we don't have to load activation_viz.js (which
+        // depends on a loaded __predatorModel for normalization).
+        renderActivationViz: function () {},
         // Math is already in vm context's global; just expose what we need.
         Math: Math,
         Date: Date,
@@ -147,15 +163,36 @@ class Oracle {
                 return new Vector(out[0], out[1]);
             };
         } else {
-            const origAF = sim.predator.getAutonomousForce;
+            // Rule mode: run the analytical rule from policy_spec.rulePolicy
+            // directly, not the live page's predator.getAutonomousForce
+            // (which now calls the NN). Patrol-target bookkeeping is done
+            // externally so the rule is purely a function of features.
+            const rulePolicy = spec.rulePolicy;
             predator.getAutonomousForce = function (boids) {
-                const v = origAF.call(this, boids);
-                // Build features *after* origAF so we capture the post-regen
-                // autoTarget that the rule actually steered toward.
+                let anyInRange = false;
+                for (let i = 0; i < boids.length; i++) {
+                    if (this.position.getDistance(boids[i].position) < R) {
+                        anyInRange = true;
+                        break;
+                    }
+                }
+                if (!anyInRange) {
+                    const currentTime = sandbox.simNow();
+                    if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
+                        const margin = 50;
+                        this.autonomousTarget.x = margin + sandbox.simRandom() * (this.simulation.canvasWidth - 2 * margin);
+                        this.autonomousTarget.y = margin + sandbox.simRandom() * (this.simulation.canvasHeight - 2 * margin);
+                        this.targetChangeTime = currentTime;
+                    }
+                    if (this.position.getDistance(this.autonomousTarget) < 30) {
+                        this.targetChangeTime = 0;
+                    }
+                }
                 const features = buildFeatures(this.position, this.velocity, boids, this.autonomousTarget);
+                const out = rulePolicy(features);
                 this._lastFeatures = features;
-                this._lastOutput = [v.x, v.y];
-                return v;
+                this._lastOutput = [out[0], out[1]];
+                return new Vector(out[0], out[1]);
             };
         }
 

@@ -33,6 +33,16 @@ function parseArgs(argv) {
         out: null,
         report: null,
         logEvery: 1,
+        // New (opt-in) knobs. Defaults preserve old behavior bit-for-bit:
+        cosine: 0,            // 1 = cosine anneal lr -> cosineMinLr over full epoch budget
+        cosineMinLr: 1e-5,
+        warmupEpochs: 0,
+        loss: 'mse',          // 'mse' | 'huber'
+        huberDelta: 0.05,
+        edgeWeight: 1,        // per-sample loss weight on R-edge (d1 in [R-15, R+15]). 1 = no extra weight.
+        ema: 0,               // 0 = off. >0 = exponential moving average decay for shadow weights.
+        bestBy: 'val',        // 'val' | 'emaVal'
+        maxLossLambda: 0,     // add lambda * max-batch-error to loss (push down worst-case)
     };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
@@ -51,6 +61,15 @@ function parseArgs(argv) {
         else if (a === '--out') args.out = argv[++i];
         else if (a === '--report') args.report = argv[++i];
         else if (a === '--logEvery') args.logEvery = +argv[++i];
+        else if (a === '--cosine') args.cosine = +argv[++i];
+        else if (a === '--cosineMinLr') args.cosineMinLr = +argv[++i];
+        else if (a === '--warmupEpochs') args.warmupEpochs = +argv[++i];
+        else if (a === '--loss') args.loss = argv[++i];
+        else if (a === '--huberDelta') args.huberDelta = +argv[++i];
+        else if (a === '--edgeWeight') args.edgeWeight = +argv[++i];
+        else if (a === '--ema') args.ema = +argv[++i];
+        else if (a === '--bestBy') args.bestBy = argv[++i];
+        else if (a === '--maxLossLambda') args.maxLossLambda = +argv[++i];
     }
     if (!args.arch) throw new Error('--arch or --archFile required');
     if (!args.out) args.out = `dev/weights/${args.arch.id}.json`;
@@ -157,16 +176,62 @@ function forwardBatch(model, Xbatch, B) {
     return { output: cur, caches };
 }
 
-function backwardBatch(model, Xbatch, Ybatch, caches, B) {
-    // Last cache's a is output. Loss = MSE; dL/da_final = 2/(B*outDim) * (a_final - y)
+function backwardBatch(model, Xbatch, Ybatch, caches, B, opts) {
+    // Build dL/dA for the final layer. Supports:
+    //   loss: 'mse' (default) | 'huber'
+    //   per-sample weights (default: all 1)
+    //   maxLossLambda: extra gradient through max_{i,j} |err|
+    // When opts is omitted, computes the exact same gradient as the original
+    // unweighted MSE path so prior runs are bit-for-bit reproducible.
     const last = caches[caches.length - 1];
     const finalDim = last.outDim;
     let dA = new Float32Array(B * finalDim);
-    const scale = 2 / (B * finalDim);
-    for (let i = 0; i < B; i++) {
-        for (let j = 0; j < finalDim; j++) {
-            const idx = i * finalDim + j;
-            dA[idx] = scale * (last.a[idx] - Ybatch[idx]);
+
+    if (!opts || (opts.loss === 'mse' && !opts.weights && !opts.maxLossLambda)) {
+        const scale = 2 / (B * finalDim);
+        for (let i = 0; i < B; i++) {
+            for (let j = 0; j < finalDim; j++) {
+                const idx = i * finalDim + j;
+                dA[idx] = scale * (last.a[idx] - Ybatch[idx]);
+            }
+        }
+    } else {
+        const loss = opts.loss || 'mse';
+        const huberDelta = opts.huberDelta || 0.05;
+        const weights = opts.weights; // length B, may be null
+        const maxLossLambda = opts.maxLossLambda || 0;
+        // Normalize so the loss matches a mean of |err|^2/2 (mse) or huber.
+        // We want gradient magnitudes comparable to the plain MSE path so
+        // the same lr works.
+        let totalW = 0;
+        if (weights) {
+            for (let i = 0; i < B; i++) totalW += weights[i];
+        } else {
+            totalW = B;
+        }
+        const denom = totalW * finalDim;
+        // Track max-error position for max-loss gradient.
+        let maxErr = 0, maxIdx = -1, maxSign = 0;
+        for (let i = 0; i < B; i++) {
+            const w = weights ? weights[i] : 1;
+            for (let j = 0; j < finalDim; j++) {
+                const idx = i * finalDim + j;
+                const err = last.a[idx] - Ybatch[idx];
+                let g;
+                if (loss === 'huber') {
+                    if (Math.abs(err) < huberDelta) g = err;
+                    else g = huberDelta * (err > 0 ? 1 : -1);
+                } else {
+                    g = err;
+                }
+                dA[idx] = (2 * w * g) / denom;
+                const ae = Math.abs(err);
+                if (ae > maxErr) { maxErr = ae; maxIdx = idx; maxSign = err > 0 ? 1 : -1; }
+            }
+        }
+        if (maxLossLambda > 0 && maxIdx >= 0) {
+            // d/d(a[maxIdx]) of (lambda * max_abs_err) = lambda * sign(err) (subgrad).
+            dA[maxIdx] += maxLossLambda * maxSign;
         }
     }
     // Backprop through layers in reverse.
@@ -324,16 +389,18 @@ function buildIndex(n, valFrac, edgeMask, oversample, rand) {
     return { trainIdx, valIdx };
 }
 
-function gatherBatch(X, Y, indices, start, B, inputDim) {
+function gatherBatch(X, Y, indices, start, B, inputDim, weightsAll) {
     const xb = new Float32Array(B * inputDim);
     const yb = new Float32Array(B * 2);
+    const wb = weightsAll ? new Float32Array(B) : null;
     for (let i = 0; i < B; i++) {
         const idx = indices[start + i];
         for (let k = 0; k < inputDim; k++) xb[i * inputDim + k] = X[idx * inputDim + k];
         yb[i * 2] = Y[idx * 2];
         yb[i * 2 + 1] = Y[idx * 2 + 1];
+        if (wb) wb[i] = weightsAll[idx];
     }
-    return { xb, yb };
+    return { xb, yb, wb };
 }
 
 function evalLoss(model, X, Y, indices, inputDim) {
@@ -393,18 +460,79 @@ function main() {
     const { trainIdx, valIdx } = buildIndex(n, args.valFrac, edgeMask, args.edgeOversample, rand);
     process.stdout.write(JSON.stringify({ phase: 'split', train: trainIdx.length, val: valIdx.length, edgeRaw: edgeMask.reduce((s,v)=>s+v,0) }) + '\n');
 
+    // Build per-sample weights (over the whole dataset, indexed by original i).
+    // When --edgeWeight > 1, R-edge samples get that multiplier in the loss.
+    let perSampleWeights = null;
+    if (args.edgeWeight !== 1) {
+        perSampleWeights = new Float32Array(n);
+        for (let i = 0; i < n; i++) perSampleWeights[i] = edgeMask[i] ? args.edgeWeight : 1;
+    }
+
     const model = buildModel(args.arch, inputDim, rand);
     const totalParams = model.layers.reduce((s, L) => s + L.W.length + L.b.length, 0);
     process.stdout.write(JSON.stringify({ phase: 'model', layers: model.layers.map(L => ({inDim:L.inDim, outDim:L.outDim, activation:L.activation})), totalParams }) + '\n');
 
+    // EMA shadow weights (used for late-stage smoothing).
+    let ema = null;
+    if (args.ema > 0) {
+        ema = model.layers.map(L => ({ W: Float32Array.from(L.W), b: Float32Array.from(L.b) }));
+    }
+
     const initialValLoss = evalLoss(model, X, Y, valIdx, inputDim);
-    process.stdout.write(JSON.stringify({ phase: 'pretrain', initialValLoss }) + '\n');
+    process.stdout.write(JSON.stringify({ phase: 'pretrain', initialValLoss, cosine: args.cosine, loss: args.loss, edgeWeight: args.edgeWeight, ema: args.ema, maxLossLambda: args.maxLossLambda }) + '\n');
+
+    function curLr(epoch) {
+        if (epoch < args.warmupEpochs) return args.lr * (epoch + 1) / args.warmupEpochs;
+        if (!args.cosine) return args.lr;
+        // cosine from args.lr -> args.cosineMinLr over [warmupEpochs, epochs)
+        const t = (epoch - args.warmupEpochs) / Math.max(1, args.epochs - args.warmupEpochs);
+        const cos = 0.5 * (1 + Math.cos(Math.PI * Math.min(1, Math.max(0, t))));
+        return args.cosineMinLr + (args.lr - args.cosineMinLr) * cos;
+    }
+
+    function copyModelWeights(target) {
+        for (let li = 0; li < model.layers.length; li++) {
+            const L = model.layers[li];
+            target[li].W = Float32Array.from(L.W);
+            target[li].b = Float32Array.from(L.b);
+        }
+    }
+
+    function emaUpdate(decay) {
+        for (let li = 0; li < model.layers.length; li++) {
+            const L = model.layers[li];
+            const sh = ema[li];
+            for (let i = 0; i < L.W.length; i++) sh.W[i] = decay * sh.W[i] + (1 - decay) * L.W[i];
+            for (let i = 0; i < L.b.length; i++) sh.b[i] = decay * sh.b[i] + (1 - decay) * L.b[i];
+        }
+    }
+
+    function emaValLoss() {
+        if (!ema) return Infinity;
+        // Swap shadow into model temporarily.
+        const tmp = model.layers.map(L => ({ W: L.W, b: L.b }));
+        for (let li = 0; li < model.layers.length; li++) {
+            model.layers[li].W = ema[li].W;
+            model.layers[li].b = ema[li].b;
+        }
+        const v = evalLoss(model, X, Y, valIdx, inputDim);
+        for (let li = 0; li < model.layers.length; li++) {
+            model.layers[li].W = tmp[li].W;
+            model.layers[li].b = tmp[li].b;
+        }
+        return v;
+    }
 
     const lossCurve = [];
     let step = 0;
     let bestVal = Infinity, bestEpoch = -1;
     let bestWeights = null;
+    let bestSource = null; // 'live' | 'ema'
+    const backwardOpts = (args.loss === 'huber' || perSampleWeights || args.maxLossLambda > 0)
+        ? { loss: args.loss, huberDelta: args.huberDelta, maxLossLambda: args.maxLossLambda }
+        : null;
     for (let epoch = 0; epoch < args.epochs; epoch++) {
+        const epochLr = curLr(epoch);
         // Shuffle train indices.
         for (let i = trainIdx.length - 1; i > 0; i--) {
             const j = Math.floor(rand() * (i + 1));
@@ -413,27 +541,44 @@ function main() {
         let epochLossSum = 0, epochSamples = 0;
         for (let off = 0; off < trainIdx.length; off += args.batch) {
             const B = Math.min(args.batch, trainIdx.length - off);
-            const { xb, yb } = gatherBatch(X, Y, trainIdx, off, B, inputDim);
+            const { xb, yb, wb } = gatherBatch(X, Y, trainIdx, off, B, inputDim, perSampleWeights);
             const { output, caches } = forwardBatch(model, xb, B);
-            // batch loss
+            // batch loss for reporting (always plain MSE so curves are comparable across configs)
             for (let i = 0; i < B * 2; i++) {
                 const d = output[i] - yb[i];
                 epochLossSum += d * d;
             }
             epochSamples += B * 2;
-            backwardBatch(model, xb, yb, caches, B);
+            if (backwardOpts) {
+                backwardBatch(model, xb, yb, caches, B, Object.assign({ weights: wb }, backwardOpts));
+            } else {
+                backwardBatch(model, xb, yb, caches, B);
+            }
             step++;
-            adamStep(model, args.lr, 0.9, 0.999, 1e-8, step);
+            adamStep(model, epochLr, 0.9, 0.999, 1e-8, step);
+            if (ema) emaUpdate(args.ema);
         }
         const trainLoss = epochLossSum / epochSamples;
         const valLoss = evalLoss(model, X, Y, valIdx, inputDim);
-        lossCurve.push({ epoch, trainLoss, valLoss });
-        if (valLoss < bestVal) {
-            bestVal = valLoss; bestEpoch = epoch;
-            bestWeights = model.layers.map(L => ({ W: Array.from(L.W), b: Array.from(L.b) }));
+        let emaVal = null;
+        if (ema) emaVal = emaValLoss();
+        lossCurve.push({ epoch, trainLoss, valLoss, lr: epochLr, emaVal });
+
+        const candidateVal = (args.bestBy === 'emaVal' && emaVal != null) ? emaVal : valLoss;
+        if (candidateVal < bestVal) {
+            bestVal = candidateVal; bestEpoch = epoch;
+            if (args.bestBy === 'emaVal' && ema) {
+                bestWeights = ema.map(L => ({ W: Array.from(L.W), b: Array.from(L.b) }));
+                bestSource = 'ema';
+            } else {
+                bestWeights = model.layers.map(L => ({ W: Array.from(L.W), b: Array.from(L.b) }));
+                bestSource = 'live';
+            }
         }
         if (epoch % args.logEvery === 0 || epoch === args.epochs - 1) {
-            process.stdout.write(JSON.stringify({ phase: 'epoch', epoch, trainLoss, valLoss, bestVal, bestEpoch }) + '\n');
+            const out = { phase: 'epoch', epoch, trainLoss, valLoss, bestVal, bestEpoch, lr: epochLr };
+            if (emaVal != null) out.emaVal = emaVal;
+            process.stdout.write(JSON.stringify(out) + '\n');
         }
     }
 
@@ -455,11 +600,12 @@ function main() {
         finalValLoss: lossCurve[lossCurve.length - 1].valLoss,
         bestValLoss: bestVal,
         bestEpoch,
+        bestSource,
         lossCurve,
     };
     ensureDir(args.report);
     fs.writeFileSync(args.report, JSON.stringify(report, null, 2));
-    process.stdout.write(JSON.stringify({ phase: 'done', bestVal, bestEpoch, weightsPath: args.out, reportPath: args.report, elapsedMs: report.elapsedMs }) + '\n');
+    process.stdout.write(JSON.stringify({ phase: 'done', bestVal, bestEpoch, bestSource, weightsPath: args.out, reportPath: args.report, elapsedMs: report.elapsedMs }) + '\n');
 }
 
 if (require.main === module) main();

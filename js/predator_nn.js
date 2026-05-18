@@ -93,15 +93,20 @@
         model.lastNormalizedInput = new Float32Array(model.featureDim);
         model.forward = function (features) {
             model.lastInput = features;
+            // Always read exactly model.featureDim values regardless of
+            // features.length. This lets the page's buildPredatorFeatures
+            // grow new features at the end without breaking older shipped
+            // weight files that were trained on a smaller featureDim.
+            var FD = model.featureDim;
             var cur = scratch[0];
             if (model.inputMean && model.inputStd) {
-                for (var i = 0; i < features.length; i++) {
+                for (var i = 0; i < FD; i++) {
                     cur[i] = (features[i] - model.inputMean[i]) / model.inputStd[i];
                 }
             } else {
-                for (var i = 0; i < features.length; i++) cur[i] = features[i] * model.inputScale;
+                for (var i = 0; i < FD; i++) cur[i] = features[i] * model.inputScale;
             }
-            for (var i = 0; i < features.length; i++) model.lastNormalizedInput[i] = cur[i];
+            for (var i = 0; i < FD; i++) model.lastNormalizedInput[i] = cur[i];
 
             for (var li = 0; li < model.layers.length; li++) {
                 var L = model.layers[li];
