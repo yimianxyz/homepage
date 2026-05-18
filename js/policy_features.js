@@ -43,8 +43,11 @@
     //   [31..32] seek_auto_xy = exact rule steering for the "patrol" branch
     //   [33]     inRange_smooth = clamp((R - d1)/10 + 0.5, 0, 1)
     //                             0 well outside R, 1 well inside, 10px transition.
-    // Total: 34 features (29 legacy + 5 v2).
-    var FEATURE_DIM = 34;
+    //   --- v3 addition (binary indicator so the network can fit the rule's
+    //   --- exact branch discontinuity, not just smooth-mix near R-edge) ---
+    //   [34]     inRange_binary = (d1 < R && dx1 != PAD) ? 1 : 0
+    // Total: 35 features.
+    var FEATURE_DIM = 35;
 
     function fastMag(x, y) {
         var ax = Math.abs(x), ay = Math.abs(y);

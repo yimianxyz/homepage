@@ -16,7 +16,7 @@ const path = require('path');
 const spec = require('./policy_spec');
 
 function parseArgs(argv) {
-    const args = { in: 'dev/dataset.bin', out: 'dev/dataset_v2.bin' };
+    const args = { in: 'dev/dataset.bin', out: 'dev/dataset_v3.bin' };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
         if (a === '--in') args.in = argv[++i];
@@ -28,8 +28,11 @@ function parseArgs(argv) {
 const MAX_SPEED = spec.PREDATOR_MAX_SPEED; // 2.5
 const MAX_FORCE = spec.PREDATOR_MAX_FORCE; // 0.05
 const R = spec.POLICY_R;                   // 80
+const PAD = spec.POLICY_PAD;
 const F = spec.F;
-const NEW_FEATURE_COUNT = 5;
+// v1 -> v2: 5 new features (seek_boid_xy, seek_auto_xy, inRange_smooth)
+// v2 -> v3: +1 binary inRange (so the NN can fit the exact branch discontinuity)
+const NEW_FEATURE_COUNT = 6;
 
 function seekStep(dx, dy, vx, vy) {
     // Match Vector.iFastSetMagnitude exactly: it's a no-op when fastMag is 0,
@@ -84,6 +87,10 @@ function main() {
         // linear ramp in a 10px window centered at R.
         const t = (R - d1) / 10 + 0.5;
         out[nOff + oldFD + 4] = t < 0 ? 0 : (t > 1 ? 1 : t);
+        // Binary in-range indicator. Matches the rule's branch exactly,
+        // including the dx1 != PAD short-circuit when there are no boids.
+        const _dx1raw = arr[oOff + F.DX1];
+        out[nOff + oldFD + 5] = (d1 < R && _dx1raw !== PAD) ? 1 : 0;
         // Copy targets after the new features.
         for (let k = 0; k < (oldROW - oldFD); k++) {
             out[nOff + newFD + k] = arr[oOff + oldFD + k];
@@ -95,7 +102,7 @@ function main() {
         featureDim: newFD,
         rowFloats: newROW,
         extendedFrom: path.basename(args.in),
-        newFeatureNames: ['seek_boid_x', 'seek_boid_y', 'seek_auto_x', 'seek_auto_y', 'inRange_smooth'],
+        newFeatureNames: ['seek_boid_x', 'seek_boid_y', 'seek_auto_x', 'seek_auto_y', 'inRange_smooth', 'inRange_binary'],
         extendedAt: new Date().toISOString(),
     });
     const newMetaPath = args.out.replace(/\.bin$/, '.meta.json');
