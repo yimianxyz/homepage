@@ -1,9 +1,10 @@
 // Real-time neural activation diagram, rendered onto the same canvas as
-// the boids/predator simulation. Tucked into the top-right whitespace of
-// the page so it never competes with the centered content. The dot/edge
-// style matches the page's gray-ladder palette; the output column borrows
-// the predator's muted red so the viz is visually tied to the body it
-// controls.
+// the boids/predator simulation. Anchored to the bottom-right of the viewport
+// so it lives in the empty gutter on every device — desktop has wide side
+// margins, mobile portrait pins content to the top with the bottom half
+// empty, and landscape phones get a tighter override below. Strictly
+// ambient: gray-ladder palette for input/hidden, predator's muted red for
+// the output column, no backing frame.
 //
 // Reads activations from window.__predatorModel, which is guaranteed to
 // be loaded by the time the simulation starts rendering (see boids.js).
@@ -12,6 +13,10 @@
     'use strict';
 
     var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function clamp(min, v, max) {
+        return v < min ? min : v > max ? max : v;
+    }
 
     // Per-layer EMA of the max activation magnitude, for stable normalization.
     var emaMax = [];
@@ -26,16 +31,30 @@
         var cw = sim.canvasWidth;
         var ch = sim.canvasHeight;
 
-        // Don't crowd small screens.
-        if (cw < 720 || ch < 480) return;
+        // Genuine micro-viewports only — anything bigger gets the adaptive layout.
+        if (cw < 260 || ch < 280) return;
 
-        // Top-right corner, fixed footprint that scales gently on narrow viewports.
-        var W = Math.min(160, cw * 0.14);
-        var H = Math.min(150, ch * 0.22);
-        var marginX = 36;
-        var marginY = 36;
+        // Compact mode covers both narrow portrait phones and short landscape
+        // phones: smaller H cap, tighter margins, single-line caption. Text
+        // remains readable even if the widget overlaps the content card
+        // because the canvas sits at z-index -1 (the page sits on top).
+        var compact = cw < 480 || ch < 500;
+
+        // Adaptive footprint, clamp(min, fluid, max) — mirrors the styles.css idiom.
+        var W       = clamp(78, cw * 0.15, 158);
+        var H       = clamp(54, ch * 0.13, compact ? 72 : 128);
+        var marginX = clamp(compact ? 10 : 14, cw * 0.022, compact ? 20 : 32);
+        var marginY = clamp(compact ? 10 : 14, ch * 0.022, compact ? 18 : 32);
+        var dotR    = clamp(1.1, H / 70, 1.6);
+
+        // Caption tier: two-line on roomy desktop, one-line on tablet / landscape,
+        // none on narrow phones. Architecture columns are the real signal — the
+        // caption is decoration.
+        var captionLines = cw < 380 ? 0 : (cw < 520 || compact) ? 1 : 2;
+        var captionReserve = captionLines === 2 ? 24 : captionLines === 1 ? 12 : 0;
+
         var x0 = cw - marginX - W;
-        var y0 = marginY;
+        var y0 = ch - marginY - H - captionReserve;
 
         var layerSizes = [model.featureDim].concat(model.layers.map(function (L) { return L.outDim; }));
         var nLayers = layerSizes.length;
@@ -116,21 +135,26 @@
                 var rgb = isOutput ? '140, 60, 60' : '85, 85, 85';
                 ctx.fillStyle = 'rgba(' + rgb + ', ' + alpha.toFixed(3) + ')';
                 ctx.beginPath();
-                ctx.arc(pos[k2].x, pos[k2].y, 1.6, 0, Math.PI * 2);
+                ctx.arc(pos[k2].x, pos[k2].y, dotR, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
         // --- Tiny caption -----------------------------------------------
-        ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
-        ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'top';
-        ctx.fillText(layerSizes.join(' · '), x0 + W, y0 + H + 8);
-        ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText('predator policy', x0 + W, y0 + H + 22);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
+        // Tiered: two lines on wide, one on tablet, none on narrow.
+        if (captionLines >= 1) {
+            ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
+            ctx.fillText(layerSizes.join(' · '), x0 + W, y0 + H + 8);
+            if (captionLines >= 2) {
+                ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
+                ctx.fillText('predator policy', x0 + W, y0 + H + 22);
+            }
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'alphabetic';
+        }
     }
 
     window.renderActivationViz = renderActivationViz;
