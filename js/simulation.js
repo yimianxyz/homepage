@@ -45,8 +45,42 @@ Simulation.prototype = {
 	addObstacle: function (obstacle) {
 		this.obstacles.push(obstacle);
 	},
+	// Interactive spawn: user clicked/tapped at (x, y) in canvas coordinates.
+	// Adds a boid at that point with the default unit-vector velocity from
+	// the Boid constructor, plus a short-lived ripple entry that renderSpawns
+	// draws as a fading expanding circle for visual confirmation.
+	spawnBoid: function (x, y) {
+		this.addBoid(new Boid(x, y, this));
+		if (!this.spawns) this.spawns = [];
+		this.spawns.push({ x: x, y: y, t0: simNow() });
+	},
+	// 400ms expanding/fading stroke ring at each recent spawn point. Drawn
+	// behind the boids (called first in render) so the new arrival appears
+	// on top of its own welcome glow. Palette matches the gray-ladder used
+	// by the activation viz and the h1.
+	renderSpawns: function () {
+		if (!this.spawns || !this.spawns.length) return;
+		var DUR = 400;
+		var now = simNow();
+		var remaining = [];
+		for (var i = 0; i < this.spawns.length; i++) {
+			var s = this.spawns[i];
+			var t = (now - s.t0) / DUR;
+			if (t >= 1) continue;
+			var r = 4 + t * 28;
+			var alpha = (1 - t) * 0.5;
+			this.ctx.beginPath();
+			this.ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+			this.ctx.strokeStyle = 'rgba(85, 85, 85, ' + alpha.toFixed(3) + ')';
+			this.ctx.lineWidth = 1.2;
+			this.ctx.stroke();
+			remaining.push(s);
+		}
+		this.spawns = remaining;
+	},
 	render: function () {
 		this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+		this.renderSpawns();
 
 		for (var bi in this.boids) {
 			this.boids[bi].run(this.boids);

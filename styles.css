@@ -33,6 +33,9 @@ body {
     justify-content: center;
     min-height: 100vh;
     min-height: 100dvh;
+    /* Suppress double-tap-zoom / gesture-delay on tap-to-spawn taps; we
+       have no scrolling (body is overflow:hidden) so we lose nothing. */
+    touch-action: manipulation;
 }
 
 body * {
