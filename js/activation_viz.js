@@ -89,16 +89,14 @@
         var edgeAlphaCap = bumped ? 0.58 : 0.42;
         var dotBaseAlpha = bumped ? 0.18 : 0.10;
 
-        // Caption tier: the numbers line ("N left · M eaten") is the
-        // signal — always show it when the viz is visible. The "brain"
-        // sub-label is decorative and only earns space on roomy desktop.
-        // Landscape phones suppress the caption entirely because the top-
-        // right anchor leaves no room below before the H1.
-        var captionLines;
-        if (landscapePhone) captionLines = 0;
-        else if (cw >= 520 && !compact) captionLines = 2;
-        else captionLines = 1;
-        var captionReserve = captionLines === 2 ? 24 : captionLines === 1 ? 12 : 0;
+        // The "predator" header sits INSIDE the widget at top-right, in
+        // the empty space above the 2-dot output column — that space is
+        // there at every viewport size (the hidden + output columns are
+        // vertically centered, the input column is dense). Below the
+        // widget we reserve one line for the live "N left · M eaten"
+        // numbers (skipped only on landscape, where the widget anchors
+        // to the top and there's no room below it).
+        var captionReserve = landscapePhone ? 0 : 12;
 
         var x0 = cw - marginX - W;
         // Landscape anchors to the TOP of the viewport (next to H1); other
@@ -198,25 +196,32 @@
             }
         }
 
-        // --- Tiny caption -----------------------------------------------
-        // Live stats — boids still flying vs boids the predator has caught —
-        // make the viz feel telemetry-like instead of decorative.
-        // Tiered: two lines on wide, one on tablet, none on narrow.
-        if (captionLines >= 1) {
-            ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'top';
-            ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
+        // --- Labels ------------------------------------------------------
+        ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+
+        // "predator" header — drawn INSIDE the widget at top-right, in the
+        // empty space above the 2-dot output column (whose color matches
+        // the predator triangle on canvas). Static metadata → dim alpha.
+        // Always visible because the empty top-right corner is structural:
+        // the short hidden/output columns are vertically centered at every
+        // viewport size, so there's always ~10px+ of clearance up there.
+        ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
+        ctx.fillText('predator', x0 + W, y0 + 2);
+
+        // Live numbers caption below the widget. Always shown except on
+        // landscape phones (where the widget anchors to the top of the
+        // viewport and there's no room below it before the content).
+        if (!landscapePhone) {
             var alive = sim.boids ? sim.boids.length : 0;
             var eaten = sim.boidsEaten || 0;
+            ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
             ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W, y0 + H + 8);
-            if (captionLines >= 2) {
-                ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-                ctx.fillText('brain', x0 + W, y0 + H + 22);
-            }
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'alphabetic';
         }
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
     }
 
     window.renderActivationViz = renderActivationViz;
