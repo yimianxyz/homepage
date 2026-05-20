@@ -18,6 +18,26 @@
         return v < min ? min : v > max ? max : v;
     }
 
+    // Input features cluster into contiguous "always-bright" and "always-dim"
+    // blocks (unit vectors at 15-22, distances at 23-26, padding zeros at
+    // 27-28, etc.), which makes the input column look stripey instead of a
+    // live firing constellation. We scramble the *visual y-position* of each
+    // input feature with a stride permutation; activation values and edge
+    // endpoints are untouched, so the rendering stays correct. Stride 8 on
+    // a length-35 column gives a permutation (gcd(8,35)=1), and 8's inverse
+    // mod 35 is 22 ≈ 35/φ, so adjacent original features land ~22 rows apart
+    // visually — the golden-ratio quasi-random spread.
+    var inputDisplayInverse = null;
+    function ensureInputPermutation(n) {
+        if (inputDisplayInverse && inputDisplayInverse.length === n) return;
+        inputDisplayInverse = new Array(n);
+        var stride = 8;
+        for (var visualPos = 0; visualPos < n; visualPos++) {
+            var featureIdx = (visualPos * stride) % n;
+            inputDisplayInverse[featureIdx] = visualPos;
+        }
+    }
+
     // Per-layer EMA of the max activation magnitude, for stable normalization.
     var emaMax = [];
     function emaUpdate(layerIdx, value) {
@@ -101,7 +121,16 @@
             var totalH = (n - 1) * spacing;
             var startY = y0 + (H - totalH) / 2;
             var col = new Array(n);
-            for (var k = 0; k < n; k++) col[k] = { x: colX, y: startY + k * spacing };
+            // For the input column only, place feature k at the permuted
+            // y-row; hidden/output columns keep natural order.
+            if (l === 0 && n > 4) {
+                ensureInputPermutation(n);
+                for (var k = 0; k < n; k++) {
+                    col[k] = { x: colX, y: startY + inputDisplayInverse[k] * spacing };
+                }
+            } else {
+                for (var k = 0; k < n; k++) col[k] = { x: colX, y: startY + k * spacing };
+            }
             positions.push(col);
         }
 
