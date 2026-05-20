@@ -201,14 +201,15 @@
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
 
-        // "predator" header — drawn INSIDE the widget at top-right, in the
-        // empty space above the 2-dot output column (whose color matches
-        // the predator triangle on canvas). Static metadata → dim alpha.
-        // Always visible because the empty top-right corner is structural:
-        // the short hidden/output columns are vertically centered at every
-        // viewport size, so there's always ~10px+ of clearance up there.
+        // "predator brain" header — drawn INSIDE the widget at top-right,
+        // in the empty space above the 2-dot output column (whose color
+        // matches the predator triangle on canvas). Static metadata → dim
+        // alpha. Always visible because the empty top-right corner is
+        // structural: the short hidden/output columns are vertically
+        // centered at every viewport size, so there's always ~10px+ of
+        // clearance up there.
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText('predator', x0 + W, y0 + 2);
+        ctx.fillText('predator brain', x0 + W, y0 + 2);
 
         // Live numbers caption below the widget. Always shown except on
         // landscape phones (where the widget anchors to the top of the
