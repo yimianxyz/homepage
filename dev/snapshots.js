@@ -101,7 +101,7 @@ async function main() {
         // Wait for __predatorReady + a couple of animation frames.
         await page.waitForFunction(() => window.__predatorReady !== undefined, null, { timeout: 5000 }).catch(() => {});
         await page.waitForFunction(() => window.__predatorModel != null, null, { timeout: 5000 }).catch(() => {});
-        await page.waitForTimeout(800);                                // let boids spread + viz EMA settle
+        await page.waitForTimeout(5000);                               // let boids spread + predator catch several so the caption shows non-zero eaten
 
         // Snapshot diagnostic state from the page.
         const diag = await page.evaluate(() => {

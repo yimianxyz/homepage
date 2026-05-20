@@ -196,16 +196,20 @@
         }
 
         // --- Tiny caption -----------------------------------------------
+        // Live stats — boids still flying vs boids the predator has caught —
+        // make the viz feel telemetry-like instead of decorative.
         // Tiered: two lines on wide, one on tablet, none on narrow.
         if (captionLines >= 1) {
             ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
             ctx.textAlign = 'right';
             ctx.textBaseline = 'top';
             ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
-            ctx.fillText(layerSizes.join(' · '), x0 + W, y0 + H + 8);
+            var alive = sim.boids ? sim.boids.length : 0;
+            var eaten = sim.boidsEaten || 0;
+            ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W, y0 + H + 8);
             if (captionLines >= 2) {
                 ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-                ctx.fillText('predator policy', x0 + W, y0 + H + 22);
+                ctx.fillText('predator brain', x0 + W, y0 + H + 22);
             }
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';

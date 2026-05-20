@@ -21,6 +21,9 @@ function Simulation(name) {
 	this.separationMultiplier = 2;
 	this.cohesionMultiplier = 1;
 	this.alignmentMultiplier = 1;
+	// Cumulative count of boids the predator has caught since page load —
+	// surfaced by the activation viz caption ("N left · M eaten").
+	this.boidsEaten = 0;
 }
 
 Simulation.prototype = {
@@ -97,6 +100,7 @@ Simulation.prototype = {
 		for (var i = caughtBoids.length - 1; i >= 0; i--) {
 			this.boids.splice(caughtBoids[i], 1);
 		}
+		this.boidsEaten += caughtBoids.length;
 		
 		// Render predator
 		this.predator.render();
