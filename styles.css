@@ -9,7 +9,12 @@ html {
 html, body {
     min-width: 20rem;
     overflow-x: hidden;
+    /* 100vh on iOS Safari includes the area behind the URL bar + bottom
+       toolbar, which clips canvas content drawn near the bottom edge.
+       100dvh tracks the actually-visible viewport as the chrome shows/hides;
+       the 100vh declaration above is the fallback for older browsers. */
     height: 100vh;
+    height: 100dvh;
 }
 
 body {
@@ -27,6 +32,7 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 body * {

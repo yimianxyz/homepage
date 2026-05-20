@@ -34,27 +34,53 @@
         // Genuine micro-viewports only — anything bigger gets the adaptive layout.
         if (cw < 260 || ch < 280) return;
 
-        // Compact mode covers both narrow portrait phones and short landscape
-        // phones: smaller H cap, tighter margins, single-line caption. Text
-        // remains readable even if the widget overlaps the content card
-        // because the canvas sits at z-index -1 (the page sits on top).
-        var compact = cw < 480 || ch < 500;
+        // Three regimes:
+        //   landscapePhone — short + wider than tall (≤480 tall). Content
+        //     overflows the viewport, so bottom-right would land on top of
+        //     text. Park a tiny version at TOP-right, above the first
+        //     paragraph, in the strip next to the H1.
+        //   compact (portrait phone) — bottom-right, weight bumped (bigger
+        //     dots, bolder edges, higher alpha) so the viz reads on retina
+        //     against the boid backdrop.
+        //   default (desktop / tablet) — original bottom-right ambient look.
+        var landscapePhone = ch < 480 && cw > ch;
+        var compact = !landscapePhone && (cw < 480 || ch < 500);
 
-        // Adaptive footprint, clamp(min, fluid, max) — mirrors the styles.css idiom.
-        var W       = clamp(78, cw * 0.15, 158);
-        var H       = clamp(54, ch * 0.13, compact ? 72 : 128);
-        var marginX = clamp(compact ? 10 : 14, cw * 0.022, compact ? 20 : 32);
-        var marginY = clamp(compact ? 10 : 14, ch * 0.022, compact ? 18 : 32);
-        var dotR    = clamp(1.1, H / 70, 1.6);
+        var W, H, marginX, marginY;
+        if (landscapePhone) {
+            W = clamp(86, cw * 0.16, 124);
+            H = clamp(38, ch * 0.10, 52);
+            marginX = clamp(10, cw * 0.018, 18);
+            marginY = clamp(10, ch * 0.030, 18);
+        } else if (compact) {
+            W = clamp(104, cw * 0.18, 134);
+            H = clamp(80,  ch * 0.13, 100);
+            marginX = clamp(12, cw * 0.024, 22);
+            marginY = clamp(12, ch * 0.022, 20);
+        } else {
+            W = clamp(78, cw * 0.15, 158);
+            H = clamp(54, ch * 0.13, 128);
+            marginX = clamp(14, cw * 0.022, 32);
+            marginY = clamp(14, ch * 0.022, 32);
+        }
+        var bumped = landscapePhone || compact;
+        var dotR         = bumped ? 2.0 : 1.6;
+        var edgeWidth    = bumped ? 0.9 : 0.6;
+        var edgeAlphaCap = bumped ? 0.58 : 0.42;
+        var dotBaseAlpha = bumped ? 0.18 : 0.10;
 
-        // Caption tier: two-line on roomy desktop, one-line on tablet / landscape,
-        // none on narrow phones. Architecture columns are the real signal — the
-        // caption is decoration.
-        var captionLines = cw < 380 ? 0 : (cw < 520 || compact) ? 1 : 2;
+        // Caption tier: hidden on landscape phones (no vertical room above
+        // first paragraph), single line on narrow / compact, two on desktop.
+        var captionLines;
+        if (landscapePhone || cw < 380) captionLines = 0;
+        else if (cw < 520 || compact) captionLines = 1;
+        else captionLines = 2;
         var captionReserve = captionLines === 2 ? 24 : captionLines === 1 ? 12 : 0;
 
         var x0 = cw - marginX - W;
-        var y0 = ch - marginY - H - captionReserve;
+        // Landscape anchors to the TOP of the viewport (next to H1); other
+        // regimes anchor to the bottom-right.
+        var y0 = landscapePhone ? marginY : ch - marginY - H - captionReserve;
 
         var layerSizes = [model.featureDim].concat(model.layers.map(function (L) { return L.outDim; }));
         var nLayers = layerSizes.length;
@@ -101,9 +127,9 @@
                 var sigCap = edges.length ? edges[0][2] : 1;
                 for (var e = 0; e < maxEdges; e++) {
                     var ed = edges[e];
-                    var a = Math.min(0.42, (ed[2] / sigCap) * 0.42);
+                    var a = Math.min(edgeAlphaCap, (ed[2] / sigCap) * edgeAlphaCap);
                     ctx.strokeStyle = 'rgba(85, 85, 85, ' + a.toFixed(3) + ')';
-                    ctx.lineWidth = 0.6;
+                    ctx.lineWidth = edgeWidth;
                     ctx.beginPath();
                     ctx.moveTo(posPrev[ed[0]].x, posPrev[ed[0]].y);
                     ctx.lineTo(posNext[ed[1]].x, posNext[ed[1]].y);
@@ -130,7 +156,7 @@
             for (var k2 = 0; k2 < nn; k2++) {
                 var v = Math.abs(act[k2]) / norm;
                 if (v > 1) v = 1;
-                var baseAlpha = 0.10;
+                var baseAlpha = dotBaseAlpha;
                 var alpha = baseAlpha + (1 - baseAlpha) * v * 0.78;
                 var rgb = isOutput ? '140, 60, 60' : '85, 85, 85';
                 ctx.fillStyle = 'rgba(' + rgb + ', ' + alpha.toFixed(3) + ')';

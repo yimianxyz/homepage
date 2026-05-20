@@ -63,6 +63,11 @@
     </style>
     <script>
         window.addEventListener("resize", resizeCanvas);
+        // iOS Safari fires visualViewport.resize when the URL bar / bottom
+        // toolbar shows or hides; window.resize alone is unreliable for that.
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener("resize", resizeCanvas);
+        }
     </script>
 </head>
 <body>

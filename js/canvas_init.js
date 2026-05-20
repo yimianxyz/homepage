@@ -15,22 +15,24 @@ function checkForCanvasSupport() {
 		return true;
 	}
 }
+// Visible viewport dimensions. On iOS Safari the layout viewport (100vh,
+// innerHeight) includes the area covered by the URL bar and bottom toolbar,
+// so content drawn at the bottom of the canvas is composited behind chrome.
+// window.visualViewport returns the actually-visible region, which is what
+// we want for sizing the canvas. Fall back to innerWidth/innerHeight on
+// browsers without visualViewport support.
 function getWidth() {
-	return Math.max(
-		document.documentElement.scrollWidth,
-		document.documentElement.offsetWidth,
-		document.documentElement.clientWidth,
-		window.innerWidth
-	);
+	if (window.visualViewport && window.visualViewport.width > 0) {
+		return Math.round(window.visualViewport.width);
+	}
+	return window.innerWidth || document.documentElement.clientWidth;
 }
 
 function getHeight() {
-	return Math.max(
-		document.documentElement.scrollHeight,
-		document.documentElement.offsetHeight,
-		document.documentElement.clientHeight,
-		window.innerHeight
-	);
+	if (window.visualViewport && window.visualViewport.height > 0) {
+		return Math.round(window.visualViewport.height);
+	}
+	return window.innerHeight || document.documentElement.clientHeight;
 }
 
 
@@ -40,4 +42,4 @@ function resizeCanvas(width, height) {
 		canvas.width = getWidth();
 		canvas.height = getHeight();
 	}
-}; 
+};
