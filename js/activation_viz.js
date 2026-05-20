@@ -89,12 +89,15 @@
         var edgeAlphaCap = bumped ? 0.58 : 0.42;
         var dotBaseAlpha = bumped ? 0.18 : 0.10;
 
-        // Caption tier: hidden on landscape phones (no vertical room above
-        // first paragraph), single line on narrow / compact, two on desktop.
+        // Caption tier: the numbers line ("N left · M eaten") is the
+        // signal — always show it when the viz is visible. The "brain"
+        // sub-label is decorative and only earns space on roomy desktop.
+        // Landscape phones suppress the caption entirely because the top-
+        // right anchor leaves no room below before the H1.
         var captionLines;
-        if (landscapePhone || cw < 380) captionLines = 0;
-        else if (cw < 520 || compact) captionLines = 1;
-        else captionLines = 2;
+        if (landscapePhone) captionLines = 0;
+        else if (cw >= 520 && !compact) captionLines = 2;
+        else captionLines = 1;
         var captionReserve = captionLines === 2 ? 24 : captionLines === 1 ? 12 : 0;
 
         var x0 = cw - marginX - W;
@@ -209,7 +212,7 @@
             ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W, y0 + H + 8);
             if (captionLines >= 2) {
                 ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-                ctx.fillText('predator brain', x0 + W, y0 + H + 22);
+                ctx.fillText('brain', x0 + W, y0 + H + 22);
             }
             ctx.textAlign = 'left';
             ctx.textBaseline = 'alphabetic';
