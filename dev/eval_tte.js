@@ -24,9 +24,9 @@ let Oracle, loadModel;
 // either extinction (all boids eaten) or maxFrames. Returns a struct with
 // TTE, the list of frame numbers at which catches happened, and a flag for
 // whether extinction was actually reached.
-function evalSeed(nnFn, seed, maxFrames, numBoids) {
+function evalSeed(nnFn, seed, maxFrames, numBoids, autoTargetMode) {
     if (!Oracle) Oracle = require('./oracle').Oracle;
-    const oracle = new Oracle({ seed, numBoids, nnFn });
+    const oracle = new Oracle({ seed, numBoids, nnFn, autoTargetMode: autoTargetMode || 'random' });
     const initialBoids = oracle.sim.boids.length;
     let prevCount = initialBoids;
     const catchFrames = [];
@@ -106,9 +106,9 @@ function buildNNFn(spec) {
 // Worker entry. Receives a list of seeds + the policy spec + run params,
 // returns a list of evalSeed results.
 if (!isMainThread) {
-    const { policySpec, seeds, maxFrames, numBoids } = workerData;
+    const { policySpec, seeds, maxFrames, numBoids, autoTargetMode } = workerData;
     const nnFn = buildNNFn(policySpec);
-    const out = seeds.map(s => evalSeed(nnFn, s, maxFrames, numBoids));
+    const out = seeds.map(s => evalSeed(nnFn, s, maxFrames, numBoids, autoTargetMode));
     parentPort.postMessage(out);
     return;  // unreachable; node exits after postMessage on worker end
 }
@@ -122,6 +122,7 @@ async function evalPolicy(policySpec, opts) {
     const maxFrames = opts.maxFrames || 12000;
     const numBoids = opts.numBoids || 120;
     const workers = Math.min(opts.workers || 4, seeds.length);
+    const autoTargetMode = opts.autoTargetMode || 'random';
 
     // Chunk seeds across workers.
     const chunkSize = Math.ceil(seeds.length / workers);
@@ -134,7 +135,7 @@ async function evalPolicy(policySpec, opts) {
     const allResults = await Promise.all(chunks.map(chunkSeeds =>
         new Promise((resolve, reject) => {
             const w = new Worker(__filename, {
-                workerData: { policySpec, seeds: chunkSeeds, maxFrames, numBoids },
+                workerData: { policySpec, seeds: chunkSeeds, maxFrames, numBoids, autoTargetMode },
             });
             w.on('message', resolve);
             w.on('error', reject);
@@ -185,6 +186,7 @@ function parseArgs(argv) {
         workers: 4,
         policy: null,            // 'null' | 'random' — overrides weights when set
         report: null,            // optional path to dump full JSON
+        autoTarget: 'random',    // 'random' | 'nearest_boid' | 'flock_centroid' | 'farthest_in_K'
     };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
@@ -196,6 +198,7 @@ function parseArgs(argv) {
         else if (a === '--workers') args.workers = +argv[++i];
         else if (a === '--policy') args.policy = argv[++i];
         else if (a === '--report') args.report = argv[++i];
+        else if (a === '--autoTarget') args.autoTarget = argv[++i];
     }
     return args;
 }
@@ -208,9 +211,11 @@ if (require.main === module) {
                      : { kind: 'weights', path: path.resolve(args.weights) };
     evalPolicy(policySpec, {
         seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, workers: args.workers,
+        autoTargetMode: args.autoTarget,
     }).then(summary => {
         const compact = {
             policy: policySpec.kind === 'weights' ? path.basename(policySpec.path) : policySpec.kind,
+            autoTarget: args.autoTarget,
             seedsRun: summary.seedsRun,
             maxFrames: summary.maxFrames,
             numBoids: summary.numBoids,

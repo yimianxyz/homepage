@@ -24,7 +24,62 @@ const DEFAULT_OPTS = {
     seed: 1,
     nnFn: null,            // optional: (features) => [ax, ay], replaces the rule
     forcePolicyR: true,    // override PREDATOR_RANGE to POLICY_R inside the VM
+    autoTargetMode: 'random', // 'random' | 'nearest_boid' | 'flock_centroid' | 'farthest_in_K'
 };
+
+// Compute the patrol target the predator should aim at when no boid is in
+// hunting range. The rule's original choice ('random') wanders to a random
+// canvas point every 5 s — fine for visual feel, terrible for catch rate
+// when boids cluster on the other side of the map. The boid-aware modes
+// give the predator a smarter "go toward the flock" patrol behavior; we
+// can A/B them against 'random' on the eval suite to find the structural
+// best.
+function computeAutoTarget(mode, predator, boids, defaultTarget, canvasWidth, canvasHeight, simRandomFn) {
+    if (mode === 'nearest_boid') {
+        // Aim at the nearest boid (regardless of distance). The predator
+        // will pursue continuously rather than wander while waiting for one
+        // to enter R. seek_auto_xy then == seek_boid_xy in patrol mode.
+        let bestD2 = Infinity, bx = defaultTarget.x, by = defaultTarget.y;
+        for (let i = 0; i < boids.length; i++) {
+            const dx = boids[i].position.x - predator.position.x;
+            const dy = boids[i].position.y - predator.position.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < bestD2) { bestD2 = d2; bx = boids[i].position.x; by = boids[i].position.y; }
+        }
+        return { x: bx, y: by };
+    }
+    if (mode === 'flock_centroid') {
+        // Aim at the centroid of all boids. Smoother than nearest_boid:
+        // the predator doesn't oscillate when nearest flips between two
+        // similar-distance boids.
+        if (boids.length === 0) return defaultTarget;
+        let sx = 0, sy = 0;
+        for (let i = 0; i < boids.length; i++) {
+            sx += boids[i].position.x;
+            sy += boids[i].position.y;
+        }
+        return { x: sx / boids.length, y: sy / boids.length };
+    }
+    if (mode === 'farthest_in_K') {
+        // Aim at the farthest of the K=4 nearest. Drags predator outward
+        // when nearest cluster keeps escaping — pre-emptive coverage of
+        // the secondary cluster. Speculative; included for the A/B sweep.
+        const K = 4;
+        const pairs = [];
+        for (let i = 0; i < boids.length; i++) {
+            const dx = boids[i].position.x - predator.position.x;
+            const dy = boids[i].position.y - predator.position.y;
+            pairs.push({ d2: dx * dx + dy * dy, x: boids[i].position.x, y: boids[i].position.y });
+        }
+        pairs.sort((a, b) => a.d2 - b.d2);
+        const top = pairs.slice(0, Math.min(K, pairs.length));
+        if (top.length === 0) return defaultTarget;
+        const last = top[top.length - 1];
+        return { x: last.x, y: last.y };
+    }
+    // 'random' — keep the default patrol target (regenerated externally).
+    return defaultTarget;
+}
 
 function makeStubCtx() {
     // Canvas 2D API surface used by boid.render / predator.render. No-ops.
@@ -131,6 +186,7 @@ class Oracle {
         predator._lastFeatures = null;
         predator._lastOutput = null;
 
+        const autoTargetMode = opts.autoTargetMode;
         if (opts.nnFn) {
             const nnFn = opts.nnFn;
             predator.getAutonomousForce = function (boids) {
@@ -145,15 +201,27 @@ class Oracle {
                     }
                 }
                 if (!anyInRange) {
-                    const currentTime = sandbox.simNow();
-                    if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
-                        const margin = 50;
-                        this.autonomousTarget.x = margin + sandbox.simRandom() * (this.simulation.canvasWidth - 2 * margin);
-                        this.autonomousTarget.y = margin + sandbox.simRandom() * (this.simulation.canvasHeight - 2 * margin);
-                        this.targetChangeTime = currentTime;
-                    }
-                    if (this.position.getDistance(this.autonomousTarget) < 30) {
-                        this.targetChangeTime = 0;
+                    if (autoTargetMode === 'random') {
+                        const currentTime = sandbox.simNow();
+                        if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
+                            const margin = 50;
+                            this.autonomousTarget.x = margin + sandbox.simRandom() * (this.simulation.canvasWidth - 2 * margin);
+                            this.autonomousTarget.y = margin + sandbox.simRandom() * (this.simulation.canvasHeight - 2 * margin);
+                            this.targetChangeTime = currentTime;
+                        }
+                        if (this.position.getDistance(this.autonomousTarget) < 30) {
+                            this.targetChangeTime = 0;
+                        }
+                    } else {
+                        // Boid-aware modes: recompute autoTarget every patrol-mode
+                        // frame to track the flock continuously.
+                        const t = computeAutoTarget(
+                            autoTargetMode, this, boids, this.autonomousTarget,
+                            this.simulation.canvasWidth, this.simulation.canvasHeight,
+                            sandbox.simRandom
+                        );
+                        this.autonomousTarget.x = t.x;
+                        this.autonomousTarget.y = t.y;
                     }
                 }
                 const features = buildFeatures(this.position, this.velocity, boids, this.autonomousTarget);
@@ -177,15 +245,25 @@ class Oracle {
                     }
                 }
                 if (!anyInRange) {
-                    const currentTime = sandbox.simNow();
-                    if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
-                        const margin = 50;
-                        this.autonomousTarget.x = margin + sandbox.simRandom() * (this.simulation.canvasWidth - 2 * margin);
-                        this.autonomousTarget.y = margin + sandbox.simRandom() * (this.simulation.canvasHeight - 2 * margin);
-                        this.targetChangeTime = currentTime;
-                    }
-                    if (this.position.getDistance(this.autonomousTarget) < 30) {
-                        this.targetChangeTime = 0;
+                    if (autoTargetMode === 'random') {
+                        const currentTime = sandbox.simNow();
+                        if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
+                            const margin = 50;
+                            this.autonomousTarget.x = margin + sandbox.simRandom() * (this.simulation.canvasWidth - 2 * margin);
+                            this.autonomousTarget.y = margin + sandbox.simRandom() * (this.simulation.canvasHeight - 2 * margin);
+                            this.targetChangeTime = currentTime;
+                        }
+                        if (this.position.getDistance(this.autonomousTarget) < 30) {
+                            this.targetChangeTime = 0;
+                        }
+                    } else {
+                        const t = computeAutoTarget(
+                            autoTargetMode, this, boids, this.autonomousTarget,
+                            this.simulation.canvasWidth, this.simulation.canvasHeight,
+                            sandbox.simRandom
+                        );
+                        this.autonomousTarget.x = t.x;
+                        this.autonomousTarget.y = t.y;
                     }
                 }
                 const features = buildFeatures(this.position, this.velocity, boids, this.autonomousTarget);
