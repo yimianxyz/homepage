@@ -148,7 +148,9 @@ Vector.prototype = {
 	},
 
 	getDistance: function(vector) {
-		return Math.sqrt(Math.pow(this.x - vector.x, 2) + Math.pow(this.y - vector.y, 2));
+		var dx = this.x - vector.x;
+		var dy = this.y - vector.y;
+		return Math.sqrt(dx * dx + dy * dy);
 	},
 
 	iSetAngle: function(angle) {
