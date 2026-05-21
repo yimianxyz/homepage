@@ -33,6 +33,7 @@ function parseArgs(argv) {
         log: null,
         rngSeed: 1234,
         zThresh: 1.0,
+        autoTarget: 'random',
     };
     for (let i = 2; i < argv.length; i++) {
         const k = argv[i];
@@ -48,6 +49,7 @@ function parseArgs(argv) {
         else if (k === '--log') a.log = argv[++i];
         else if (k === '--rngSeed') a.rngSeed = +argv[++i];
         else if (k === '--zThresh') a.zThresh = +argv[++i];
+        else if (k === '--autoTarget') a.autoTarget = argv[++i];
     }
     return a;
 }
@@ -92,11 +94,11 @@ function perturbInPlace(weights, sigma, rand) {
 // One eval cycle: write weights to a temp file, run evalPolicy, return its
 // meanCatches summary. We persist to disk so the worker threads can read
 // the policy spec by path (worker_threads can't easily share Function refs).
-async function evalCandidate(weightsObj, seeds, maxFrames, numBoids, workers, tmpPath) {
+async function evalCandidate(weightsObj, seeds, maxFrames, numBoids, workers, tmpPath, autoTargetMode) {
     fs.writeFileSync(tmpPath, JSON.stringify(weightsObj));
     const summary = await evalPolicy(
         { kind: 'weights', path: path.resolve(tmpPath) },
-        { seeds, maxFrames, numBoids, workers }
+        { seeds, maxFrames, numBoids, workers, autoTargetMode }
     );
     return summary;
 }
@@ -124,10 +126,10 @@ async function main() {
         if (args.log) fs.writeFileSync(args.log, logLines.join('\n') + '\n');
     };
 
-    log({ phase: 'start', base: args.base, sigma: args.sigma, tries: args.tries, seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, totalParams, zThresh: args.zThresh });
+    log({ phase: 'start', base: args.base, sigma: args.sigma, tries: args.tries, seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, totalParams, zThresh: args.zThresh, autoTarget: args.autoTarget });
 
     // 1. Score the baseline (so all subsequent perturbations are comparable).
-    const baseSummary = await evalCandidate(baseWeights, seeds, args.maxFrames, args.numBoids, args.workers, tmpPath);
+    const baseSummary = await evalCandidate(baseWeights, seeds, args.maxFrames, args.numBoids, args.workers, tmpPath, args.autoTarget);
     const basePerSeed = baseSummary.perSeed.map(p => p.catches);
     const baseMean = baseSummary.meanCatches;
     log({ phase: 'baseline', meanCatches: +baseMean.toFixed(3), perSeed: basePerSeed, elapsedSec: +(baseSummary.elapsedMs / 1000).toFixed(1) });
@@ -142,7 +144,7 @@ async function main() {
     for (let t = 1; t <= args.tries; t++) {
         const cand = cloneWeights(bestWeights);
         perturbInPlace(cand, args.sigma, rand);
-        const s = await evalCandidate(cand, seeds, args.maxFrames, args.numBoids, args.workers, tmpPath);
+        const s = await evalCandidate(cand, seeds, args.maxFrames, args.numBoids, args.workers, tmpPath, args.autoTarget);
         const candPerSeed = s.perSeed.map(p => p.catches);
         const candMean = s.meanCatches;
         // Paired delta (candidate − current best), same seeds.
