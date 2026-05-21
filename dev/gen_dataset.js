@@ -38,6 +38,9 @@ function parseArgs(argv) {
         out: 'dev/dataset.bin',
         workers: 4,
         numBoids: 120,
+        rule: 'rule',           // 'rule' | 'rule_v2'
+        alpha: 0,
+        autoTarget: 'random',    // 'random' | 'flock_centroid' | ...
     };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
@@ -46,21 +49,30 @@ function parseArgs(argv) {
         else if (a === '--out') args.out = argv[++i];
         else if (a === '--workers') args.workers = +argv[++i];
         else if (a === '--numBoids') args.numBoids = +argv[++i];
+        else if (a === '--rule') args.rule = argv[++i];
+        else if (a === '--alpha') args.alpha = +argv[++i];
+        else if (a === '--autoTarget') args.autoTarget = argv[++i];
     }
     return args;
 }
 
 // ---- Worker: process a list of seeds and return the buffer. ----
 function workerMain() {
-    const { seeds, framesPerSeed, numBoids } = workerData;
+    const { seeds, framesPerSeed, numBoids, rule, alpha, autoTarget } = workerData;
     const { Oracle } = require('./oracle');
     const FD = spec.FEATURE_DIM;
     const ROW = FD + 2;
     const buf = new Float32Array(seeds.length * framesPerSeed * ROW);
     let wIdx = 0;
     let validRows = 0;
+    // Choose policy: rule_v2 takes alpha, rule is unchanged.
+    let nnFn = null;
+    if (rule === 'rule_v2') {
+        const f = spec.rulePolicy_v2;
+        nnFn = (features) => f(features, alpha);
+    }
     for (const seed of seeds) {
-        const o = new Oracle({ seed, numBoids });
+        const o = new Oracle({ seed, numBoids, nnFn, autoTargetMode: autoTarget });
         for (let i = 0; i < framesPerSeed; i++) {
             o.step(false);
             const f = o.sim.predator._lastFeatures;
@@ -102,7 +114,10 @@ async function runMain() {
     const seedChunks = chunk(args.seeds, args.workers);
     const promises = seedChunks.map(seedSubset => new Promise((resolve, reject) => {
         const w = new Worker(__filename, {
-            workerData: { seeds: seedSubset, framesPerSeed: args.framesPerSeed, numBoids: args.numBoids },
+            workerData: {
+                seeds: seedSubset, framesPerSeed: args.framesPerSeed, numBoids: args.numBoids,
+                rule: args.rule, alpha: args.alpha, autoTarget: args.autoTarget,
+            },
         });
         w.on('message', msg => {
             if (msg.kind === 'progress') {
@@ -136,6 +151,9 @@ async function runMain() {
         seeds: args.seeds,
         framesPerSeed: args.framesPerSeed,
         numBoids: args.numBoids,
+        rule: args.rule,
+        alpha: args.alpha,
+        autoTarget: args.autoTarget,
         generatedAt: new Date().toISOString(),
         elapsedMs: Date.now() - tStart,
     };
