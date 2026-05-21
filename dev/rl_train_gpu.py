@@ -150,11 +150,17 @@ def evaluate(teacher, theta_flat, seeds, max_frames, feature_dim, device):
 
 
 def es_iteration(teacher, theta_flat, sigma, K, B, max_frames,
-                 seeds, feature_dim, device, lr, gen, log):
-    """One ES generation. Returns updated theta_flat and stats."""
+                 seeds, feature_dim, device, lr, gen, log,
+                 top_k=None, greedy=False, max_step_norm=None):
+    """One ES generation. Returns updated theta_flat and stats.
+
+    Variants:
+      - top_k: ARS-style — only use top-K perturbations (by best of +/- pair)
+               to compute the gradient. If None, use all K (standard ES).
+      - greedy: only update if best perturbation > baseline; else no-op.
+      - max_step_norm: cap the update's L2 norm (prevent destructive jumps).
+    """
     n_params = teacher.num_params
-    # Antithetic pairs: K perturbation directions × 2 (+ and -).
-    # K must be even.
     H = K // 2
     rng = torch.Generator(device='cpu').manual_seed(int(gen) * 1000003 + 7)
     eps_half = torch.randn(H, n_params, generator=rng).to(device).to(theta_flat.dtype)
@@ -164,19 +170,54 @@ def es_iteration(teacher, theta_flat, sigma, K, B, max_frames,
         cand = theta_flat + sigma * eps[i]
         r, _ = evaluate(teacher, cand, seeds, max_frames, feature_dim, device)
         rewards[i] = r
-    # Baseline reward of current θ (single eval, same seeds)
     base_r, _ = evaluate(teacher, theta_flat, seeds, max_frames, feature_dim, device)
 
-    # Rank-based fitness shaping (more stable than raw rewards).
-    order = torch.argsort(rewards, descending=True)
-    ranks = torch.empty_like(order, dtype=theta_flat.dtype)
-    ranks[order] = torch.arange(K, device=device, dtype=theta_flat.dtype)
-    # Centered ranks in [-0.5, 0.5]
-    centered = ranks / (K - 1) - 0.5
-    # OpenAI-ES gradient estimate
-    grad = (eps * centered.unsqueeze(1)).sum(dim=0) / (K * sigma)
-    # Step
-    new_theta = theta_flat + lr * grad
+    if greedy and rewards.max() <= base_r:
+        # No improvement found: keep current theta.
+        stats = {
+            'gen': gen,
+            'baseline_catches': float(base_r),
+            'mean_perturbation_catches': float(rewards.mean()),
+            'best_perturbation_catches': float(rewards.max()),
+            'std_perturbation_catches': float(rewards.std()),
+            'grad_norm': 0.0,
+            'step_norm': 0.0,
+            'accepted': False,
+        }
+        log(stats)
+        return theta_flat, stats
+
+    if top_k is not None and top_k < H:
+        # ARS-style elite selection. For each antithetic pair, use
+        # max(F+, F-) for ranking, then pick top_k pairs.
+        pair_max = torch.maximum(rewards[:H], rewards[H:])
+        elite_idx = torch.argsort(pair_max, descending=True)[:top_k]
+        elite_eps_pos = eps[:H][elite_idx]
+        elite_eps_neg = eps[H:][elite_idx]
+        elite_rewards_pos = rewards[:H][elite_idx]
+        elite_rewards_neg = rewards[H:][elite_idx]
+        # ARS gradient: Σ (F+ - F-) * ε  /  (top_k * σ * std(rewards))
+        diffs = (elite_rewards_pos - elite_rewards_neg).unsqueeze(1)   # (top_k, 1)
+        grad = (diffs * elite_eps_pos).sum(dim=0) / (top_k * sigma)
+        # Normalize by std of selected rewards for stability (ARS V2)
+        elite_all = torch.cat([elite_rewards_pos, elite_rewards_neg])
+        reward_std = elite_all.std().clamp_min(1e-6)
+        grad = grad / reward_std
+    else:
+        # Standard rank-shaped ES
+        order = torch.argsort(rewards, descending=True)
+        ranks = torch.empty_like(order, dtype=theta_flat.dtype)
+        ranks[order] = torch.arange(K, device=device, dtype=theta_flat.dtype)
+        centered = ranks / (K - 1) - 0.5
+        grad = (eps * centered.unsqueeze(1)).sum(dim=0) / (K * sigma)
+
+    step = lr * grad
+    if max_step_norm is not None:
+        step_norm = step.norm()
+        if step_norm > max_step_norm:
+            step = step * (max_step_norm / step_norm)
+
+    new_theta = theta_flat + step
 
     stats = {
         'gen': gen,
@@ -185,6 +226,8 @@ def es_iteration(teacher, theta_flat, sigma, K, B, max_frames,
         'best_perturbation_catches': float(rewards.max()),
         'std_perturbation_catches': float(rewards.std()),
         'grad_norm': float(grad.norm()),
+        'step_norm': float(step.norm()),
+        'accepted': True,
     }
     log(stats)
     return new_theta, stats
@@ -206,6 +249,14 @@ def main():
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed_pool_size', type=int, default=10000,
                    help='Sample B seeds from [0, seed_pool_size) each generation.')
+    p.add_argument('--fixed_seeds', type=int, default=0,
+                   help='If >0, use seeds 100..100+N (fixed every gen) instead of random sampling. Cleaner gradient at the cost of seed-set overfitting; pair with a holdout JS check.')
+    p.add_argument('--top_k', type=int, default=0,
+                   help='If >0, use ARS-style elite selection (top_k pairs).')
+    p.add_argument('--greedy', action='store_true',
+                   help='Only step if best perturbation > baseline.')
+    p.add_argument('--max_step_norm', type=float, default=0.0,
+                   help='Cap the update step L2 norm (0 = no cap).')
     p.add_argument('--out', default='dev/checkpoints/teacher')
     p.add_argument('--init_seed', type=int, default=1234)
     p.add_argument('--init_from', default=None,
@@ -261,13 +312,17 @@ def main():
     t0 = time.time()
     best_baseline = -1
     for gen in range(args.gens):
-        # Sample B seeds for this generation (rotating, to keep noise low
-        # per-perturbation but prevent overfitting across generations).
-        seeds = sorted(seed_rng.choice(args.seed_pool_size, size=args.B, replace=False).tolist())
+        if args.fixed_seeds > 0:
+            seeds = list(range(100, 100 + args.fixed_seeds))
+        else:
+            seeds = sorted(seed_rng.choice(args.seed_pool_size, size=args.B, replace=False).tolist())
         gen_t0 = time.time()
         theta, stats = es_iteration(
             teacher, theta, args.sigma, args.K, args.B, args.frames,
-            seeds, args.feature_dim, args.device, args.lr, gen, log)
+            seeds, args.feature_dim, args.device, args.lr, gen, log,
+            top_k=(args.top_k if args.top_k > 0 else None),
+            greedy=args.greedy,
+            max_step_norm=(args.max_step_norm if args.max_step_norm > 0 else None))
         stats['gen_seconds'] = time.time() - gen_t0
         stats['total_seconds'] = time.time() - t0
         if stats['baseline_catches'] > best_baseline:
