@@ -34,3 +34,23 @@ aims at when in patrol mode, the NN's seek_auto_xy feature
 auto-updates with no weight retraining required. Shipping this would
 be a one-line change in js/predator.js (replace the random-target
 block with the centroid computation).
+
+## Variant sweep — all modes A/B'd on seeds 100..115
+
+| mode               | meanCatches | Δ vs random | z    |
+|--------------------|-------------|-------------|------|
+| random (base)      | 17.44       | -           | -    |
+| nearest_boid       | 21.44       | +4.00       | 1.94 |
+| predicted_centroid | 21.38       | +3.94       | 1.91 |
+| farthest_in_K      | 22.25       | +4.81       | 2.27 |
+| flock_centroid     | 24.25       | +6.81       | 3.55 |
+| **weighted_centroid** | **24.81** | **+7.38**   | **4.26** |
+
+`weighted_centroid` edges `flock_centroid` by +0.56 (z=0.52, tied
+within noise). `predicted_centroid` (centroid + 30·mean_velocity)
+*hurt* slightly — boids flock so mean velocity is correlated but
+small relative to position spread; the lookahead pushes the target
+past where the flock actually is.
+
+Choosing **flock_centroid** for production: simpler code, same
+performance within noise. Five-line patch in js/predator.js.
