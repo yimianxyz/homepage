@@ -6,15 +6,26 @@ Last updated: 2026-05-21 22:14 UTC.
 - **shipped** (c3v3_H4, dataset_v3 random-patrol training): **24.25 catches** (16 seeds × 5000 frames, flock_centroid patrol).
 - +39% over original baseline (17.44); z=3.55 train, z=3.59 holdout.
 
-## Running experiments
+## Pivot — sim_torch ES doesn't transfer to JS
+
+VM 2 ARS reached sim_torch baseline 10.84 (gen 3) → JS only 18.44 (vs
+supervised init 20.56 and shipped 24.25). Even though sim_torch
+catches improved, JS performance **regressed**.
+
+Confirmed the rank-discordance: sim_torch is unsafe as an optimization
+target for JS-deployed policies. Killed VM 1 (stuck in greedy mode)
+and VM 2 (oscillating, not transferring). VM 3 keeps running (random
+seeds, exploring widely).
+
+## Running experiments (current)
 
 | machine | experiment | progress | est. wall |
 |---------|-----------|----------|-----------|
-| VM 1 (us-central1-a) | ARS H=64, σ=0.02, greedy, fixed_seeds, top_k=8 | gen 0/200 | 50 hr |
-| VM 2 (us-central1-a) | ARS H=64, σ=0.05, top_k=8, fixed_seeds | gen 0/200 | 50 hr |
-| VM 3 (us-central1-c) | ARS H=64, σ=0.10, top_k=8, random seeds | gen 0/200 | 50 hr |
-| local CPU | JS ES σ=0.20 on shipped, K=20 tries | gen 0/20 | 4 hr |
-| local watcher | every 30 min: pull best.pt → JS verify | continuous | indefinite |
+| VM 1 (us-central1-a) | **JS-native** rl_es σ=0.10, K=20 tries on shipped | tries 0/20 | 4 hr |
+| VM 2 (us-central1-a) | **JS-native** rl_es σ=0.30, K=20 tries on shipped | tries 0/20 | 4 hr |
+| VM 3 (us-central1-c) | GPU ARS H=64, σ=0.10, random seeds (kept running) | gen 1/200 | 50 hr |
+| local CPU | JS rl_es σ=0.20, K=20 tries on shipped | tries 0/20 | 4 hr |
+| local watcher | every 30 min: pull VM3 best.pt → JS verify | continuous | indefinite |
 
 All GPU runs are **warm-started** from a supervised H=64 distillation of
 the rule (dev/checkpoints/supervised_H64_init.pt; 23.56 catches in
