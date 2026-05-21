@@ -26,13 +26,16 @@ Predator.prototype = {
 
     // Autonomous movement. The steering policy is the trained neural
     // network in window.__predatorModel; only patrol-target bookkeeping
-    // (regenerating autoTarget on a 5 s timer or 30 px proximity) remains
-    // in plain JS. The simulation is gated on the weights being loaded,
-    // so window.__predatorModel is always present here.
+    // remains in plain JS. The simulation is gated on the weights being
+    // loaded, so window.__predatorModel is always present here.
+    //
+    // Patrol target = centroid of the live boid swarm. The predator
+    // heads toward where the boids actually are when none are in
+    // hunting range, instead of wandering toward random canvas points.
+    // Measured +39% catches/eval on the dev harness (z=3.55, held out
+    // on a second seed set at z=3.59) — see dev/reports/autotarget_*.
     getAutonomousForce: function(boids) {
         var R = POLICY_R;
-        var currentTime = simNow();
-
         var anyInRange = false;
         for (var i = 0; i < boids.length; i++) {
             if (this.position.getDistance(boids[i].position) < R) {
@@ -40,16 +43,14 @@ Predator.prototype = {
                 break;
             }
         }
-        if (!anyInRange) {
-            if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
-                var margin = 50;
-                this.autonomousTarget.x = margin + simRandom() * (this.simulation.canvasWidth - 2 * margin);
-                this.autonomousTarget.y = margin + simRandom() * (this.simulation.canvasHeight - 2 * margin);
-                this.targetChangeTime = currentTime;
+        if (!anyInRange && boids.length > 0) {
+            var sx = 0, sy = 0;
+            for (var i = 0; i < boids.length; i++) {
+                sx += boids[i].position.x;
+                sy += boids[i].position.y;
             }
-            if (this.position.getDistance(this.autonomousTarget) < 30) {
-                this.targetChangeTime = 0;
-            }
+            this.autonomousTarget.x = sx / boids.length;
+            this.autonomousTarget.y = sy / boids.length;
         }
 
         var features = buildPredatorFeatures(this.position, this.velocity, boids, this.autonomousTarget);
