@@ -1,0 +1,1 @@
+{"phase":"start","base":"js/predator_weights.json","sigma":0.05,"tries":20,"seeds":[100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115],"maxFrames":5000,"numBoids":120,"totalParams":154,"zThresh":2}
