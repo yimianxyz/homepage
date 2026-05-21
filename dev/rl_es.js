@@ -32,6 +32,7 @@ function parseArgs(argv) {
         out: 'dev/weights/rl_candidate.json',
         log: null,
         rngSeed: 1234,
+        zThresh: 1.0,
     };
     for (let i = 2; i < argv.length; i++) {
         const k = argv[i];
@@ -46,6 +47,7 @@ function parseArgs(argv) {
         else if (k === '--out') a.out = argv[++i];
         else if (k === '--log') a.log = argv[++i];
         else if (k === '--rngSeed') a.rngSeed = +argv[++i];
+        else if (k === '--zThresh') a.zThresh = +argv[++i];
     }
     return a;
 }
@@ -122,7 +124,7 @@ async function main() {
         if (args.log) fs.writeFileSync(args.log, logLines.join('\n') + '\n');
     };
 
-    log({ phase: 'start', base: args.base, sigma: args.sigma, tries: args.tries, seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, totalParams });
+    log({ phase: 'start', base: args.base, sigma: args.sigma, tries: args.tries, seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, totalParams, zThresh: args.zThresh });
 
     // 1. Score the baseline (so all subsequent perturbations are comparable).
     const baseSummary = await evalCandidate(baseWeights, seeds, args.maxFrames, args.numBoids, args.workers, tmpPath);
@@ -148,13 +150,18 @@ async function main() {
         const dMean = deltas.reduce((a, b) => a + b, 0) / deltas.length;
         const dVar = deltas.reduce((a, b) => a + (b - dMean) ** 2, 0) / deltas.length;
         const dSE = Math.sqrt(dVar / deltas.length);
-        const accept = dMean > 0 && dMean > dSE;        // simple ≥ 1·SE threshold
+        const z = dSE > 0 ? dMean / dSE : 0;
+        // Accept if delta is positive AND statistically meaningful at the
+        // configured z-threshold. Tighter z reduces false positives at the
+        // cost of missing weak-but-real improvements.
+        const accept = dMean > 0 && z > args.zThresh;
         const entry = {
             phase: 'try',
             t,
             candMean: +candMean.toFixed(3),
             dMean: +dMean.toFixed(3),
             dSE: +dSE.toFixed(3),
+            z: +z.toFixed(3),
             accept,
             elapsedSec: +(s.elapsedMs / 1000).toFixed(1),
             bestMean: +bestMean.toFixed(3),
