@@ -1,0 +1,75 @@
+{
+  "policySpec": {
+    "kind": "weights",
+    "path": "/workspace/dev/weights/seed_search/w_seed8.json"
+  },
+  "seedsRun": 8,
+  "maxFrames": 5000,
+  "numBoids": 120,
+  "elapsedMs": 340674,
+  "meanTTE": 5000,
+  "stdTTE": 0,
+  "medianTTE": 5000,
+  "minTTE": 5000,
+  "maxTTE": 5000,
+  "meanCatches": 23.75,
+  "extinctRate": 0,
+  "perSeed": [
+    {
+      "seed": 100,
+      "tte": 5000,
+      "catches": 28,
+      "extinct": false,
+      "remaining": 92
+    },
+    {
+      "seed": 101,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 102,
+      "tte": 5000,
+      "catches": 30,
+      "extinct": false,
+      "remaining": 90
+    },
+    {
+      "seed": 103,
+      "tte": 5000,
+      "catches": 26,
+      "extinct": false,
+      "remaining": 94
+    },
+    {
+      "seed": 104,
+      "tte": 5000,
+      "catches": 26,
+      "extinct": false,
+      "remaining": 94
+    },
+    {
+      "seed": 105,
+      "tte": 5000,
+      "catches": 22,
+      "extinct": false,
+      "remaining": 98
+    },
+    {
+      "seed": 106,
+      "tte": 5000,
+      "catches": 27,
+      "extinct": false,
+      "remaining": 93
+    },
+    {
+      "seed": 107,
+      "tte": 5000,
+      "catches": 13,
+      "extinct": false,
+      "remaining": 107
+    }
+  ]
+}
