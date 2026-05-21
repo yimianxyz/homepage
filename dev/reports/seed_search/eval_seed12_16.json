@@ -1,0 +1,131 @@
+{
+  "policySpec": {
+    "kind": "weights",
+    "path": "/workspace/dev/weights/seed_search/w_seed12.json"
+  },
+  "seedsRun": 16,
+  "maxFrames": 5000,
+  "numBoids": 120,
+  "elapsedMs": 686185,
+  "meanTTE": 5000,
+  "stdTTE": 0,
+  "medianTTE": 5000,
+  "minTTE": 5000,
+  "maxTTE": 5000,
+  "meanCatches": 21.5,
+  "extinctRate": 0,
+  "perSeed": [
+    {
+      "seed": 100,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 101,
+      "tte": 5000,
+      "catches": 28,
+      "extinct": false,
+      "remaining": 92
+    },
+    {
+      "seed": 102,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 103,
+      "tte": 5000,
+      "catches": 28,
+      "extinct": false,
+      "remaining": 92
+    },
+    {
+      "seed": 104,
+      "tte": 5000,
+      "catches": 26,
+      "extinct": false,
+      "remaining": 94
+    },
+    {
+      "seed": 105,
+      "tte": 5000,
+      "catches": 28,
+      "extinct": false,
+      "remaining": 92
+    },
+    {
+      "seed": 106,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 107,
+      "tte": 5000,
+      "catches": 7,
+      "extinct": false,
+      "remaining": 113
+    },
+    {
+      "seed": 108,
+      "tte": 5000,
+      "catches": 16,
+      "extinct": false,
+      "remaining": 104
+    },
+    {
+      "seed": 109,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 110,
+      "tte": 5000,
+      "catches": 28,
+      "extinct": false,
+      "remaining": 92
+    },
+    {
+      "seed": 111,
+      "tte": 5000,
+      "catches": 22,
+      "extinct": false,
+      "remaining": 98
+    },
+    {
+      "seed": 112,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 113,
+      "tte": 5000,
+      "catches": 15,
+      "extinct": false,
+      "remaining": 105
+    },
+    {
+      "seed": 114,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 115,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    }
+  ]
+}
