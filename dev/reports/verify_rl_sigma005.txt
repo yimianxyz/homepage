@@ -1,0 +1,56 @@
+=== Baseline (js/predator_weights.json) ===
+{
+  "policy": "predator_weights.json",
+  "seedsRun": 16,
+  "maxFrames": 5000,
+  "numBoids": 120,
+  "meanTTE": 5000,
+  "stdTTE": 0,
+  "medianTTE": 5000,
+  "minTTE": 5000,
+  "maxTTE": 5000,
+  "extinctRate": 0,
+  "meanCatches": 17.4,
+  "elapsedSec": 774.8
+}
+
+=== Candidate (dev/weights/rl_sigma005.json) ===
+{
+  "policy": "rl_sigma005.json",
+  "seedsRun": 16,
+  "maxFrames": 5000,
+  "numBoids": 120,
+  "meanTTE": 5000,
+  "stdTTE": 0,
+  "medianTTE": 5000,
+  "minTTE": 5000,
+  "maxTTE": 5000,
+  "extinctRate": 0,
+  "meanCatches": 19.3,
+  "elapsedSec": 709.3
+}
+
+=== Paired comparison ===
+seed   baseline   candidate   delta
+100        12          25  +13
+101        16          16  0
+102        27          28  +1
+103        14          18  +4
+104        25          19  -6
+105        13          27  +14
+106        23          18  -5
+107        10          13  +3
+108        17          14  -3
+109        14          21  +7
+110        18          17  -1
+111        22          24  +2
+112        17          17  0
+113         8          28  +20
+114        23          20  -3
+115        20           4  -16
+
+paired delta:  mean=1.88  SE=2.10  z=0.89
+baseline mean catches:  17.44
+candidate mean catches: 19.31
+improvement: 10.8%
+VERDICT: marginal — noise
