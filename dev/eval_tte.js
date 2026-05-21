@@ -75,6 +75,13 @@ function buildNNFn(spec) {
         const rulePolicy = require('./policy_spec').rulePolicy;
         return (features) => rulePolicy(features);
     }
+    if (spec.kind === 'rule_v2') {
+        // Velocity-aware rule: hunt branch aims at predicted boid
+        // position α frames ahead. spec.alpha sets the lookahead.
+        const rulePolicy_v2 = require('./policy_spec').rulePolicy_v2;
+        const alpha = spec.alpha || 0;
+        return (features) => rulePolicy_v2(features, alpha);
+    }
     if (spec.kind === 'weights') {
         if (!loadModel) loadModel = require('../js/predator_nn').loadModel;
         const json = JSON.parse(fs.readFileSync(spec.path, 'utf8'));
@@ -192,10 +199,11 @@ function parseArgs(argv) {
         maxFrames: 12000,
         numBoids: 120,
         workers: 4,
-        policy: null,            // 'null' | 'random' — overrides weights when set
+        policy: null,            // 'null' | 'random' | 'rule' | 'rule_v2' — overrides weights when set
         report: null,            // optional path to dump full JSON
         autoTarget: 'random',    // 'random' | 'nearest_boid' | 'flock_centroid' | 'farthest_in_K'
         lookahead: 0,            // when > 0, features see shadow boids at pos + N·velocity
+        alpha: 0,                // rule_v2: prediction horizon in frames for hunt branch
     };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
@@ -209,6 +217,7 @@ function parseArgs(argv) {
         else if (a === '--report') args.report = argv[++i];
         else if (a === '--autoTarget') args.autoTarget = argv[++i];
         else if (a === '--lookahead') args.lookahead = +argv[++i];
+        else if (a === '--alpha') args.alpha = +argv[++i];
     }
     return args;
 }
@@ -219,6 +228,7 @@ if (require.main === module) {
     const policySpec = args.policy === 'null' ? { kind: 'null' }
                      : args.policy === 'random' ? { kind: 'random' }
                      : args.policy === 'rule' ? { kind: 'rule' }
+                     : args.policy === 'rule_v2' ? { kind: 'rule_v2', alpha: args.alpha }
                      : { kind: 'weights', path: path.resolve(args.weights) };
     evalPolicy(policySpec, {
         seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, workers: args.workers,

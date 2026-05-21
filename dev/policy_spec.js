@@ -26,6 +26,9 @@ const F = {
     DX1: 7, DY1: 8,
     UX1: 15, UY1: 16,
     D1: 23,
+    // v4: per-K-nearest boid velocities (slots 35..42). Slot k uses
+    // [35 + 2*k] = vx_k, [36 + 2*k] = vy_k.
+    VX1: 35, VY1: 36,
 };
 
 // Predator kinematic constants -- must match js/predator.js exactly.
@@ -91,6 +94,38 @@ function ruleBranch(features) {
     return (d1 < POLICY_R && features[F.DX1] !== POLICY_PAD) ? 'hunt' : 'patrol';
 }
 
+// rulePolicy v2: in hunt mode, aim at the *predicted* boid position
+// α frames into the future. The predator's own predicted position is
+// also extrapolated, so the relative offset to track is:
+//
+//   predicted_offset = (boid.pos - pred.pos) + α × (boid.vel - pred.vel)
+//                    = dx1 + α × (bvx - vx)   (and same for y)
+//
+// α=0 collapses to the original rule. Tuning α trades aim-precision
+// (small α) against aim-anticipation (large α); too large overshoots.
+function rulePolicy_v2(features, alpha) {
+    const vx = features[F.VX];
+    const vy = features[F.VY];
+    const dx1 = features[F.DX1];
+    const dy1 = features[F.DY1];
+    const d1 = features[F.D1];
+    const bvx1 = features[F.VX1];
+    const bvy1 = features[F.VY1];
+
+    let tx, ty;
+    if (d1 < POLICY_R && dx1 !== POLICY_PAD) {
+        tx = dx1 + alpha * (bvx1 - vx);
+        ty = dy1 + alpha * (bvy1 - vy);
+    } else {
+        tx = features[F.DXA];
+        ty = features[F.DYA];
+    }
+
+    const desired = fastSetMagnitude(tx, ty, PREDATOR_MAX_SPEED);
+    const steering = fastLimit(desired[0] - vx, desired[1] - vy, PREDATOR_MAX_FORCE);
+    return steering;
+}
+
 module.exports = {
     POLICY_R,
     POLICY_K,
@@ -105,5 +140,6 @@ module.exports = {
     trueDist,
     buildFeatures,
     rulePolicy,
+    rulePolicy_v2,
     ruleBranch,
 };
