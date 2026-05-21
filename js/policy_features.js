@@ -55,8 +55,19 @@
     //   --- v4 padding for absent boids: 0 (zero velocity is a fine sentinel
     //   --- because the position is already PAD-coded; the NN can read the
     //   --- inRange flag and the d_k distance to know if slot k is real) ---
-    // Total: 43 features.
-    var FEATURE_DIM = 43;
+    //   --- v5 addition: precomputed velocity-aware hunt steering. The NN
+    //   --- distilled from the velocity-aware rule needs this slot as the
+    //   --- "ready-made answer" the same way seek_boid_xy (29,30) gave it
+    //   --- the answer for the original rule. Without it, H=4 ran out of
+    //   --- capacity trying to reconstruct rule_v2's steering from raw inputs.
+    //   [43..44] seek_boid_v2_xy = fastLimit(fastSetMag((dx1 + α·(bvx1-vx),
+    //                                                    dy1 + α·(bvy1-vy)),
+    //                                                   MAX_SPEED) - vel,
+    //                                       MAX_FORCE)
+    //            with α = PREDICT_ALPHA below.
+    // Total: 45 features.
+    var FEATURE_DIM = 45;
+    var PREDICT_ALPHA = 8;   // matches the rule_v2 α used to generate v5 dataset
 
     function fastMag(x, y) {
         var ax = Math.abs(x), ay = Math.abs(y);
@@ -145,6 +156,19 @@
         // model the rule's discontinuity at d1=R precisely, instead of having
         // to smear it across a finite transition region.
         out[34] = (d1 < POLICY_R && dx1 !== POLICY_PAD) ? 1 : 0;
+        // v5 addition: precomputed velocity-aware hunt steering. Uses the
+        // nearest boid's velocity (slots 35,36 above) to compute rule_v2's
+        // exact hunt-branch output. The distilled NN can blend this slot
+        // with seek_auto_xy via the inRange_binary feature just like the
+        // v3 model did.
+        if (d1 < POLICY_R && dx1 !== POLICY_PAD) {
+            var bvx1 = out[35], bvy1 = out[36];
+            seekStep(dx1 + PREDICT_ALPHA * (bvx1 - vx),
+                     dy1 + PREDICT_ALPHA * (bvy1 - vy),
+                     vx, vy, out, 43);
+        } else {
+            out[43] = 0; out[44] = 0;
+        }
 
         return out;
     }
