@@ -68,6 +68,13 @@ function evalSeed(nnFn, seed, maxFrames, numBoids, autoTargetMode) {
 // In worker context this is called inside the worker; in main context only
 // for single-threaded runs.
 function buildNNFn(spec) {
+    if (spec.kind === 'rule') {
+        // Pure analytical rule: head toward nearest boid in range, else
+        // toward autoTarget. Useful for distinguishing distillation loss
+        // from rule-level limits when we change autoTargetMode.
+        const rulePolicy = require('./policy_spec').rulePolicy;
+        return (features) => rulePolicy(features);
+    }
     if (spec.kind === 'weights') {
         if (!loadModel) loadModel = require('../js/predator_nn').loadModel;
         const json = JSON.parse(fs.readFileSync(spec.path, 'utf8'));
@@ -208,6 +215,7 @@ if (require.main === module) {
     const seeds = Array.from({ length: args.numSeeds }, (_, i) => args.seedStart + i);
     const policySpec = args.policy === 'null' ? { kind: 'null' }
                      : args.policy === 'random' ? { kind: 'random' }
+                     : args.policy === 'rule' ? { kind: 'rule' }
                      : { kind: 'weights', path: path.resolve(args.weights) };
     evalPolicy(policySpec, {
         seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, workers: args.workers,
