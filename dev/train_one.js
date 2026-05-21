@@ -432,7 +432,10 @@ function saveModel(model, arch, args, mean, std, outPath) {
         version: 1,
         id: arch.id,
         K: spec.POLICY_K,
-        featureDim: spec.FEATURE_DIM,
+        // Use the actual trained input dim (matches the dataset's featureDim
+        // and the layer-0 W shape). spec.FEATURE_DIM may have drifted higher
+        // since the dataset was generated.
+        featureDim: mean.length,
         inputMean: Array.from(mean),
         inputStd: Array.from(std),
         outputScale: args.outputScale,

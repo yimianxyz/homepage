@@ -110,8 +110,11 @@ def load_weights(path: str | Path) -> dict:
         W = np.array(L['W'], dtype=np.float32).reshape(in_dim, out_dim)
         b = np.array(L['b'], dtype=np.float32)
         layers.append({'W': W, 'b': b, 'activation': L['activation']})
+    # Use inputMean length as the ground-truth featureDim (some weight files
+    # incorrectly save spec.FEATURE_DIM instead of the dataset's featureDim).
+    true_fd = len(j['inputMean'])
     return {
-        'featureDim': j['featureDim'],
+        'featureDim': true_fd,
         'inputMean': np.array(j['inputMean'], dtype=np.float32),
         'inputStd': np.array(j['inputStd'], dtype=np.float32),
         'outputScale': float(j['outputScale']),
