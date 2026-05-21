@@ -25,6 +25,7 @@ const DEFAULT_OPTS = {
     nnFn: null,            // optional: (features) => [ax, ay], replaces the rule
     forcePolicyR: true,    // override PREDATOR_RANGE to POLICY_R inside the VM
     autoTargetMode: 'random', // 'random' | 'nearest_boid' | 'flock_centroid' | 'farthest_in_K'
+    lookaheadFrames: 0,    // when > 0, features see shadow boids at pos + N·velocity
 };
 
 // Compute the patrol target the predator should aim at when no boid is in
@@ -222,6 +223,25 @@ class Oracle {
         predator._lastOutput = null;
 
         const autoTargetMode = opts.autoTargetMode;
+        const lookaheadFrames = opts.lookaheadFrames || 0;
+        // Build a shadow boids array where each boid sits at its predicted
+        // position N frames into the future. Used only for feature
+        // construction; real boids unchanged so catch detection and
+        // autoTarget centroid still use ground truth.
+        function shadowBoids(boids) {
+            if (lookaheadFrames <= 0) return boids;
+            const out = new Array(boids.length);
+            for (let i = 0; i < boids.length; i++) {
+                const b = boids[i];
+                out[i] = {
+                    position: {
+                        x: b.position.x + lookaheadFrames * b.velocity.x,
+                        y: b.position.y + lookaheadFrames * b.velocity.y,
+                    },
+                };
+            }
+            return out;
+        }
         if (opts.nnFn) {
             const nnFn = opts.nnFn;
             predator.getAutonomousForce = function (boids) {
@@ -259,7 +279,8 @@ class Oracle {
                         this.autonomousTarget.y = t.y;
                     }
                 }
-                const features = buildFeatures(this.position, this.velocity, boids, this.autonomousTarget);
+                const featBoids = shadowBoids(boids);
+                const features = buildFeatures(this.position, this.velocity, featBoids, this.autonomousTarget);
                 const out = nnFn(features);
                 this._lastFeatures = features;
                 this._lastOutput = [out[0], out[1]];
@@ -301,7 +322,8 @@ class Oracle {
                         this.autonomousTarget.y = t.y;
                     }
                 }
-                const features = buildFeatures(this.position, this.velocity, boids, this.autonomousTarget);
+                const featBoids = shadowBoids(boids);
+                const features = buildFeatures(this.position, this.velocity, featBoids, this.autonomousTarget);
                 const out = rulePolicy(features);
                 this._lastFeatures = features;
                 this._lastOutput = [out[0], out[1]];
