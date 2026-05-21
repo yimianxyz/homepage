@@ -60,6 +60,41 @@ function computeAutoTarget(mode, predator, boids, defaultTarget, canvasWidth, ca
         }
         return { x: sx / boids.length, y: sy / boids.length };
     }
+    if (mode === 'predicted_centroid') {
+        // Centroid + lookahead × mean boid velocity. The boids flock with
+        // alignment, so their mean velocity is a coherent direction;
+        // adding it lets the predator anticipate where the flock will be
+        // a few frames from now instead of chasing the past.
+        if (boids.length === 0) return defaultTarget;
+        let sx = 0, sy = 0, svx = 0, svy = 0;
+        for (let i = 0; i < boids.length; i++) {
+            sx += boids[i].position.x;
+            sy += boids[i].position.y;
+            svx += boids[i].velocity.x;
+            svy += boids[i].velocity.y;
+        }
+        const n = boids.length;
+        const lookahead = 30; // frames
+        return { x: sx / n + lookahead * svx / n, y: sy / n + lookahead * svy / n };
+    }
+    if (mode === 'weighted_centroid') {
+        // Centroid weighted by 1/distance: emphasises nearby boids. The
+        // raw centroid can sit in the middle of a sparse region between
+        // two clusters; the weighted version pulls toward whatever
+        // cluster the predator is closer to.
+        if (boids.length === 0) return defaultTarget;
+        let wsum = 0, sx = 0, sy = 0;
+        for (let i = 0; i < boids.length; i++) {
+            const dx = boids[i].position.x - predator.position.x;
+            const dy = boids[i].position.y - predator.position.y;
+            const w = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+            wsum += w;
+            sx += boids[i].position.x * w;
+            sy += boids[i].position.y * w;
+        }
+        if (wsum === 0) return defaultTarget;
+        return { x: sx / wsum, y: sy / wsum };
+    }
     if (mode === 'farthest_in_K') {
         // Aim at the farthest of the K=4 nearest. Drags predator outward
         // when nearest cluster keeps escaping — pre-emptive coverage of
