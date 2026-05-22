@@ -239,11 +239,15 @@ def main():
         rewards = means[:args.K]
         baseline = float(means[args.K].item())
 
-        # Snapshot pre-step theta — this is the one we just measured as
-        # `baseline`, and the one we save when baseline beats the prior
-        # best. The post-step theta below is what we *try* next; we don't
-        # yet know its score.
+        # Snapshot pre-step theta and find the best candidate this gen.
+        # Save the BEST seen (perturbation or baseline) as best.json — the
+        # candidates routinely hit far above the central theta's baseline,
+        # and we want best.json to be the highest-scoring policy we've
+        # actually measured, not the gradient-step extrapolation.
         theta_pre = theta.clone()
+        gen_max_idx = int(means.argmax().item())
+        gen_max_score = float(means[gen_max_idx].item())
+        gen_max_theta = all_thetas[gen_max_idx].detach().clone()
 
         # ARS-V1 elite selection
         pair_max = torch.maximum(rewards[:H], rewards[H:])     # (H,)
@@ -270,6 +274,9 @@ def main():
             'best_perturbation_catches': float(rewards.max().item()),
             'std_perturbation_catches': float(rewards.std().item()),
             'top_k_mean_catches': float(reward_pool.mean().item()),
+            'gen_max_score': gen_max_score,
+            'gen_max_is_pert': gen_max_idx < args.K,
+            'best_so_far': best_baseline,
             'grad_norm': float(grad.norm().item()),
             'step_norm': step_norm,
             'gen_seconds': gen_t,
@@ -277,25 +284,25 @@ def main():
             'seeds_start': ss,
         })
 
-        # Save the PRE-step theta as `best.*` whenever its measured
-        # baseline beats the prior best. This is the theta with the
-        # score we logged — the post-step theta is just where we're
-        # heading next and hasn't been measured yet.
-        if baseline > best_baseline:
-            best_baseline = baseline
+        # Save the BEST seen (perturbation OR baseline). The candidates
+        # frequently hit far above the central theta's baseline, so this
+        # captures real high-scoring policies we'd otherwise discard.
+        if gen_max_score > best_baseline:
+            best_baseline = gen_max_score
             torch.save({
-                'theta': theta_pre.detach().cpu(),
+                'theta': gen_max_theta.detach().cpu(),
                 'P': P,
                 'gen': gen,
                 'baseline_catches': best_baseline,
+                'is_perturbation': gen_max_idx < args.K,
                 'args': vars(args),
             }, out_dir / 'best.pt')
-            export_weights_to_js(theta_pre, template,
+            export_weights_to_js(gen_max_theta, template,
                                  str(out_dir / 'best.json'))
 
         if gen % args.ckpt_every == 0 or gen == args.gens - 1:
-            # ckpt_gen* always saves the pre-step theta whose baseline we
-            # just measured, so the .json matches the logged score.
+            # ckpt_gen* saves the central (pre-step) theta whose baseline
+            # we just measured, so the .json matches the logged baseline.
             torch.save({
                 'theta': theta_pre.detach().cpu(),
                 'P': P,
