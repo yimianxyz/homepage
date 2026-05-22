@@ -218,13 +218,14 @@ def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
 
 class Sim:
     def __init__(self, seeds, weights, num_boids=N_BOIDS,
-                 auto_target='flock_centroid', device='cpu'):
+                 auto_target='flock_centroid', device='cpu', sequential=False):
         self.seeds = list(seeds)
         self.B = len(self.seeds)
         self.N = num_boids
         self.weights = weights
         self.auto_target_mode = auto_target
         self.device = device
+        self.sequential = sequential
         self._initialize()
 
     def _initialize(self):
@@ -255,6 +256,16 @@ class Sim:
             self.pred_vel[bi, 1] = r[2 + self.N + 1] * 2 - 1
 
         self.frame = 0
+
+        if self.sequential:
+            # Persistent acceleration accumulator — JS keeps acceleration on the
+            # boid between flock passes (iAdd, not assign) and only zeros it
+            # at the end of update(). Initialised to the result of the
+            # pre-setInterval self.tick() in simulation.js:run.
+            self.boid_accel = torch.zeros((self.B, self.N, 2), dtype=dt, device=d)
+            ax_pre, ay_pre = self._compute_boid_acceleration()
+            self.boid_accel[..., 0] = ax_pre
+            self.boid_accel[..., 1] = ay_pre
 
     def _compute_boid_acceleration(self):
         B, N = self.B, self.N
@@ -363,6 +374,170 @@ class Sim:
         self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] > m, torch.tensor(-BORDER_OFFSET, dtype=torch.float64, device=self.device), self.boid_pos[..., 1])
         self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] < -BORDER_OFFSET, torch.tensor(m, dtype=torch.float64, device=self.device), self.boid_pos[..., 1])
 
+    def _compute_single_boid_acceleration(self, i):
+        """Compute (ax, ay) for boid i across all B batches, using CURRENT
+        boid positions (which may include in-frame updates from boids 0..i-1
+        when called from the sequential loop).
+
+        Returns: ax (B,), ay (B,) — one acceleration delta from one flock pass
+        for boid i. Mirrors getCohesionVector + getSeparationVector +
+        getAlignmentVector + getPredatorAvoidanceVector from js/boid.js.
+        """
+        B, N = self.B, self.N
+        d = self.device
+        pos = self.boid_pos          # (B, N, 2)
+        vel = self.boid_vel
+        alive = self.boid_alive
+
+        pos_ix = pos[:, i, 0]        # (B,)
+        pos_iy = pos[:, i, 1]
+        vel_ix = vel[:, i, 0]
+        vel_iy = vel[:, i, 1]
+
+        delta_x = pos[..., 0] - pos_ix.unsqueeze(1)   # (B, N) other - self
+        delta_y = pos[..., 1] - pos_iy.unsqueeze(1)
+        dist = torch.sqrt(delta_x ** 2 + delta_y ** 2) + EPSILON
+
+        other_mask = torch.ones((B, N), dtype=torch.bool, device=d)
+        other_mask[:, i] = False
+        alive_j = alive & other_mask
+
+        # Cohesion
+        coh_mask = alive_j & (dist <= NEIGHBOR_DISTANCE)
+        coh_count = coh_mask.sum(dim=1)
+        coh_pos_sum_x = (pos[..., 0] * coh_mask).sum(dim=1)
+        coh_pos_sum_y = (pos[..., 1] * coh_mask).sum(dim=1)
+        coh_has = coh_count > 0
+        ones_c = torch.ones_like(coh_count, dtype=torch.float64)
+        denom = torch.where(coh_has, coh_count.double(), ones_c)
+        coh_avg_x = torch.where(coh_has, coh_pos_sum_x / denom, pos_ix)
+        coh_avg_y = torch.where(coh_has, coh_pos_sum_y / denom, pos_iy)
+        seek_x = coh_avg_x - pos_ix
+        seek_y = coh_avg_y - pos_iy
+        dx0, dy0 = fast_set_magnitude(seek_x, seek_y, MAX_SPEED)
+        cx = dx0 - vel_ix
+        cy = dy0 - vel_iy
+        cx, cy = fast_limit(cx, cy, MAX_FORCE)
+        cx = torch.where(coh_has, cx, torch.zeros_like(cx))
+        cy = torch.where(coh_has, cy, torch.zeros_like(cy))
+
+        # Separation
+        sep_mask = alive_j & (dist < DESIRED_SEPARATION) & (dist > 0)
+        sep_count = sep_mask.sum(dim=1)
+        delta_neg_x = -delta_x
+        delta_neg_y = -delta_y
+        true_mag = torch.sqrt(delta_neg_x ** 2 + delta_neg_y ** 2) + EPSILON
+        unit_x = delta_neg_x / true_mag
+        unit_y = delta_neg_y / true_mag
+        scaled_x = unit_x / dist
+        scaled_y = unit_y / dist
+        sep_sx = (scaled_x * sep_mask).sum(dim=1)
+        sep_sy = (scaled_y * sep_mask).sum(dim=1)
+        sep_has = sep_count > 0
+        ones_s = torch.ones_like(sep_count, dtype=torch.float64)
+        denom_s = torch.where(sep_has, sep_count.double(), ones_s)
+        sep_x_avg = torch.where(sep_has, sep_sx / denom_s, torch.zeros_like(sep_sx))
+        sep_y_avg = torch.where(sep_has, sep_sy / denom_s, torch.zeros_like(sep_sy))
+        m_sep = fast_mag(sep_x_avg, sep_y_avg)
+        applied = m_sep > 0
+        sx, sy = fast_set_magnitude(sep_x_avg, sep_y_avg, MAX_SPEED)
+        sx = sx - vel_ix
+        sy = sy - vel_iy
+        sx, sy = fast_limit(sx, sy, MAX_FORCE)
+        sep_x_final = torch.where(applied, sx, torch.zeros_like(sx))
+        sep_y_final = torch.where(applied, sy, torch.zeros_like(sy))
+
+        # Alignment
+        ali_mask = alive_j & (dist < NEIGHBOR_DISTANCE) & (dist > 0)
+        ali_count = ali_mask.sum(dim=1)
+        ali_sum_x = (vel[..., 0] * ali_mask).sum(dim=1)
+        ali_sum_y = (vel[..., 1] * ali_mask).sum(dim=1)
+        ali_has = ali_count > 0
+        ones_a = torch.ones_like(ali_count, dtype=torch.float64)
+        denom_a = torch.where(ali_has, ali_count.double(), ones_a)
+        ali_avg_x = torch.where(ali_has, ali_sum_x / denom_a, torch.zeros_like(ali_sum_x))
+        ali_avg_y = torch.where(ali_has, ali_sum_y / denom_a, torch.zeros_like(ali_sum_y))
+        ax_, ay_ = fast_set_magnitude(ali_avg_x, ali_avg_y, MAX_SPEED)
+        ax_ = ax_ - vel_ix
+        ay_ = ay_ - vel_iy
+        ax_, ay_ = fast_limit(ax_, ay_, MAX_FORCE)
+        ax_ = torch.where(ali_has, ax_, torch.zeros_like(ax_))
+        ay_ = torch.where(ali_has, ay_, torch.zeros_like(ay_))
+
+        # Predator avoidance
+        pdx = pos_ix - self.pred_pos[:, 0]
+        pdy = pos_iy - self.pred_pos[:, 1]
+        pdist = torch.sqrt(pdx * pdx + pdy * pdy) + EPSILON
+        in_pr = pdist < PREDATOR_RANGE
+        fm = fast_mag(pdx, pdy)
+        fm_safe = torch.where(fm > 0, fm, torch.ones_like(fm))
+        avx = pdx / fm_safe
+        avy = pdy / fm_safe
+        strength = (PREDATOR_RANGE - pdist) / PREDATOR_RANGE
+        avx = avx * strength * PREDATOR_TURN_FACTOR
+        avy = avy * strength * PREDATOR_TURN_FACTOR
+        avx, avy = fast_limit(avx, avy, MAX_FORCE * 1.5)
+        avx = torch.where(in_pr, avx, torch.zeros_like(avx))
+        avy = torch.where(in_pr, avy, torch.zeros_like(avy))
+
+        acc_x = (cx * COH_MULT) + (sep_x_final * SEP_MULT) + (ax_ * ALI_MULT) + avx
+        acc_y = (cy * COH_MULT) + (sep_y_final * SEP_MULT) + (ay_ * ALI_MULT) + avy
+        return acc_x, acc_y
+
+    def _step_boids_sequential(self):
+        """Two-pass sequential boid update, matching js/simulation.js.
+
+        Frame structure in JS (`tick()` then `render()`):
+          1. tick():    parallel flock pass — for every boid i, add forces
+                        computed from CURRENT (pre-update) positions to
+                        boid_accel[i]. No position updates.
+          2. render():  sequential loop — for each boid i in order:
+                          (a) flock pass — ADD forces (from positions that
+                              now include in-frame updates of boids 0..i-1)
+                              to boid_accel[i].
+                          (b) velocity += boid_accel[i]; fastLimit.
+                              position += velocity; wrap. boid_accel[i] = 0.
+
+        Pre-loop tick (the `self.tick()` call before the setInterval in
+        simulation.js:run) is replicated at the end of _initialize.
+        """
+        # Phase 1: parallel pre-tick (the setInterval's self.tick() call)
+        ax_pre, ay_pre = self._compute_boid_acceleration()
+        self.boid_accel[..., 0] += ax_pre
+        self.boid_accel[..., 1] += ay_pre
+
+        d = self.device
+        dt = torch.float64
+        m_w = CANVAS_W + BORDER_OFFSET
+        m_h = CANVAS_H + BORDER_OFFSET
+        neg_b = torch.tensor(-BORDER_OFFSET, dtype=dt, device=d)
+        pos_mw = torch.tensor(m_w, dtype=dt, device=d)
+        pos_mh = torch.tensor(m_h, dtype=dt, device=d)
+
+        # Phase 2: sequential per-boid pass
+        for i in range(self.N):
+            ax_i, ay_i = self._compute_single_boid_acceleration(i)
+            self.boid_accel[:, i, 0] += ax_i
+            self.boid_accel[:, i, 1] += ay_i
+
+            new_vx = self.boid_vel[:, i, 0] + self.boid_accel[:, i, 0]
+            new_vy = self.boid_vel[:, i, 1] + self.boid_accel[:, i, 1]
+            new_vx, new_vy = fast_limit(new_vx, new_vy, MAX_SPEED)
+            self.boid_vel[:, i, 0] = new_vx
+            self.boid_vel[:, i, 1] = new_vy
+
+            new_px = self.boid_pos[:, i, 0] + new_vx
+            new_py = self.boid_pos[:, i, 1] + new_vy
+            new_px = torch.where(new_px > m_w, neg_b, new_px)
+            new_px = torch.where(new_px < -BORDER_OFFSET, pos_mw, new_px)
+            new_py = torch.where(new_py > m_h, neg_b, new_py)
+            new_py = torch.where(new_py < -BORDER_OFFSET, pos_mh, new_py)
+            self.boid_pos[:, i, 0] = new_px
+            self.boid_pos[:, i, 1] = new_py
+
+            self.boid_accel[:, i, 0] = 0
+            self.boid_accel[:, i, 1] = 0
+
     def _update_auto_target(self):
         if self.auto_target_mode == 'random':
             return
@@ -443,7 +618,10 @@ class Sim:
             self.pred_size)
 
     def step(self):
-        self._step_boids()
+        if self.sequential:
+            self._step_boids_sequential()
+        else:
+            self._step_boids()
         self._step_predator()
         self._check_catches()
         self._decay_size()
@@ -465,10 +643,11 @@ if __name__ == '__main__':
     n_seeds = int(sys.argv[2]) if len(sys.argv) > 2 else 16
     max_frames = int(sys.argv[3]) if len(sys.argv) > 3 else 5000
     device = sys.argv[4] if len(sys.argv) > 4 else 'cpu'
+    sequential = '--sequential' in sys.argv
     seeds = list(range(100, 100 + n_seeds))
     weights = load_weights(weights_path, device=device)
-    print(f"loaded weights featureDim={weights['featureDim']} on {device}")
-    sim = Sim(seeds=seeds, weights=weights, device=device)
+    print(f"loaded weights featureDim={weights['featureDim']} on {device}  sequential={sequential}")
+    sim = Sim(seeds=seeds, weights=weights, device=device, sequential=sequential)
     t0 = time.time()
     out = sim.run(max_frames)
     elapsed = time.time() - t0
