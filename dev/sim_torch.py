@@ -256,6 +256,15 @@ class Sim:
             self.pred_vel[bi, 1] = r[2 + self.N + 1] * 2 - 1
 
         self.frame = 0
+        # GPU-resident scalars + per-batch row index. Pre-allocated so the
+        # full step() is graph-safe (no fresh tensor allocations per frame).
+        self._frame_ms = torch.zeros((), dtype=dt, device=d)
+        self._row_idx = torch.arange(self.B, device=d)
+        self._max_size_t = torch.tensor(PREDATOR_MAX_SIZE, dtype=dt, device=d)
+        self._base_size_t = torch.tensor(PREDATOR_BASE_SIZE, dtype=dt, device=d)
+        self._wrap_w_max = torch.tensor(CANVAS_W + 20.0, dtype=dt, device=d)
+        self._wrap_h_max = torch.tensor(CANVAS_H + 20.0, dtype=dt, device=d)
+        self._wrap_neg20 = torch.tensor(-20.0, dtype=dt, device=d)
 
         if self.sequential:
             # Persistent acceleration accumulator — JS keeps acceleration on the
@@ -576,17 +585,16 @@ class Sim:
         self.pred_vel[:, 1] = new_vy
         self.pred_pos[:, 0] += new_vx
         self.pred_pos[:, 1] += new_vy
-        d = self.device
-        dt = torch.float64
-        m = CANVAS_W + 20
-        self.pred_pos[:, 0] = torch.where(self.pred_pos[:, 0] > m, torch.tensor(-20.0, dtype=dt, device=d), self.pred_pos[:, 0])
-        self.pred_pos[:, 0] = torch.where(self.pred_pos[:, 0] < -20, torch.tensor(float(m), dtype=dt, device=d), self.pred_pos[:, 0])
-        m = CANVAS_H + 20
-        self.pred_pos[:, 1] = torch.where(self.pred_pos[:, 1] > m, torch.tensor(-20.0, dtype=dt, device=d), self.pred_pos[:, 1])
-        self.pred_pos[:, 1] = torch.where(self.pred_pos[:, 1] < -20, torch.tensor(float(m), dtype=dt, device=d), self.pred_pos[:, 1])
+        self.pred_pos[:, 0] = torch.where(self.pred_pos[:, 0] > self._wrap_w_max, self._wrap_neg20, self.pred_pos[:, 0])
+        self.pred_pos[:, 0] = torch.where(self.pred_pos[:, 0] < self._wrap_neg20, self._wrap_w_max, self.pred_pos[:, 0])
+        self.pred_pos[:, 1] = torch.where(self.pred_pos[:, 1] > self._wrap_h_max, self._wrap_neg20, self.pred_pos[:, 1])
+        self.pred_pos[:, 1] = torch.where(self.pred_pos[:, 1] < self._wrap_neg20, self._wrap_h_max, self.pred_pos[:, 1])
 
     def _check_catches(self):
-        cur_ms = self.frame * FRAME_MS
+        # cur_ms lives on GPU as a tensor scalar so the whole step() can be
+        # captured in a CUDA graph (graphs can't read Python state during
+        # replay, only GPU tensors).
+        cur_ms = self._frame_ms
         cooldown_done = (cur_ms - self.pred_last_feed_ms) >= PREDATOR_FEED_COOLDOWN_MS
         dx = self.boid_pos[..., 0] - self.pred_pos[:, None, 0]
         dy = self.boid_pos[..., 1] - self.pred_pos[:, None, 1]
@@ -595,27 +603,24 @@ class Sim:
         in_catch = (d < catch_radius) & self.boid_alive
         catch_avail = in_catch & cooldown_done.unsqueeze(1)
         any_catch = catch_avail.any(dim=1)
-        # First True index per row. torch.argmax on bool returns int64.
         first_idx = catch_avail.int().argmax(dim=1)
-        rows = torch.arange(self.B, device=self.device)
-        # Mask out (mark dead) only where any_catch
-        alive_new = self.boid_alive.clone()
-        alive_new[rows, first_idx] = torch.where(
-            any_catch, torch.zeros_like(any_catch), alive_new[rows, first_idx])
-        self.boid_alive = alive_new
-        self.pred_size = torch.where(
+        rows = self._row_idx
+        # In-place: clear the bit at (row, first_idx) where any_catch.
+        # No clone(), no attribute reassignment — graph-safe.
+        cur = self.boid_alive[rows, first_idx]
+        self.boid_alive[rows, first_idx] = cur & ~any_catch
+        self.pred_size.copy_(torch.where(
             any_catch,
-            torch.minimum(self.pred_size + PREDATOR_GROWTH,
-                          torch.tensor(PREDATOR_MAX_SIZE, dtype=torch.float64, device=self.device)),
-            self.pred_size)
-        self.pred_last_feed_ms = torch.where(any_catch, torch.tensor(float(cur_ms), dtype=torch.float64, device=self.device), self.pred_last_feed_ms)
+            torch.minimum(self.pred_size + PREDATOR_GROWTH, self._max_size_t),
+            self.pred_size))
+        self.pred_last_feed_ms.copy_(torch.where(any_catch, cur_ms.expand_as(self.pred_last_feed_ms), self.pred_last_feed_ms))
         self.catches += any_catch.int()
 
     def _decay_size(self):
-        self.pred_size = torch.where(
+        self.pred_size.copy_(torch.where(
             self.pred_size > PREDATOR_BASE_SIZE,
-            torch.maximum(self.pred_size - PREDATOR_DECAY, torch.tensor(PREDATOR_BASE_SIZE, dtype=torch.float64, device=self.device)),
-            self.pred_size)
+            torch.maximum(self.pred_size - PREDATOR_DECAY, self._base_size_t),
+            self.pred_size))
 
     def step(self):
         if self.sequential:
@@ -626,10 +631,45 @@ class Sim:
         self._check_catches()
         self._decay_size()
         self.frame += 1
+        self._frame_ms += FRAME_MS
 
     def run(self, max_frames):
         for _ in range(max_frames):
             self.step()
+        return {
+            'mean_catches': float(self.catches.float().mean().item()),
+            'per_seed_catches': self.catches.cpu().tolist(),
+            'seeds': self.seeds,
+        }
+
+    def run_graph(self, max_frames, warmup=3):
+        """Capture step() as a CUDA graph and replay it `max_frames` times.
+
+        Cuts the ~0.47s per-frame Python+kernel-launch overhead down to a
+        single graph launch per frame. Requires that all state mutations
+        in step() be in-place (no `self.X = new_tensor`) and that no
+        tensor allocations depend on CPU-side state. Both are true after
+        the refactor in this file.
+
+        Falls back to ordinary `run()` if CUDA is unavailable.
+        """
+        if not (isinstance(self.device, str) and self.device.startswith('cuda')) and self.device != 'cuda':
+            return self.run(max_frames)
+        s = torch.cuda.Stream()
+        s.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(s):
+            for _ in range(warmup):
+                self.step()
+        torch.cuda.current_stream().wait_stream(s)
+
+        g = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(g):
+            self.step()
+
+        remaining = max_frames - warmup - 1
+        for _ in range(remaining):
+            g.replay()
+        torch.cuda.synchronize()
         return {
             'mean_catches': float(self.catches.float().mean().item()),
             'per_seed_catches': self.catches.cpu().tolist(),
