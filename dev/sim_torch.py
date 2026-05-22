@@ -81,6 +81,8 @@ def fast_limit(x, y, max_mag):
 
 
 def load_weights(path: str | Path, device='cpu', dtype=torch.float32) -> dict:
+    # JS predator_nn.js stores weights, inputMean/Std as Float32Array; we
+    # match that to keep numerical drift between sim_torch and JS minimal.
     """Load weights JSON, return tensors on `device`."""
     with open(path) as f:
         j = json.load(f)
@@ -172,9 +174,9 @@ def stack_weights(weights_list: list[dict]) -> dict:
 
 
 def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
-                   auto_target, feature_dim, device):
+                   auto_target, feature_dim, device, dtype=torch.float64):
     B = pred_pos.shape[0]
-    out = torch.zeros((B, feature_dim), dtype=torch.float32, device=device)
+    out = torch.zeros((B, feature_dim), dtype=dtype, device=device)
     out[:, 0] = pred_vel[:, 0]
     out[:, 1] = pred_vel[:, 1]
     dxA = auto_target[:, 0] - pred_pos[:, 0]
@@ -218,12 +220,12 @@ def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
         out[:, 15 + 2 * k] = torch.where(
             safe_k,
             near_dx[:, k] / torch.where(safe_k, near_d[:, k], torch.ones_like(near_d[:, k])),
-            torch.where(is_real, torch.zeros_like(is_real, dtype=torch.float32),
-                        torch.ones_like(is_real, dtype=torch.float32)))
+            torch.where(is_real, torch.zeros_like(is_real, dtype=dtype),
+                        torch.ones_like(is_real, dtype=dtype)))
         out[:, 16 + 2 * k] = torch.where(
             safe_k,
             near_dy[:, k] / torch.where(safe_k, near_d[:, k], torch.ones_like(near_d[:, k])),
-            torch.zeros((B,), dtype=torch.float32, device=device))
+            torch.zeros((B,), dtype=dtype, device=device))
         out[:, 23 + k] = d_k
 
     dx1 = out[:, 7]; dy1 = out[:, 8]; d1 = out[:, 23]
@@ -250,7 +252,7 @@ def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
     if feature_dim >= 43:
         for k in range(K):
             is_real = near_alive[:, k]
-            zero = torch.zeros((B,), dtype=torch.float32, device=device)
+            zero = torch.zeros((B,), dtype=dtype, device=device)
             out[:, 35 + 2 * k] = torch.where(is_real, near_bvx[:, k], zero)
             out[:, 36 + 2 * k] = torch.where(is_real, near_bvy[:, k], zero)
 
@@ -262,7 +264,7 @@ def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
         sx = dx0 - pred_vel[:, 0]
         sy = dy0 - pred_vel[:, 1]
         sx, sy = fast_limit(sx, sy, PREDATOR_MAX_FORCE)
-        z = torch.zeros((B,), dtype=torch.float32, device=device)
+        z = torch.zeros((B,), dtype=dtype, device=device)
         out[:, 43] = torch.where(in_range_real, sx, z)
         out[:, 44] = torch.where(in_range_real, sy, z)
 
@@ -627,10 +629,14 @@ class Sim:
 
     def _step_predator(self):
         self._update_auto_target()
+        # Build features as float32 because the NN weights are float32 (JS
+        # uses Float32Array for the NN — see js/predator_nn.js). Boid state
+        # itself stays float64 to match JS Number semantics elsewhere.
         feats = build_features(
             self.pred_pos.float(), self.pred_vel.float(),
             self.boid_pos.float(), self.boid_vel.float(), self.boid_alive,
             self.pred_auto.float(), self.weights['featureDim'], self.device,
+            dtype=torch.float32,
         )
         if 'K' in self.weights:
             steering = nn_forward_batched(feats, self.weights).double()
