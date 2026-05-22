@@ -239,6 +239,12 @@ def main():
         rewards = means[:args.K]
         baseline = float(means[args.K].item())
 
+        # Snapshot pre-step theta — this is the one we just measured as
+        # `baseline`, and the one we save when baseline beats the prior
+        # best. The post-step theta below is what we *try* next; we don't
+        # yet know its score.
+        theta_pre = theta.clone()
+
         # ARS-V1 elite selection
         pair_max = torch.maximum(rewards[:H], rewards[H:])     # (H,)
         elite_idx = torch.argsort(pair_max, descending=True)[:args.top_k]
@@ -271,28 +277,33 @@ def main():
             'seeds_start': ss,
         })
 
+        # Save the PRE-step theta as `best.*` whenever its measured
+        # baseline beats the prior best. This is the theta with the
+        # score we logged — the post-step theta is just where we're
+        # heading next and hasn't been measured yet.
         if baseline > best_baseline:
             best_baseline = baseline
             torch.save({
-                'theta': theta.detach().cpu(),
+                'theta': theta_pre.detach().cpu(),
                 'P': P,
                 'gen': gen,
                 'baseline_catches': best_baseline,
                 'args': vars(args),
             }, out_dir / 'best.pt')
-            # Also export to JS-ready weights JSON for downstream JS-verify
-            export_weights_to_js(theta, template,
+            export_weights_to_js(theta_pre, template,
                                  str(out_dir / 'best.json'))
 
         if gen % args.ckpt_every == 0 or gen == args.gens - 1:
+            # ckpt_gen* always saves the pre-step theta whose baseline we
+            # just measured, so the .json matches the logged score.
             torch.save({
-                'theta': theta.detach().cpu(),
+                'theta': theta_pre.detach().cpu(),
                 'P': P,
                 'gen': gen,
                 'baseline_catches': baseline,
                 'args': vars(args),
             }, out_dir / f'ckpt_gen{gen:04d}.pt')
-            export_weights_to_js(theta, template,
+            export_weights_to_js(theta_pre, template,
                                  str(out_dir / f'ckpt_gen{gen:04d}.json'))
 
     log({'phase': 'done', 'best_baseline_catches': best_baseline,
