@@ -1,0 +1,12 @@
+{"phase":"start","base":"js/predator_weights.json","sigma":0.2,"tries":20,"seeds":[100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115],"maxFrames":5000,"numBoids":120,"totalParams":154,"zThresh":2,"autoTarget":"flock_centroid"}
+{"phase":"baseline","meanCatches":24.25,"perSeed":[37,18,33,29,22,22,20,18,30,25,25,16,26,21,25,21],"elapsedSec":785.5}
+{"phase":"try","t":1,"candMean":17.75,"dMean":-6.5,"dSE":2.192,"z":-2.965,"accept":false,"elapsedSec":722.5,"bestMean":24.25}
+{"phase":"try","t":2,"candMean":16.75,"dMean":-7.5,"dSE":2.201,"z":-3.408,"accept":false,"elapsedSec":1453.5,"bestMean":24.25}
+{"phase":"try","t":3,"candMean":20.75,"dMean":-3.5,"dSE":1.904,"z":-1.838,"accept":false,"elapsedSec":1426.3,"bestMean":24.25}
+{"phase":"try","t":4,"candMean":15.438,"dMean":-8.813,"dSE":2.655,"z":-3.319,"accept":false,"elapsedSec":766.2,"bestMean":24.25}
+{"phase":"try","t":5,"candMean":21.25,"dMean":-3,"dSE":2.859,"z":-1.049,"accept":false,"elapsedSec":726.6,"bestMean":24.25}
+{"phase":"try","t":6,"candMean":17.188,"dMean":-7.063,"dSE":2.171,"z":-3.253,"accept":false,"elapsedSec":1065.2,"bestMean":24.25}
+{"phase":"try","t":7,"candMean":16.938,"dMean":-7.313,"dSE":1.747,"z":-4.185,"accept":false,"elapsedSec":1483.5,"bestMean":24.25}
+{"phase":"try","t":8,"candMean":18.063,"dMean":-6.188,"dSE":1.739,"z":-3.557,"accept":false,"elapsedSec":1154.2,"bestMean":24.25}
+{"phase":"try","t":9,"candMean":13.188,"dMean":-11.063,"dSE":2.421,"z":-4.569,"accept":false,"elapsedSec":773.2,"bestMean":24.25}
+{"phase":"try","t":10,"candMean":17.875,"dMean":-6.375,"dSE":2.347,"z":-2.717,"accept":false,"elapsedSec":734,"bestMean":24.25}

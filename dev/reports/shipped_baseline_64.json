@@ -1,0 +1,467 @@
+{
+  "policySpec": {
+    "kind": "weights",
+    "path": "/workspace/js/predator_weights.json"
+  },
+  "seedsRun": 64,
+  "maxFrames": 5000,
+  "numBoids": 120,
+  "elapsedMs": 4786373,
+  "meanTTE": 5000,
+  "stdTTE": 0,
+  "medianTTE": 5000,
+  "minTTE": 5000,
+  "maxTTE": 5000,
+  "meanCatches": 21.375,
+  "extinctRate": 0,
+  "perSeed": [
+    {
+      "seed": 100,
+      "tte": 5000,
+      "catches": 37,
+      "extinct": false,
+      "remaining": 83
+    },
+    {
+      "seed": 101,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 102,
+      "tte": 5000,
+      "catches": 33,
+      "extinct": false,
+      "remaining": 87
+    },
+    {
+      "seed": 103,
+      "tte": 5000,
+      "catches": 29,
+      "extinct": false,
+      "remaining": 91
+    },
+    {
+      "seed": 104,
+      "tte": 5000,
+      "catches": 22,
+      "extinct": false,
+      "remaining": 98
+    },
+    {
+      "seed": 105,
+      "tte": 5000,
+      "catches": 22,
+      "extinct": false,
+      "remaining": 98
+    },
+    {
+      "seed": 106,
+      "tte": 5000,
+      "catches": 20,
+      "extinct": false,
+      "remaining": 100
+    },
+    {
+      "seed": 107,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 108,
+      "tte": 5000,
+      "catches": 30,
+      "extinct": false,
+      "remaining": 90
+    },
+    {
+      "seed": 109,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 110,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 111,
+      "tte": 5000,
+      "catches": 16,
+      "extinct": false,
+      "remaining": 104
+    },
+    {
+      "seed": 112,
+      "tte": 5000,
+      "catches": 26,
+      "extinct": false,
+      "remaining": 94
+    },
+    {
+      "seed": 113,
+      "tte": 5000,
+      "catches": 21,
+      "extinct": false,
+      "remaining": 99
+    },
+    {
+      "seed": 114,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 115,
+      "tte": 5000,
+      "catches": 21,
+      "extinct": false,
+      "remaining": 99
+    },
+    {
+      "seed": 116,
+      "tte": 5000,
+      "catches": 26,
+      "extinct": false,
+      "remaining": 94
+    },
+    {
+      "seed": 117,
+      "tte": 5000,
+      "catches": 15,
+      "extinct": false,
+      "remaining": 105
+    },
+    {
+      "seed": 118,
+      "tte": 5000,
+      "catches": 8,
+      "extinct": false,
+      "remaining": 112
+    },
+    {
+      "seed": 119,
+      "tte": 5000,
+      "catches": 23,
+      "extinct": false,
+      "remaining": 97
+    },
+    {
+      "seed": 120,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 121,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 122,
+      "tte": 5000,
+      "catches": 15,
+      "extinct": false,
+      "remaining": 105
+    },
+    {
+      "seed": 123,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 124,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 125,
+      "tte": 5000,
+      "catches": 13,
+      "extinct": false,
+      "remaining": 107
+    },
+    {
+      "seed": 126,
+      "tte": 5000,
+      "catches": 13,
+      "extinct": false,
+      "remaining": 107
+    },
+    {
+      "seed": 127,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 128,
+      "tte": 5000,
+      "catches": 18,
+      "extinct": false,
+      "remaining": 102
+    },
+    {
+      "seed": 129,
+      "tte": 5000,
+      "catches": 27,
+      "extinct": false,
+      "remaining": 93
+    },
+    {
+      "seed": 130,
+      "tte": 5000,
+      "catches": 17,
+      "extinct": false,
+      "remaining": 103
+    },
+    {
+      "seed": 131,
+      "tte": 5000,
+      "catches": 23,
+      "extinct": false,
+      "remaining": 97
+    },
+    {
+      "seed": 132,
+      "tte": 5000,
+      "catches": 5,
+      "extinct": false,
+      "remaining": 115
+    },
+    {
+      "seed": 133,
+      "tte": 5000,
+      "catches": 21,
+      "extinct": false,
+      "remaining": 99
+    },
+    {
+      "seed": 134,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 135,
+      "tte": 5000,
+      "catches": 28,
+      "extinct": false,
+      "remaining": 92
+    },
+    {
+      "seed": 136,
+      "tte": 5000,
+      "catches": 13,
+      "extinct": false,
+      "remaining": 107
+    },
+    {
+      "seed": 137,
+      "tte": 5000,
+      "catches": 31,
+      "extinct": false,
+      "remaining": 89
+    },
+    {
+      "seed": 138,
+      "tte": 5000,
+      "catches": 19,
+      "extinct": false,
+      "remaining": 101
+    },
+    {
+      "seed": 139,
+      "tte": 5000,
+      "catches": 22,
+      "extinct": false,
+      "remaining": 98
+    },
+    {
+      "seed": 140,
+      "tte": 5000,
+      "catches": 16,
+      "extinct": false,
+      "remaining": 104
+    },
+    {
+      "seed": 141,
+      "tte": 5000,
+      "catches": 21,
+      "extinct": false,
+      "remaining": 99
+    },
+    {
+      "seed": 142,
+      "tte": 5000,
+      "catches": 31,
+      "extinct": false,
+      "remaining": 89
+    },
+    {
+      "seed": 143,
+      "tte": 5000,
+      "catches": 23,
+      "extinct": false,
+      "remaining": 97
+    },
+    {
+      "seed": 144,
+      "tte": 5000,
+      "catches": 9,
+      "extinct": false,
+      "remaining": 111
+    },
+    {
+      "seed": 145,
+      "tte": 5000,
+      "catches": 22,
+      "extinct": false,
+      "remaining": 98
+    },
+    {
+      "seed": 146,
+      "tte": 5000,
+      "catches": 25,
+      "extinct": false,
+      "remaining": 95
+    },
+    {
+      "seed": 147,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 148,
+      "tte": 5000,
+      "catches": 9,
+      "extinct": false,
+      "remaining": 111
+    },
+    {
+      "seed": 149,
+      "tte": 5000,
+      "catches": 12,
+      "extinct": false,
+      "remaining": 108
+    },
+    {
+      "seed": 150,
+      "tte": 5000,
+      "catches": 10,
+      "extinct": false,
+      "remaining": 110
+    },
+    {
+      "seed": 151,
+      "tte": 5000,
+      "catches": 19,
+      "extinct": false,
+      "remaining": 101
+    },
+    {
+      "seed": 152,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 153,
+      "tte": 5000,
+      "catches": 16,
+      "extinct": false,
+      "remaining": 104
+    },
+    {
+      "seed": 154,
+      "tte": 5000,
+      "catches": 12,
+      "extinct": false,
+      "remaining": 108
+    },
+    {
+      "seed": 155,
+      "tte": 5000,
+      "catches": 24,
+      "extinct": false,
+      "remaining": 96
+    },
+    {
+      "seed": 156,
+      "tte": 5000,
+      "catches": 34,
+      "extinct": false,
+      "remaining": 86
+    },
+    {
+      "seed": 157,
+      "tte": 5000,
+      "catches": 20,
+      "extinct": false,
+      "remaining": 100
+    },
+    {
+      "seed": 158,
+      "tte": 5000,
+      "catches": 23,
+      "extinct": false,
+      "remaining": 97
+    },
+    {
+      "seed": 159,
+      "tte": 5000,
+      "catches": 31,
+      "extinct": false,
+      "remaining": 89
+    },
+    {
+      "seed": 160,
+      "tte": 5000,
+      "catches": 19,
+      "extinct": false,
+      "remaining": 101
+    },
+    {
+      "seed": 161,
+      "tte": 5000,
+      "catches": 26,
+      "extinct": false,
+      "remaining": 94
+    },
+    {
+      "seed": 162,
+      "tte": 5000,
+      "catches": 20,
+      "extinct": false,
+      "remaining": 100
+    },
+    {
+      "seed": 163,
+      "tte": 5000,
+      "catches": 27,
+      "extinct": false,
+      "remaining": 93
+    }
+  ]
+}
