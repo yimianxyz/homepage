@@ -265,6 +265,11 @@ class Sim:
         self._wrap_w_max = torch.tensor(CANVAS_W + 20.0, dtype=dt, device=d)
         self._wrap_h_max = torch.tensor(CANVAS_H + 20.0, dtype=dt, device=d)
         self._wrap_neg20 = torch.tensor(-20.0, dtype=dt, device=d)
+        # Boid wrap (uses BORDER_OFFSET=10) — different scalars from predator wrap (20)
+        self._wrap_b_w_max = torch.tensor(CANVAS_W + BORDER_OFFSET, dtype=dt, device=d)
+        self._wrap_b_h_max = torch.tensor(CANVAS_H + BORDER_OFFSET, dtype=dt, device=d)
+        self._wrap_neg_b = torch.tensor(-BORDER_OFFSET, dtype=dt, device=d)
+        self._inf_t = torch.tensor(float('inf'), dtype=dt, device=d)
 
         if self.sequential:
             # Persistent acceleration accumulator — JS keeps acceleration on the
@@ -515,13 +520,11 @@ class Sim:
         self.boid_accel[..., 0] += ax_pre
         self.boid_accel[..., 1] += ay_pre
 
-        d = self.device
-        dt = torch.float64
-        m_w = CANVAS_W + BORDER_OFFSET
-        m_h = CANVAS_H + BORDER_OFFSET
-        neg_b = torch.tensor(-BORDER_OFFSET, dtype=dt, device=d)
-        pos_mw = torch.tensor(m_w, dtype=dt, device=d)
-        pos_mh = torch.tensor(m_h, dtype=dt, device=d)
+        # Pre-allocated scalars (see _initialize) — using them directly so
+        # the step is graph-safe.
+        neg_b = self._wrap_neg_b
+        pos_mw = self._wrap_b_w_max
+        pos_mh = self._wrap_b_h_max
 
         # Phase 2: sequential per-boid pass
         for i in range(self.N):
@@ -537,10 +540,10 @@ class Sim:
 
             new_px = self.boid_pos[:, i, 0] + new_vx
             new_py = self.boid_pos[:, i, 1] + new_vy
-            new_px = torch.where(new_px > m_w, neg_b, new_px)
-            new_px = torch.where(new_px < -BORDER_OFFSET, pos_mw, new_px)
-            new_py = torch.where(new_py > m_h, neg_b, new_py)
-            new_py = torch.where(new_py < -BORDER_OFFSET, pos_mh, new_py)
+            new_px = torch.where(new_px > pos_mw, neg_b, new_px)
+            new_px = torch.where(new_px < neg_b, pos_mw, new_px)
+            new_py = torch.where(new_py > pos_mh, neg_b, new_py)
+            new_py = torch.where(new_py < neg_b, pos_mh, new_py)
             self.boid_pos[:, i, 0] = new_px
             self.boid_pos[:, i, 1] = new_py
 
@@ -556,8 +559,7 @@ class Sim:
         dx = self.boid_pos[..., 0] - self.pred_pos[:, None, 0]
         dy = self.boid_pos[..., 1] - self.pred_pos[:, None, 1]
         d = torch.sqrt(dx * dx + dy * dy)
-        inf = torch.tensor(float('inf'), dtype=d.dtype, device=self.device)
-        d_masked = torch.where(self.boid_alive, d, inf)
+        d_masked = torch.where(self.boid_alive, d, self._inf_t)
         any_in_range = (d_masked < PREDATOR_RANGE).any(dim=1)
         any_alive = self.boid_alive.any(dim=1)
 
