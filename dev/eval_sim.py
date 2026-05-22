@@ -20,7 +20,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sim_torch import Sim, load_weights
+from sim_torch import Sim, load_weights, stack_weights
 
 
 def evaluate(weights_path_or_dict, seeds=tuple(range(100, 116)), frames=5000,
@@ -47,6 +47,52 @@ def evaluate(weights_path_or_dict, seeds=tuple(range(100, 116)), frames=5000,
         'use_graph': use_graph and device == 'cuda',
         'elapsed_s': el,
         'seed_fps': len(seeds) * frames / el,
+    }
+
+
+def evaluate_multi(weights_list, seeds=tuple(range(100, 116)), frames=5000,
+                   device='cuda', use_graph=True, sequential=True,
+                   auto_target='flock_centroid'):
+    """Evaluate K policies on the same S seeds in a single batched sim.
+
+    Args:
+        weights_list: list of K dicts (each returned by load_weights), all
+                      with the same architecture (featureDim + layer shapes).
+        seeds: list of S seed ints.
+        frames, device, use_graph, sequential, auto_target: as evaluate().
+
+    Returns dict with:
+        mean_catches: list of K means
+        per_seed_catches: list of K lists of length S
+        ... plus the same metadata as evaluate()
+    Layout: batch index k*S + s corresponds to policy k, seed seeds[s].
+    """
+    K = len(weights_list)
+    S = len(seeds)
+    weights_batched = stack_weights(weights_list)
+    seeds_expanded = [seeds[s] for k in range(K) for s in range(S)]
+    sim = Sim(seeds=seeds_expanded, weights=weights_batched, device=device,
+              sequential=sequential, auto_target=auto_target)
+    t0 = time.time()
+    if use_graph and device == 'cuda' and torch.cuda.is_available():
+        out = sim.run_graph(frames)
+    else:
+        out = sim.run(frames)
+    el = time.time() - t0
+    per = out['per_seed_catches']
+    # Reshape (K*S,) → list of K sublists
+    per_policy = [per[k*S:(k+1)*S] for k in range(K)]
+    mean_per_policy = [sum(p) / S for p in per_policy]
+    return {
+        'mean_catches': mean_per_policy,
+        'per_seed_catches': per_policy,
+        'seeds': list(seeds),
+        'K': K,
+        'frames': frames,
+        'sequential': sequential,
+        'use_graph': use_graph and device == 'cuda',
+        'elapsed_s': el,
+        'seed_fps': (K * S * frames) / el,
     }
 
 

@@ -103,6 +103,11 @@ def load_weights(path: str | Path, device='cpu', dtype=torch.float32) -> dict:
 
 
 def nn_forward(features: torch.Tensor, weights: dict) -> torch.Tensor:
+    """Single-policy forward.
+
+    features: (B, fd_or_more). weights: result of load_weights() — W has
+    shape (in, out), b has shape (out,). Returns (B, out_dim).
+    """
     fd = weights['featureDim']
     x = (features[:, :fd] - weights['inputMean']) / weights['inputStd']
     for L in weights['layers']:
@@ -116,6 +121,54 @@ def nn_forward(features: torch.Tensor, weights: dict) -> torch.Tensor:
         s = torch.where(mag > cm, cm / torch.clamp(mag, min=1e-12), torch.ones_like(mag))
         x = x * s.unsqueeze(1)
     return x
+
+
+def nn_forward_batched(features: torch.Tensor, weights: dict) -> torch.Tensor:
+    """Multi-policy forward.
+
+    weights is the result of `stack_weights(...)` and has layers with
+    W of shape (K, in, out), b of shape (K, out); inputMean/inputStd
+    have shape (K, fd). features: (B=K*S, fd_or_more), with each
+    consecutive S elements belonging to one policy. Returns (B, out_dim).
+    """
+    K = weights['K']
+    S = features.shape[0] // K
+    fd = weights['featureDim']
+    x = features[:, :fd].view(K, S, fd)
+    x = (x - weights['inputMean'].unsqueeze(1)) / weights['inputStd'].unsqueeze(1)
+    for L in weights['layers']:
+        x = torch.bmm(x, L['W']) + L['b'].unsqueeze(1)
+        if L['activation'] == 'relu':
+            x = torch.relu(x)
+    x = x * weights['outputScale']
+    cm = weights['clipMagnitude']
+    if cm > 0:
+        mag = torch.sqrt(x[..., 0] ** 2 + x[..., 1] ** 2)
+        s = torch.where(mag > cm, cm / torch.clamp(mag, min=1e-12), torch.ones_like(mag))
+        x = x * s.unsqueeze(-1)
+    return x.reshape(K * S, -1)
+
+
+def stack_weights(weights_list: list[dict]) -> dict:
+    """Stack K loaded weight dicts into one batched dict for use with
+    nn_forward_batched. Assumes identical architecture across policies.
+    """
+    K = len(weights_list)
+    w0 = weights_list[0]
+    layers = []
+    for li in range(len(w0['layers'])):
+        W = torch.stack([w['layers'][li]['W'] for w in weights_list], dim=0)
+        b = torch.stack([w['layers'][li]['b'] for w in weights_list], dim=0)
+        layers.append({'W': W, 'b': b, 'activation': w0['layers'][li]['activation']})
+    return {
+        'featureDim': w0['featureDim'],
+        'inputMean': torch.stack([w['inputMean'] for w in weights_list]),
+        'inputStd': torch.stack([w['inputStd'] for w in weights_list]),
+        'outputScale': w0['outputScale'],
+        'clipMagnitude': w0['clipMagnitude'],
+        'layers': layers,
+        'K': K,
+    }
 
 
 def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
@@ -579,7 +632,10 @@ class Sim:
             self.boid_pos.float(), self.boid_vel.float(), self.boid_alive,
             self.pred_auto.float(), self.weights['featureDim'], self.device,
         )
-        steering = nn_forward(feats, self.weights).double()
+        if 'K' in self.weights:
+            steering = nn_forward_batched(feats, self.weights).double()
+        else:
+            steering = nn_forward(feats, self.weights).double()
         new_vx = self.pred_vel[:, 0] + steering[:, 0]
         new_vy = self.pred_vel[:, 1] + steering[:, 1]
         new_vx, new_vy = fast_limit(new_vx, new_vy, PREDATOR_MAX_SPEED)
