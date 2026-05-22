@@ -18,6 +18,7 @@ mkdir -p "$WATCH" dev/reports/rl_v2
 VMS=(
     "1:us-central1-a:es_shipped_sigma05"
     "2:us-central1-a:es_shipped_sigma15"
+    "3:us-central1-c:es_v6_sigma05"
 )
 
 PROJECT=data-analytics-prod-aegis
