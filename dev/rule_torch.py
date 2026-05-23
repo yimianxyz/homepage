@@ -90,18 +90,29 @@ def rule_v2_torch(features, alpha):
     return torch.stack(_seek_steering(tx, ty, vx, vy), dim=-1)
 
 
-def rule_v3_torch(features, mode='score_minus_dist', distW=0.05, alpha=0.0):
-    """Smart target selection. features: (B, ≥43)."""
+def rule_v3_torch(features, mode='score_minus_dist', distW=0.05, alpha=0.0,
+                   buffers=None):
+    """Smart target selection. features: (B, ≥43).
+    buffers (optional): dict with pre-allocated 'best_score', 'best_tx',
+    'best_ty', 'any_valid', 'neg_inf'. Avoids allocations inside CUDA
+    graph capture.
+    """
     B = features.shape[0]
     device = features.device
     vx = features[:, 0]; vy = features[:, 1]
     dxA = features[:, 2]; dyA = features[:, 3]
     EPS = 0.05
 
-    best_score = torch.full((B,), -float('inf'), dtype=features.dtype, device=device)
-    best_tx = torch.zeros(B, dtype=features.dtype, device=device)
-    best_ty = torch.zeros(B, dtype=features.dtype, device=device)
-    any_valid = torch.zeros(B, dtype=torch.bool, device=device)
+    if buffers is None:
+        best_score = torch.full((B,), -float('inf'), dtype=features.dtype, device=device)
+        best_tx = torch.zeros(B, dtype=features.dtype, device=device)
+        best_ty = torch.zeros(B, dtype=features.dtype, device=device)
+        any_valid = torch.zeros(B, dtype=torch.bool, device=device)
+    else:
+        best_score = buffers['best_score'].fill_(-float('inf'))
+        best_tx = buffers['best_tx'].fill_(0.0)
+        best_ty = buffers['best_ty'].fill_(0.0)
+        any_valid = buffers['any_valid'].fill_(False)
 
     for k in range(POLICY_K):
         dxk = features[:, 7 + 2*k]
@@ -141,7 +152,7 @@ def rule_v3_torch(features, mode='score_minus_dist', distW=0.05, alpha=0.0):
     return torch.stack(_seek_steering(tx, ty, vx, vy), dim=-1)
 
 
-def rule_v4_torch(features, distW=0.0):
+def rule_v4_torch(features, distW=0.0, buffers=None):
     """Perfect-intercept. features: (B, ≥43)."""
     B = features.shape[0]
     device = features.device
@@ -150,10 +161,16 @@ def rule_v4_torch(features, distW=0.0):
     sp = PREDATOR_MAX_SPEED
     sp2 = sp * sp
 
-    best_t = torch.full((B,), float('inf'), dtype=features.dtype, device=device)
-    best_tx = torch.zeros(B, dtype=features.dtype, device=device)
-    best_ty = torch.zeros(B, dtype=features.dtype, device=device)
-    any_valid = torch.zeros(B, dtype=torch.bool, device=device)
+    if buffers is None:
+        best_t = torch.full((B,), float('inf'), dtype=features.dtype, device=device)
+        best_tx = torch.zeros(B, dtype=features.dtype, device=device)
+        best_ty = torch.zeros(B, dtype=features.dtype, device=device)
+        any_valid = torch.zeros(B, dtype=torch.bool, device=device)
+    else:
+        best_t = buffers['best_t'].fill_(float('inf'))
+        best_tx = buffers['best_tx'].fill_(0.0)
+        best_ty = buffers['best_ty'].fill_(0.0)
+        any_valid = buffers['any_valid'].fill_(False)
 
     for k in range(POLICY_K):
         dxk = features[:, 7 + 2*k]
@@ -200,7 +217,89 @@ def rule_v4_torch(features, distW=0.0):
     return torch.stack(_seek_steering(tx, ty, vx, vy), dim=-1)
 
 
-def predator_steering(features, kind, opts=None):
+def rule_v5_torch(features, steps=5, distW=0.0, buffers=None):
+    """Multi-step prediction with boid-avoidance acceleration.
+    features: (B, ≥43). Returns (B, 2) steering.
+    """
+    B = features.shape[0]
+    device = features.device
+    vx = features[:, 0]; vy = features[:, 1]
+    dxA = features[:, 2]; dyA = features[:, 3]
+
+    if buffers is None:
+        best_score = torch.full((B,), float('inf'), dtype=features.dtype, device=device)
+        best_tx = torch.zeros(B, dtype=features.dtype, device=device)
+        best_ty = torch.zeros(B, dtype=features.dtype, device=device)
+        any_valid = torch.zeros(B, dtype=torch.bool, device=device)
+    else:
+        best_score = buffers['best_score'].fill_(float('inf'))
+        best_tx = buffers['best_tx'].fill_(0.0)
+        best_ty = buffers['best_ty'].fill_(0.0)
+        any_valid = buffers['any_valid'].fill_(False)
+
+    for k in range(POLICY_K):
+        dxk = features[:, 7 + 2*k]
+        dyk = features[:, 8 + 2*k]
+        dk = features[:, 23 + k]
+        bvxk0 = features[:, 35 + 2*k]
+        bvyk0 = features[:, 36 + 2*k]
+
+        real = (dxk != POLICY_PAD) & (dk < POLICY_R)
+        rx = dxk
+        ry = dyk
+        bvx = bvxk0
+        bvy = bvyk0
+        # Forward-simulate T steps. We compute predator steering toward
+        # the CURRENT relative offset at each step.
+        for t in range(steps):
+            dnow = torch.sqrt(rx * rx + ry * ry).clamp_min(1e-9)
+            in_range = dnow < POLICY_R
+            strength = ((POLICY_R - dnow) / POLICY_R * PREDATOR_TURN_FACTOR)
+            ux = rx / dnow
+            uy = ry / dnow
+            # Avoidance acceleration on boid
+            ax_av = ux * strength
+            ay_av = uy * strength
+            # fastLimit avoidance to MAX_FORCE * 1.5
+            mag_a = fast_mag(ax_av, ay_av)
+            cap = mag_a > BOID_MAX_FORCE_AVOID
+            s = torch.where(cap, BOID_MAX_FORCE_AVOID / torch.where(cap, mag_a, torch.ones_like(mag_a)), torch.ones_like(mag_a))
+            ax_av = ax_av * s
+            ay_av = ay_av * s
+            # Only apply within range
+            ax_av = torch.where(in_range, ax_av, torch.zeros_like(ax_av))
+            ay_av = torch.where(in_range, ay_av, torch.zeros_like(ay_av))
+            # Update boid velocity
+            bvx = bvx + ax_av
+            bvy = bvy + ay_av
+            # Cap boid speed to BOID_MAX_SPEED
+            bm = fast_mag(bvx, bvy)
+            cap = bm > BOID_MAX_SPEED
+            s2 = torch.where(cap, BOID_MAX_SPEED / torch.where(cap, bm, torch.ones_like(bm)), torch.ones_like(bm))
+            bvx = bvx * s2
+            bvy = bvy * s2
+            # Predator step: head toward (rx, ry) at MAX_SPEED
+            sm = torch.sqrt(rx * rx + ry * ry).clamp_min(1e-9)
+            pvx = rx / sm * PREDATOR_MAX_SPEED
+            pvy = ry / sm * PREDATOR_MAX_SPEED
+            # Relative offset update
+            rx = rx + bvx - pvx
+            ry = ry + bvy - pvy
+
+        d_pred = torch.sqrt(rx * rx + ry * ry)
+        score = d_pred + distW * dk
+        better = real & (score < best_score)
+        best_score = torch.where(better, score, best_score)
+        best_tx = torch.where(better, rx, best_tx)
+        best_ty = torch.where(better, ry, best_ty)
+        any_valid = any_valid | better
+
+    tx = torch.where(any_valid, best_tx, dxA)
+    ty = torch.where(any_valid, best_ty, dyA)
+    return torch.stack(_seek_steering(tx, ty, vx, vy), dim=-1)
+
+
+def predator_steering(features, kind, opts=None, buffers=None):
     """Top-level dispatcher. Returns steering tensor (B, 2)."""
     opts = opts or {}
     if kind == 'rule_v1' or kind == 'rule':
@@ -211,7 +310,25 @@ def predator_steering(features, kind, opts=None):
         return rule_v3_torch(features,
                               mode=opts.get('mode', 'score_minus_dist'),
                               distW=opts.get('distW', 0.05),
-                              alpha=opts.get('alpha', 0.0))
+                              alpha=opts.get('alpha', 0.0),
+                              buffers=buffers)
     if kind == 'rule_v4':
-        return rule_v4_torch(features, distW=opts.get('distW', 0.0))
+        return rule_v4_torch(features, distW=opts.get('distW', 0.0),
+                              buffers=buffers)
+    if kind == 'rule_v5':
+        return rule_v5_torch(features,
+                              steps=opts.get('steps', 5),
+                              distW=opts.get('distW', 0.0),
+                              buffers=buffers)
     raise ValueError(f"unknown rule kind: {kind}")
+
+
+def make_rule_buffers(B, device, dtype=torch.float64):
+    """Pre-allocate scratch buffers for graph-safe rule policies."""
+    return {
+        'best_score': torch.empty((B,), dtype=dtype, device=device),
+        'best_t':     torch.empty((B,), dtype=dtype, device=device),
+        'best_tx':    torch.empty((B,), dtype=dtype, device=device),
+        'best_ty':    torch.empty((B,), dtype=dtype, device=device),
+        'any_valid':  torch.empty((B,), dtype=torch.bool, device=device),
+    }

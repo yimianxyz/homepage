@@ -36,6 +36,9 @@ class RuleSim(Sim):
         super().__init__(seeds=seeds, **kw)
         self.rule_kind = kind
         self.rule_opts = opts or {}
+        # Pre-allocated rule buffers for graph-safe execution.
+        self._rule_buffers = rt.make_rule_buffers(self.B, self.device,
+                                                    dtype=torch.float64)
 
     def _step_predator(self):
         self._update_auto_target()
@@ -44,14 +47,14 @@ class RuleSim(Sim):
             self.boid_pos, self.boid_vel, self.boid_alive,
             self.pred_auto, 45, self.device,
         )
-        steering = rt.predator_steering(feats, self.rule_kind, self.rule_opts).double()
+        steering = rt.predator_steering(feats, self.rule_kind, self.rule_opts,
+                                          buffers=self._rule_buffers).double()
 
         # Same predator integration as Sim._step_predator
         new_vx = self.pred_vel[:, 0] + steering[:, 0]
         new_vy = self.pred_vel[:, 1] + steering[:, 1]
-        from sim_torch import fast_limit
-        new_vx, new_vy = fast_limit(new_vx, new_vy,
-                                      torch.tensor(2.5, dtype=torch.float64, device=self.device).item())
+        from sim_torch import fast_limit, PREDATOR_MAX_SPEED
+        new_vx, new_vy = fast_limit(new_vx, new_vy, PREDATOR_MAX_SPEED)
         self.pred_vel[:, 0] = new_vx
         self.pred_vel[:, 1] = new_vy
         self.pred_pos[:, 0] += new_vx
@@ -69,10 +72,11 @@ class RuleSim(Sim):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--rule', default='v1',
-                   choices=['v1', 'rule', 'v2', 'v3', 'v4'])
+                   choices=['v1', 'rule', 'v2', 'v3', 'v4', 'v5'])
     p.add_argument('--mode', default='score_minus_dist')
     p.add_argument('--distW', type=float, default=0.05)
     p.add_argument('--alpha', type=float, default=0.0)
+    p.add_argument('--steps', type=int, default=5)
     p.add_argument('--seeds', type=int, default=16)
     p.add_argument('--seedStart', type=int, default=100)
     p.add_argument('--frames', type=int, default=5000)
@@ -85,7 +89,8 @@ def main():
     kind = 'rule_' + args.rule if not args.rule.startswith('rule_') else args.rule
     if kind in ('rule_rule', 'rule_v1'):
         kind = 'rule_v1'
-    opts = {'mode': args.mode, 'distW': args.distW, 'alpha': args.alpha}
+    opts = {'mode': args.mode, 'distW': args.distW, 'alpha': args.alpha,
+            'steps': args.steps}
 
     sim = RuleSim(seeds=seeds, kind=kind, opts=opts,
                    device=args.device, sequential=True,
