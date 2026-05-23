@@ -126,6 +126,192 @@ function rulePolicy_v2(features, alpha) {
     return steering;
 }
 
+// rulePolicy v3: smart target selection. The original rule picks the
+// SINGLE NEAREST boid within range. v3 looks at all K=4 nearest and picks
+// the one with the best "catch ease" — closing speed minus distance
+// penalty — so we don't waste compute chasing a boid that's escaping
+// faster than we can follow.
+//
+// This is structurally analogous to the flock_centroid patrol fix: a
+// small change to the policy's TARGET SELECTION, no NN retraining. The
+// +39% patrol fix changed WHERE to patrol; v3 changes WHICH boid to
+// chase. If the same kind of structural win exists in the attack
+// branch, it lives here.
+//
+// Variants (selected by `mode`):
+//   'score_minus_dist': score_k = closing_k - DIST_W * d_k
+//   'closing_only':     score_k = closing_k
+//   'time_to_catch':    score_k = -d_k / max(closing_k, eps)  (min t_catch)
+//   'closing_lookahead':as 'score_minus_dist' but score the boid's
+//                       position α frames in the future (combines v2 +
+//                       smart selection)
+function rulePolicy_v3(features, opts) {
+    opts = opts || {};
+    const mode = opts.mode || 'score_minus_dist';
+    const DIST_W = opts.distW != null ? opts.distW : 0.05;
+    const alpha = opts.alpha != null ? opts.alpha : 0;
+    const EPS = 0.05;
+
+    const vx = features[F.VX];
+    const vy = features[F.VY];
+    const dxA = features[F.DXA];
+    const dyA = features[F.DYA];
+
+    let bestK = -1;
+    let bestScore = -Infinity;
+    for (let k = 0; k < POLICY_K; k++) {
+        const dxk = features[7 + 2 * k];
+        if (dxk === POLICY_PAD) continue;
+        const dyk = features[8 + 2 * k];
+        const dk = features[23 + k];
+        if (dk >= POLICY_R) continue;
+        const bvxk = features[35 + 2 * k];
+        const bvyk = features[36 + 2 * k];
+
+        // For closing_lookahead: shift target by α·(boid_vel - pred_vel)
+        let tx_k = dxk, ty_k = dyk, d_k = dk;
+        if (alpha !== 0) {
+            tx_k = dxk + alpha * (bvxk - vx);
+            ty_k = dyk + alpha * (bvyk - vy);
+            d_k = Math.sqrt(tx_k * tx_k + ty_k * ty_k);
+            if (d_k < 1e-9) d_k = 1e-9;
+        }
+
+        // Closing speed = component of (pred_vel - boid_vel) along (dx, dy)
+        // = positive means predator approaching the (predicted) boid position
+        const closing = ((vx - bvxk) * tx_k + (vy - bvyk) * ty_k) / d_k;
+
+        let score;
+        if (mode === 'closing_only') {
+            score = closing;
+        } else if (mode === 'time_to_catch') {
+            // Minimise d / max(closing, eps); equivalent to maximising -that.
+            score = -d_k / Math.max(closing, EPS);
+        } else {
+            // score_minus_dist (default) or closing_lookahead with default DIST_W.
+            score = closing - DIST_W * d_k;
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestK = k;
+        }
+    }
+
+    let tx, ty;
+    if (bestK >= 0) {
+        // Use the chosen boid's offset (with optional lookahead) as the seek target.
+        const bvxk = features[35 + 2 * bestK];
+        const bvyk = features[36 + 2 * bestK];
+        tx = features[7 + 2 * bestK];
+        ty = features[8 + 2 * bestK];
+        if (alpha !== 0) {
+            tx = tx + alpha * (bvxk - vx);
+            ty = ty + alpha * (bvyk - vy);
+        }
+    } else {
+        tx = dxA;
+        ty = dyA;
+    }
+
+    const desired = fastSetMagnitude(tx, ty, PREDATOR_MAX_SPEED);
+    const steering = fastLimit(desired[0] - vx, desired[1] - vy, PREDATOR_MAX_FORCE);
+    return steering;
+}
+
+// rulePolicy v4: classic pursuit-curve intercept. For each candidate boid
+// within range, solve the quadratic for time-to-intercept assuming the
+// boid moves at constant velocity and the predator moves at MAX_SPEED in
+// a straight line toward the lead point. Pick the boid with smallest
+// intercept time, head to ITS LEAD POINT (not its current position).
+//
+// Math: solve |b + v_b * t - p| = s_p * t for smallest positive t.
+//   Let d = b - p, then  (d + v_b·t)·(d + v_b·t) = s_p² t²
+//   ⇒ |v_b|² t² + 2 d·v_b t + |d|² - s_p² t² = 0
+//   ⇒ (|v_b|² - s_p²) t² + 2(d·v_b) t + |d|² = 0
+// If |v_b| > s_p the boid can outrun the predator (no real positive root
+// when discriminant < 0). Fall back to seeking the boid's current
+// position in that case.
+//
+// Returns the steering toward the lead point.
+function rulePolicy_v4(features, opts) {
+    opts = opts || {};
+    const fallback_dist_w = opts.distW != null ? opts.distW : 0.0;  // optional distance tiebreaker
+
+    const vx = features[F.VX];
+    const vy = features[F.VY];
+    const dxA = features[F.DXA];
+    const dyA = features[F.DYA];
+    const sp = PREDATOR_MAX_SPEED;
+    const sp2 = sp * sp;
+
+    let bestK = -1;
+    let bestT = Infinity;
+    let best_lead_x = 0, best_lead_y = 0;
+
+    for (let k = 0; k < POLICY_K; k++) {
+        const dxk = features[7 + 2 * k];
+        if (dxk === POLICY_PAD) continue;
+        const dyk = features[8 + 2 * k];
+        const dk = features[23 + k];
+        if (dk >= POLICY_R) continue;
+        const bvxk = features[35 + 2 * k];
+        const bvyk = features[36 + 2 * k];
+
+        // Quadratic: (|v_b|² - s_p²) t² + 2(d·v_b) t + |d|² = 0
+        const v2 = bvxk * bvxk + bvyk * bvyk;
+        const a = v2 - sp2;
+        const b = 2 * (dxk * bvxk + dyk * bvyk);
+        const c = dxk * dxk + dyk * dyk;
+
+        let t;
+        if (Math.abs(a) < 1e-9) {
+            // Degenerate (boid speed == predator speed): linear in t.
+            t = -c / b;
+        } else {
+            const disc = b * b - 4 * a * c;
+            if (disc < 0) {
+                // Boid can outrun predator (or both stationary), no perfect
+                // intercept. Skip this boid (or fall back to seeking current).
+                continue;
+            }
+            const sqd = Math.sqrt(disc);
+            // Two roots; want smallest positive
+            const t1 = (-b - sqd) / (2 * a);
+            const t2 = (-b + sqd) / (2 * a);
+            if (t1 > 0 && t2 > 0) t = Math.min(t1, t2);
+            else if (t1 > 0)      t = t1;
+            else if (t2 > 0)      t = t2;
+            else                  continue; // no positive root
+        }
+        if (t < 0 || !isFinite(t)) continue;
+
+        // Optional distance tiebreaker so we don't always pick "shortest t"
+        // when t differences are tiny (often happens at close range).
+        const adjusted_t = t + fallback_dist_w * dk;
+
+        if (adjusted_t < bestT) {
+            bestT = adjusted_t;
+            bestK = k;
+            best_lead_x = dxk + bvxk * t;
+            best_lead_y = dyk + bvyk * t;
+        }
+    }
+
+    let tx, ty;
+    if (bestK >= 0) {
+        tx = best_lead_x;
+        ty = best_lead_y;
+    } else {
+        tx = dxA;
+        ty = dyA;
+    }
+
+    const desired = fastSetMagnitude(tx, ty, PREDATOR_MAX_SPEED);
+    const steering = fastLimit(desired[0] - vx, desired[1] - vy, PREDATOR_MAX_FORCE);
+    return steering;
+}
+
 module.exports = {
     POLICY_R,
     POLICY_K,
@@ -141,5 +327,7 @@ module.exports = {
     buildFeatures,
     rulePolicy,
     rulePolicy_v2,
+    rulePolicy_v3,
+    rulePolicy_v4,
     ruleBranch,
 };

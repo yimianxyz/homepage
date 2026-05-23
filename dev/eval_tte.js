@@ -82,6 +82,25 @@ function buildNNFn(spec) {
         const alpha = spec.alpha || 0;
         return (features) => rulePolicy_v2(features, alpha);
     }
+    if (spec.kind === 'rule_v3') {
+        // Smart target selection: pick best of K=4 nearest within range
+        // by closing speed (+ optional distance penalty / lookahead).
+        const rulePolicy_v3 = require('./policy_spec').rulePolicy_v3;
+        const opts = {
+            mode: spec.mode || 'score_minus_dist',
+            distW: spec.distW != null ? spec.distW : 0.05,
+            alpha: spec.alpha != null ? spec.alpha : 0,
+        };
+        return (features) => rulePolicy_v3(features, opts);
+    }
+    if (spec.kind === 'rule_v4') {
+        // Perfect-intercept: solve quadratic for time-to-catch under
+        // constant-velocity boid + max-speed predator. Pick boid with
+        // smallest intercept time, head to its lead point.
+        const rulePolicy_v4 = require('./policy_spec').rulePolicy_v4;
+        const opts = { distW: spec.distW != null ? spec.distW : 0.0 };
+        return (features) => rulePolicy_v4(features, opts);
+    }
     if (spec.kind === 'weights') {
         if (!loadModel) loadModel = require('../js/predator_nn').loadModel;
         const json = JSON.parse(fs.readFileSync(spec.path, 'utf8'));
@@ -199,11 +218,13 @@ function parseArgs(argv) {
         maxFrames: 12000,
         numBoids: 120,
         workers: 4,
-        policy: null,            // 'null' | 'random' | 'rule' | 'rule_v2' — overrides weights when set
+        policy: null,            // 'null' | 'random' | 'rule' | 'rule_v2' | 'rule_v3' — overrides weights when set
         report: null,            // optional path to dump full JSON
         autoTarget: 'random',    // 'random' | 'nearest_boid' | 'flock_centroid' | 'farthest_in_K'
         lookahead: 0,            // when > 0, features see shadow boids at pos + N·velocity
-        alpha: 0,                // rule_v2: prediction horizon in frames for hunt branch
+        alpha: 0,                // rule_v2 / rule_v3: prediction horizon in frames for hunt branch
+        mode: 'score_minus_dist',// rule_v3 target-scoring mode
+        distW: 0.05,             // rule_v3 distance weight for score_minus_dist mode
     };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
@@ -218,6 +239,8 @@ function parseArgs(argv) {
         else if (a === '--autoTarget') args.autoTarget = argv[++i];
         else if (a === '--lookahead') args.lookahead = +argv[++i];
         else if (a === '--alpha') args.alpha = +argv[++i];
+        else if (a === '--mode') args.mode = argv[++i];
+        else if (a === '--distW') args.distW = +argv[++i];
     }
     return args;
 }
@@ -229,6 +252,8 @@ if (require.main === module) {
                      : args.policy === 'random' ? { kind: 'random' }
                      : args.policy === 'rule' ? { kind: 'rule' }
                      : args.policy === 'rule_v2' ? { kind: 'rule_v2', alpha: args.alpha }
+                     : args.policy === 'rule_v3' ? { kind: 'rule_v3', mode: args.mode, distW: args.distW, alpha: args.alpha }
+                     : args.policy === 'rule_v4' ? { kind: 'rule_v4', distW: args.distW }
                      : { kind: 'weights', path: path.resolve(args.weights) };
     evalPolicy(policySpec, {
         seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, workers: args.workers,
