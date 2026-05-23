@@ -52,6 +52,8 @@ function parseArgs(argv) {
         else if (a === '--rule') args.rule = argv[++i];
         else if (a === '--alpha') args.alpha = +argv[++i];
         else if (a === '--autoTarget') args.autoTarget = argv[++i];
+        else if (a === '--mode') args.mode = argv[++i];
+        else if (a === '--distW') args.distW = +argv[++i];
     }
     return args;
 }
@@ -65,11 +67,22 @@ function workerMain() {
     const buf = new Float32Array(seeds.length * framesPerSeed * ROW);
     let wIdx = 0;
     let validRows = 0;
-    // Choose policy: rule_v2 takes alpha, rule is unchanged.
+    // Choose policy: rule_v2 takes alpha; rule_v3 takes mode + distW + alpha;
+    // base rule is unchanged.
     let nnFn = null;
     if (rule === 'rule_v2') {
         const f = spec.rulePolicy_v2;
         nnFn = (features) => f(features, alpha);
+    } else if (rule === 'rule_v3') {
+        const f = spec.rulePolicy_v3;
+        const opts = { mode: workerData.mode || 'score_minus_dist',
+                       distW: workerData.distW != null ? workerData.distW : 0.05,
+                       alpha: alpha };
+        nnFn = (features) => f(features, opts);
+    } else if (rule === 'rule_v4') {
+        const f = spec.rulePolicy_v4;
+        const opts = { distW: workerData.distW != null ? workerData.distW : 0.0 };
+        nnFn = (features) => f(features, opts);
     }
     for (const seed of seeds) {
         const o = new Oracle({ seed, numBoids, nnFn, autoTargetMode: autoTarget });
@@ -117,6 +130,7 @@ async function runMain() {
             workerData: {
                 seeds: seedSubset, framesPerSeed: args.framesPerSeed, numBoids: args.numBoids,
                 rule: args.rule, alpha: args.alpha, autoTarget: args.autoTarget,
+                mode: args.mode, distW: args.distW,
             },
         });
         w.on('message', msg => {
