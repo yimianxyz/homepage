@@ -17,10 +17,12 @@ last_processed_gen=-1
 while true; do
     # List ckpt files on VM, parse gens
     gens=$(gcloud compute ssh $VM --zone=$ZONE --project=$PROJECT --tunnel-through-iap \
-        --command="ls ~/$DIR/$RUN/ckpt_gen*.json 2>/dev/null | xargs -I{} basename {} | sed 's/ckpt_gen0*\([0-9]*\).json/\1/'" 2>/dev/null \
-        | grep -v Warning | grep -v "please see" | grep -v NumPy | sort -n)
-    for g in $gens; do
-        if [ -n "$g" ] && [ "$g" -gt "$last_processed_gen" ]; then
+        --command="ls ~/$DIR/$RUN/ckpt_gen*.json 2>/dev/null | xargs -I{} basename {} | sed 's/ckpt_gen\([0-9]*\).json/\1/'" 2>/dev/null \
+        | grep -v Warning | grep -v "please see" | grep -v NumPy | grep -E '^[0-9]+$' | sort -n)
+    for g_raw in $gens; do
+        # 10# prefix forces decimal parse (avoid octal on leading zeros like 0008)
+        g=$((10#$g_raw))
+        if [ "$g" -gt "$last_processed_gen" ]; then
             local_ckpt="$LOCAL_DIR/ckpt_gen$(printf '%04d' $g).json"
             jsout="$LOCAL_DIR/ckpt_gen$(printf '%04d' $g)_jseval.json"
             if [ ! -f "$jsout" ]; then
