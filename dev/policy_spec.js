@@ -312,6 +312,117 @@ function rulePolicy_v4(features, opts) {
     return steering;
 }
 
+// rulePolicy v5: avoidance-aware multi-step prediction. The boid the
+// predator is approaching is actively turning away (predator-avoidance
+// acceleration ≈ 0.15 / frame in the flee direction when close). Linear
+// extrapolation (rule_v2 / v3 with α-lookahead) under-counts how far
+// the boid will move because it ignores this acceleration.
+//
+// v5 predicts the boid's future position T frames ahead by iterating:
+//   boid_pos(t+1) = boid_pos(t) + boid_vel(t)
+//   boid_vel(t+1) = boid_vel(t) + a_avoid(t)
+//   a_avoid(t)   ≈ unit(boid_pos - pred_pos) · (R-d)/R · TURN_FACTOR,
+//                  with fastLimit cap.
+// (We ignore boid-boid flocking forces — too expensive to recompute.)
+//
+// We also predict the predator's straight-line motion at MAX_SPEED in
+// the seek direction so the relative offset stays meaningful. Then for
+// each candidate boid, we pick the one with the smallest projected
+// distance at T frames, and head to its predicted position.
+const PREDATOR_RANGE_V5 = POLICY_R;            // matches PREDATOR_RANGE / POLICY_R = 80
+const PREDATOR_TURN_FACTOR_V5 = 0.3;
+const BOID_MAX_FORCE_AVOID = 0.15;             // MAX_FORCE * 1.5 from boid.js
+
+function rulePolicy_v5(features, opts) {
+    opts = opts || {};
+    const T = opts.steps != null ? opts.steps : 5;
+    const score_w_dist = opts.distW != null ? opts.distW : 0.0;
+
+    const vx = features[F.VX];
+    const vy = features[F.VY];
+    const dxA = features[F.DXA];
+    const dyA = features[F.DYA];
+
+    let bestK = -1;
+    let bestScore = Infinity;
+    let best_lead_x = 0, best_lead_y = 0;
+
+    for (let k = 0; k < POLICY_K; k++) {
+        const dxk = features[7 + 2 * k];
+        if (dxk === POLICY_PAD) continue;
+        const dyk = features[8 + 2 * k];
+        const dk = features[23 + k];
+        if (dk >= PREDATOR_RANGE_V5) continue;
+        const bvxk0 = features[35 + 2 * k];
+        const bvyk0 = features[36 + 2 * k];
+
+        // Roll forward T frames. Track boid position relative to predator's
+        // expected position. Predator pursues by seeking toward the boid's
+        // current relative offset (a strong simplification; could iterate).
+        let rx = dxk, ry = dyk;      // relative offset (boid - predator)
+        let bvx = bvxk0, bvy = bvyk0;
+        for (let t = 0; t < T; t++) {
+            const dnow = Math.sqrt(rx * rx + ry * ry);
+            if (dnow < 1e-9) break;
+            // Avoidance accel (boid moves away from predator)
+            let ax = 0, ay = 0;
+            if (dnow < PREDATOR_RANGE_V5) {
+                const strength = (PREDATOR_RANGE_V5 - dnow) / PREDATOR_RANGE_V5 * PREDATOR_TURN_FACTOR_V5;
+                const um = fastMagnitude(rx, ry);
+                if (um > 0) {
+                    ax = (rx / um) * strength;
+                    ay = (ry / um) * strength;
+                    const fm = fastMagnitude(ax, ay);
+                    if (fm > BOID_MAX_FORCE_AVOID) {
+                        const s = BOID_MAX_FORCE_AVOID / fm;
+                        ax *= s; ay *= s;
+                    }
+                }
+            }
+            // Boid step
+            bvx = bvx + ax;
+            bvy = bvy + ay;
+            // Clamp boid speed (boid.js uses iFastLimit(MAX_SPEED=6))
+            const bm = fastMagnitude(bvx, bvy);
+            if (bm > 6.0) { const s = 6.0 / bm; bvx *= s; bvy *= s; }
+            // Predator step: seek the current relative offset at MAX_SPEED
+            const sm = fastMagnitude(rx, ry);
+            let pvx = 0, pvy = 0;
+            if (sm > 0) { pvx = (rx / sm) * PREDATOR_MAX_SPEED; pvy = (ry / sm) * PREDATOR_MAX_SPEED; }
+            // Relative offset update: boid moves by bvx; predator moves by pvx.
+            rx = rx + bvx - pvx;
+            ry = ry + bvy - pvy;
+        }
+        const d_pred = Math.sqrt(rx * rx + ry * ry);
+
+        // Score: smaller projected distance is better, optional distance penalty.
+        const score = d_pred + score_w_dist * dk;
+        if (score < bestScore) {
+            bestScore = score;
+            bestK = k;
+            // Lead point = boid's predicted offset relative to PREDATOR's
+            // CURRENT position. Re-derive as: dx_k + (Δboid - Δpred we just
+            // simulated). Use the relative offset rx, ry plus predator's
+            // expected forward motion.
+            best_lead_x = rx + T * (PREDATOR_MAX_SPEED * (dxk / Math.max(dk, 1e-9)));
+            best_lead_y = ry + T * (PREDATOR_MAX_SPEED * (dyk / Math.max(dk, 1e-9)));
+        }
+    }
+
+    let tx, ty;
+    if (bestK >= 0) {
+        tx = best_lead_x;
+        ty = best_lead_y;
+    } else {
+        tx = dxA;
+        ty = dyA;
+    }
+
+    const desired = fastSetMagnitude(tx, ty, PREDATOR_MAX_SPEED);
+    const steering = fastLimit(desired[0] - vx, desired[1] - vy, PREDATOR_MAX_FORCE);
+    return steering;
+}
+
 module.exports = {
     POLICY_R,
     POLICY_K,
@@ -329,5 +440,6 @@ module.exports = {
     rulePolicy_v2,
     rulePolicy_v3,
     rulePolicy_v4,
+    rulePolicy_v5,
     ruleBranch,
 };

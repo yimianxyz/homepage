@@ -101,6 +101,16 @@ function buildNNFn(spec) {
         const opts = { distW: spec.distW != null ? spec.distW : 0.0 };
         return (features) => rulePolicy_v4(features, opts);
     }
+    if (spec.kind === 'rule_v5') {
+        // Multi-step prediction with boid-avoidance accounted for.
+        // spec.steps T (default 5), spec.distW score tiebreaker (default 0).
+        const rulePolicy_v5 = require('./policy_spec').rulePolicy_v5;
+        const opts = {
+            steps: spec.steps != null ? spec.steps : 5,
+            distW: spec.distW != null ? spec.distW : 0.0,
+        };
+        return (features) => rulePolicy_v5(features, opts);
+    }
     if (spec.kind === 'weights') {
         if (!loadModel) loadModel = require('../js/predator_nn').loadModel;
         const json = JSON.parse(fs.readFileSync(spec.path, 'utf8'));
@@ -224,7 +234,8 @@ function parseArgs(argv) {
         lookahead: 0,            // when > 0, features see shadow boids at pos + N·velocity
         alpha: 0,                // rule_v2 / rule_v3: prediction horizon in frames for hunt branch
         mode: 'score_minus_dist',// rule_v3 target-scoring mode
-        distW: 0.05,             // rule_v3 distance weight for score_minus_dist mode
+        distW: 0.05,             // rule_v3/v4 distance weight
+        steps: 5,                // rule_v5 lookahead steps
     };
     for (let i = 2; i < argv.length; i++) {
         const a = argv[i];
@@ -241,6 +252,7 @@ function parseArgs(argv) {
         else if (a === '--alpha') args.alpha = +argv[++i];
         else if (a === '--mode') args.mode = argv[++i];
         else if (a === '--distW') args.distW = +argv[++i];
+        else if (a === '--steps') args.steps = +argv[++i];
     }
     return args;
 }
@@ -254,6 +266,7 @@ if (require.main === module) {
                      : args.policy === 'rule_v2' ? { kind: 'rule_v2', alpha: args.alpha }
                      : args.policy === 'rule_v3' ? { kind: 'rule_v3', mode: args.mode, distW: args.distW, alpha: args.alpha }
                      : args.policy === 'rule_v4' ? { kind: 'rule_v4', distW: args.distW }
+                     : args.policy === 'rule_v5' ? { kind: 'rule_v5', steps: args.steps, distW: args.distW }
                      : { kind: 'weights', path: path.resolve(args.weights) };
     evalPolicy(policySpec, {
         seeds, maxFrames: args.maxFrames, numBoids: args.numBoids, workers: args.workers,
