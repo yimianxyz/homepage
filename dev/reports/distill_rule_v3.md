@@ -42,6 +42,42 @@ That would be a clear, statistically significant win over shipped.
 - After gen: train H=8 NN on it (~5 min), JS-verify with
   flock_centroid (~10 min).
 
+## Update 2026-05-23: random-patrol training tested
+
+Hypothesis: train rule_v3 NN on RANDOM patrol (like shipped did with
+rule_v1) to get a +2.25 generalization bonus over pure rule.
+
+Result: WORSE than flock-patrol training.
+
+| Model | Train data | JS @ 32 seeds |
+|-------|------------|--------------:|
+| H=8 NN, rule_v3 + RANDOM patrol | rule_v3 + random | 21.75 |
+| H=8 NN, rule_v3 + FLOCK patrol  | rule_v3 + flock  | **22.94** |
+
+The "random patrol generalizes" pattern doesn't replicate for rule_v3
+— suggesting that the +2.25 bonus shipped got was specific to rule_v1
+(smoothing its sharper discrete choice), not a universal "diverse data"
+benefit.
+
+## Update 2026-05-27: 128-seed verify and scale-up
+
+The H=8 rule_v3 + FLOCK NN was JS-verified at 128 seeds:
+
+| Model | JS @ 128 seeds | Δ vs shipped | z (paired) |
+|-------|---------------:|-------------:|-----------:|
+| shipped NN | 21.20 | — | — |
+| H=8 NN, rule_v3 + FLOCK | **22.34** | **+1.14** | **+1.36** |
+
+Trending toward significance (p≈0.087 one-tailed). At 256 seeds the
+expected z if effect is real ≈ 1.92 (p≈0.027). Currently running both
+at 256 seeds for the verification.
+
+In parallel:
+- 8-seed RNG ensemble training (H=8 rule_v3 + flock) — pick best of 8.
+- Patrol-mode screening (`weighted_centroid`, `weighted_predicted`,
+  `nearest_K_centroid`) — looking for a better-than-flock_centroid
+  structural change to compound with the distillation bonus.
+
 ## What's the elegant insight
 
 The shipped NN's success isn't just NN smoothing — it's specifically
