@@ -335,14 +335,10 @@ class Sim:
         self._inf_t = torch.tensor(float('inf'), dtype=dt, device=d)
 
         if self.sequential:
-            # Persistent acceleration accumulator — JS keeps acceleration on the
-            # boid between flock passes (iAdd, not assign) and only zeros it
-            # at the end of update(). Initialised to the result of the
-            # pre-setInterval self.tick() in simulation.js:run.
+            # Acceleration accumulator — matches JS Oracle which calls
+            # sim.render() only (skipping the live-page's sim.tick()), so each
+            # boid gets exactly ONE flock pass per frame inside boid.run().
             self.boid_accel = torch.zeros((self.B, self.N, 2), dtype=dt, device=d)
-            ax_pre, ay_pre = self._compute_boid_acceleration()
-            self.boid_accel[..., 0] = ax_pre
-            self.boid_accel[..., 1] = ay_pre
 
     def _compute_boid_acceleration(self):
         B, N = self.B, self.N
@@ -562,34 +558,28 @@ class Sim:
         return acc_x, acc_y
 
     def _step_boids_sequential(self):
-        """Two-pass sequential boid update, matching js/simulation.js.
+        """One-pass sequential boid update, matching dev/oracle.js's render-only
+        step (Oracle skips sim.tick(); fullTick=false is the default — see
+        oracle.js step() line 348-352).
 
-        Frame structure in JS (`tick()` then `render()`):
-          1. tick():    parallel flock pass — for every boid i, add forces
-                        computed from CURRENT (pre-update) positions to
-                        boid_accel[i]. No position updates.
-          2. render():  sequential loop — for each boid i in order:
-                          (a) flock pass — ADD forces (from positions that
-                              now include in-frame updates of boids 0..i-1)
-                              to boid_accel[i].
-                          (b) velocity += boid_accel[i]; fastLimit.
-                              position += velocity; wrap. boid_accel[i] = 0.
+        Per-frame, per-boid in order:
+          (a) flock pass — compute forces from CURRENT (pre-update) positions
+              that include in-frame updates from boids 0..i-1, ADD to accel.
+          (b) velocity += accel; fastLimit. position += velocity; wrap.
+              accel = 0.
 
-        Pre-loop tick (the `self.tick()` call before the setInterval in
-        simulation.js:run) is replicated at the end of _initialize.
+        IMPORTANT: this is single-flock-pass per frame to match Oracle. The
+        live page (js/simulation.js:run) does TWO flock passes (tick + render),
+        but all our eval and training data is generated via Oracle, so we
+        match that — otherwise the boid dynamics diverge after 1 frame.
         """
-        # Phase 1: parallel pre-tick (the setInterval's self.tick() call)
-        ax_pre, ay_pre = self._compute_boid_acceleration()
-        self.boid_accel[..., 0] += ax_pre
-        self.boid_accel[..., 1] += ay_pre
-
         # Pre-allocated scalars (see _initialize) — using them directly so
         # the step is graph-safe.
         neg_b = self._wrap_neg_b
         pos_mw = self._wrap_b_w_max
         pos_mh = self._wrap_b_h_max
 
-        # Phase 2: sequential per-boid pass
+        # Sequential per-boid flock + update pass
         for i in range(self.N):
             ax_i, ay_i = self._compute_single_boid_acceleration(i)
             self.boid_accel[:, i, 0] += ax_i
