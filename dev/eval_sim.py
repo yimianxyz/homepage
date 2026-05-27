@@ -25,13 +25,14 @@ from sim_torch import Sim, load_weights, stack_weights
 
 def evaluate(weights_path_or_dict, seeds=tuple(range(100, 116)), frames=5000,
              device='cuda', use_graph=True, sequential=True,
-             auto_target='flock_centroid'):
+             auto_target='flock_centroid', auto_target_opts=None):
     if isinstance(weights_path_or_dict, (str, os.PathLike)):
         weights = load_weights(str(weights_path_or_dict), device=device)
     else:
         weights = weights_path_or_dict
     sim = Sim(seeds=list(seeds), weights=weights, device=device,
-              sequential=sequential, auto_target=auto_target)
+              sequential=sequential, auto_target=auto_target,
+              auto_target_opts=auto_target_opts)
     t0 = time.time()
     if use_graph and device == 'cuda' and torch.cuda.is_available():
         out = sim.run_graph(frames)
@@ -107,12 +108,17 @@ if __name__ == '__main__':
     p.add_argument('--no_graph', action='store_true')
     p.add_argument('--no_sequential', action='store_true')
     p.add_argument('--autoTarget', default='flock_centroid')
+    p.add_argument('--lookahead', type=float, default=None)
+    p.add_argument('--K', type=int, default=None)
     p.add_argument('--report', default=None)
     a = p.parse_args()
     seeds = list(range(a.seedStart, a.seedStart + a.seeds))
+    auto_target_opts = {}
+    if a.lookahead is not None: auto_target_opts['lookahead'] = a.lookahead
+    if a.K is not None: auto_target_opts['K'] = a.K
     out = evaluate(a.weights, seeds=seeds, frames=a.frames, device=a.device,
                    use_graph=not a.no_graph, sequential=not a.no_sequential,
-                   auto_target=a.autoTarget)
+                   auto_target=a.autoTarget, auto_target_opts=auto_target_opts)
     print(json.dumps(out, indent=2))
     if a.report:
         with open(a.report, 'w') as f:

@@ -273,12 +273,14 @@ def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
 
 class Sim:
     def __init__(self, seeds, weights, num_boids=N_BOIDS,
-                 auto_target='flock_centroid', device='cpu', sequential=False):
+                 auto_target='flock_centroid', device='cpu', sequential=False,
+                 auto_target_opts=None):
         self.seeds = list(seeds)
         self.B = len(self.seeds)
         self.N = num_boids
         self.weights = weights
         self.auto_target_mode = auto_target
+        self.auto_target_opts = auto_target_opts or {}
         self.device = device
         self.sequential = sequential
         self._initialize()
@@ -608,8 +610,6 @@ class Sim:
     def _update_auto_target(self):
         if self.auto_target_mode == 'random':
             return
-        if self.auto_target_mode != 'flock_centroid':
-            raise NotImplementedError(f"autoTargetMode={self.auto_target_mode}")
 
         dx = self.boid_pos[..., 0] - self.pred_pos[:, None, 0]
         dy = self.boid_pos[..., 1] - self.pred_pos[:, None, 1]
@@ -621,8 +621,56 @@ class Sim:
         alive_f = self.boid_alive.double()
         n_alive = alive_f.sum(dim=1)
         n_safe = torch.where(n_alive > 0, n_alive, torch.ones_like(n_alive))
-        cx = (self.boid_pos[..., 0] * alive_f).sum(dim=1) / n_safe
-        cy = (self.boid_pos[..., 1] * alive_f).sum(dim=1) / n_safe
+
+        mode = self.auto_target_mode
+        if mode == 'flock_centroid':
+            cx = (self.boid_pos[..., 0] * alive_f).sum(dim=1) / n_safe
+            cy = (self.boid_pos[..., 1] * alive_f).sum(dim=1) / n_safe
+        elif mode == 'weighted_centroid':
+            # JS: w = 1/sqrt(d^2 + 1); centroid = sum(w*pos)/sum(w)
+            w = 1.0 / torch.sqrt(dx * dx + dy * dy + 1.0)
+            w = w * alive_f
+            wsum = w.sum(dim=1)
+            wsafe = torch.where(wsum > 0, wsum, torch.ones_like(wsum))
+            cx = (self.boid_pos[..., 0] * w).sum(dim=1) / wsafe
+            cy = (self.boid_pos[..., 1] * w).sum(dim=1) / wsafe
+        elif mode == 'predicted_centroid':
+            lookahead = float(self.auto_target_opts.get('lookahead', 30))
+            cx0 = (self.boid_pos[..., 0] * alive_f).sum(dim=1) / n_safe
+            cy0 = (self.boid_pos[..., 1] * alive_f).sum(dim=1) / n_safe
+            vx0 = (self.boid_vel[..., 0] * alive_f).sum(dim=1) / n_safe
+            vy0 = (self.boid_vel[..., 1] * alive_f).sum(dim=1) / n_safe
+            cx = cx0 + lookahead * vx0
+            cy = cy0 + lookahead * vy0
+        elif mode == 'weighted_predicted':
+            # Density-weighted centroid + lookahead × density-weighted mean velocity.
+            lookahead = float(self.auto_target_opts.get('lookahead', 5))
+            w = 1.0 / torch.sqrt(dx * dx + dy * dy + 1.0)
+            w = w * alive_f
+            wsum = w.sum(dim=1)
+            wsafe = torch.where(wsum > 0, wsum, torch.ones_like(wsum))
+            cx0 = (self.boid_pos[..., 0] * w).sum(dim=1) / wsafe
+            cy0 = (self.boid_pos[..., 1] * w).sum(dim=1) / wsafe
+            vx0 = (self.boid_vel[..., 0] * w).sum(dim=1) / wsafe
+            vy0 = (self.boid_vel[..., 1] * w).sum(dim=1) / wsafe
+            cx = cx0 + lookahead * vx0
+            cy = cy0 + lookahead * vy0
+        elif mode == 'nearest_K_centroid':
+            # Centroid of the K nearest live boids.
+            K = int(self.auto_target_opts.get('K', 8))
+            K = min(K, self.N)
+            d_masked2 = torch.where(self.boid_alive, d * d, self._inf_t)
+            _, idx = torch.topk(d_masked2, K, dim=1, largest=False)
+            sel_x = torch.gather(self.boid_pos[..., 0], 1, idx)
+            sel_y = torch.gather(self.boid_pos[..., 1], 1, idx)
+            sel_alive = torch.gather(alive_f, 1, idx)
+            k_sum = sel_alive.sum(dim=1)
+            k_safe = torch.where(k_sum > 0, k_sum, torch.ones_like(k_sum))
+            cx = (sel_x * sel_alive).sum(dim=1) / k_safe
+            cy = (sel_y * sel_alive).sum(dim=1) / k_safe
+        else:
+            raise NotImplementedError(f"autoTargetMode={mode}")
+
         cond = (~any_in_range) & any_alive
         self.pred_auto[:, 0] = torch.where(cond, cx, self.pred_auto[:, 0])
         self.pred_auto[:, 1] = torch.where(cond, cy, self.pred_auto[:, 1])
