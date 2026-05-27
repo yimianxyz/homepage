@@ -169,6 +169,9 @@ def main():
     p.add_argument('--rotate_seeds', action='store_true',
                    help='Rotate the seed window each gen (shifts by +S).')
     p.add_argument('--ckpt_every', type=int, default=10)
+    p.add_argument('--resume', default=None,
+                   help='Path to a .pt checkpoint to resume from. Loads theta, gen, '
+                        'and best_baseline. Architecture/template still comes from --init_from.')
     args = p.parse_args()
 
     assert args.K % 2 == 0, "K must be even (antithetic sampling)"
@@ -187,6 +190,14 @@ def main():
     P = param_size(template)
     theta = flatten_weights(template).to(args.device)
     print(f"loaded init from {args.init_from}, P={P} params", flush=True)
+
+    start_gen = 0
+    if args.resume:
+        ck = torch.load(args.resume, map_location=args.device, weights_only=False)
+        assert ck['P'] == P, f"resume P={ck['P']} != template P={P}"
+        theta = ck['theta'].to(args.device).to(torch.float32)
+        start_gen = int(ck.get('gen', -1)) + 1
+        print(f"resumed from {args.resume}: theta restored, starting at gen={start_gen}", flush=True)
 
     # Warmup the CUDA path once so first gen isn't artificially slow
     if args.device == 'cuda' and torch.cuda.is_available():
@@ -209,10 +220,20 @@ def main():
         'seed': args.seed,
     })
 
-    best_baseline = -1.0
+    # Restore best_baseline across resumes by scanning a per-run state file
+    # (so the resumed run doesn't overwrite a stronger best.pt found earlier).
+    state_path = out_dir / 'run_state.json'
+    if state_path.exists():
+        try:
+            st = json.loads(state_path.read_text())
+            best_baseline = float(st.get('best_baseline', -1.0))
+        except Exception:
+            best_baseline = -1.0
+    else:
+        best_baseline = -1.0
     t_start = time.time()
     H = args.K // 2
-    for gen in range(args.gens):
+    for gen in range(start_gen, args.gens):
         gen_t0 = time.time()
 
         if args.rotate_seeds:
@@ -299,6 +320,17 @@ def main():
             }, out_dir / 'best.pt')
             export_weights_to_js(gen_max_theta, template,
                                  str(out_dir / 'best.json'))
+
+        # Always save 'last.pt' so resume-after-preemption is one-line.
+        torch.save({
+            'theta': theta.detach().cpu(),
+            'P': P,
+            'gen': gen,
+            'baseline_catches': baseline,
+            'args': vars(args),
+        }, out_dir / 'last.pt')
+        state_path.write_text(json.dumps({'best_baseline': best_baseline,
+                                            'last_gen': gen}))
 
         if gen % args.ckpt_every == 0 or gen == args.gens - 1:
             # ckpt_gen* saves the central (pre-step) theta whose baseline
