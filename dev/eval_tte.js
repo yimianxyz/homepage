@@ -117,6 +117,24 @@ function buildNNFn(spec) {
         const model = loadModel(json);
         return (features) => model.forward(features);
     }
+    if (spec.kind === 'ensemble') {
+        // spec.paths is a list of weights JSONs; we load all, forward
+        // each frame and average the outputs.
+        if (!loadModel) loadModel = require('../js/predator_nn').loadModel;
+        const models = spec.paths.map(p => loadModel(JSON.parse(fs.readFileSync(p, 'utf8'))));
+        const out = new Float32Array(2);
+        return (features) => {
+            let sx = 0, sy = 0;
+            for (let i = 0; i < models.length; i++) {
+                const y = models[i].forward(features);
+                sx += y[0];
+                sy += y[1];
+            }
+            out[0] = sx / models.length;
+            out[1] = sy / models.length;
+            return out;
+        };
+    }
     if (spec.kind === 'null') {
         const out = new Float32Array([0, 0]);
         return (_features) => out;
@@ -253,6 +271,7 @@ function parseArgs(argv) {
         else if (a === '--mode') args.mode = argv[++i];
         else if (a === '--distW') args.distW = +argv[++i];
         else if (a === '--steps') args.steps = +argv[++i];
+        else if (a === '--ensemble') args.ensemble = argv[++i]; // comma-separated paths
     }
     return args;
 }
@@ -260,7 +279,8 @@ function parseArgs(argv) {
 if (require.main === module) {
     const args = parseArgs(process.argv);
     const seeds = Array.from({ length: args.numSeeds }, (_, i) => args.seedStart + i);
-    const policySpec = args.policy === 'null' ? { kind: 'null' }
+    const policySpec = args.ensemble ? { kind: 'ensemble', paths: args.ensemble.split(',').map(p => path.resolve(p)) }
+                     : args.policy === 'null' ? { kind: 'null' }
                      : args.policy === 'random' ? { kind: 'random' }
                      : args.policy === 'rule' ? { kind: 'rule' }
                      : args.policy === 'rule_v2' ? { kind: 'rule_v2', alpha: args.alpha }
