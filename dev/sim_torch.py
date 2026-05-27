@@ -119,7 +119,11 @@ def nn_forward(features: torch.Tensor, weights: dict) -> torch.Tensor:
     x = x * weights['outputScale']
     cm = weights['clipMagnitude']
     if cm > 0:
-        mag = torch.sqrt(x[:, 0] ** 2 + x[:, 1] ** 2)
+        # Match JS predator_nn.js: alpha-max-beta-min approximation
+        # mag ≈ max(|x|,|y|)*0.96 + min(|x|,|y|)*0.398. NOT exact sqrt.
+        ax = torch.abs(x[:, 0])
+        ay = torch.abs(x[:, 1])
+        mag = torch.maximum(ax, ay) * 0.96 + torch.minimum(ax, ay) * 0.398
         s = torch.where(mag > cm, cm / torch.clamp(mag, min=1e-12), torch.ones_like(mag))
         x = x * s.unsqueeze(1)
     return x
@@ -145,7 +149,9 @@ def nn_forward_batched(features: torch.Tensor, weights: dict) -> torch.Tensor:
     x = x * weights['outputScale']
     cm = weights['clipMagnitude']
     if cm > 0:
-        mag = torch.sqrt(x[..., 0] ** 2 + x[..., 1] ** 2)
+        ax = torch.abs(x[..., 0])
+        ay = torch.abs(x[..., 1])
+        mag = torch.maximum(ax, ay) * 0.96 + torch.minimum(ax, ay) * 0.398
         s = torch.where(mag > cm, cm / torch.clamp(mag, min=1e-12), torch.ones_like(mag))
         x = x * s.unsqueeze(-1)
     return x.reshape(K * S, -1)
