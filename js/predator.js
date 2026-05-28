@@ -44,13 +44,27 @@ Predator.prototype = {
             }
         }
         if (!anyInRange && boids.length > 0) {
-            var sx = 0, sy = 0;
+            // weighted_predicted patrol: density-weighted centroid + a short
+            // lookahead of the density-weighted mean velocity. Pulls toward the
+            // nearest dense cluster and anticipates where it's heading.
+            // +1.77 catches over the plain flock centroid (JS 256-seed, z=3.02);
+            // see dev/reports/weighted_predicted_patrol.md.
+            var LOOKAHEAD = 5; // frames
+            var wsum = 0, sx = 0, sy = 0, svx = 0, svy = 0;
             for (var i = 0; i < boids.length; i++) {
-                sx += boids[i].position.x;
-                sy += boids[i].position.y;
+                var dx = boids[i].position.x - this.position.x;
+                var dy = boids[i].position.y - this.position.y;
+                var w = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+                wsum += w;
+                sx += boids[i].position.x * w;
+                sy += boids[i].position.y * w;
+                svx += boids[i].velocity.x * w;
+                svy += boids[i].velocity.y * w;
             }
-            this.autonomousTarget.x = sx / boids.length;
-            this.autonomousTarget.y = sy / boids.length;
+            if (wsum > 0) {
+                this.autonomousTarget.x = sx / wsum + LOOKAHEAD * svx / wsum;
+                this.autonomousTarget.y = sy / wsum + LOOKAHEAD * svy / wsum;
+            }
         }
 
         var features = buildPredatorFeatures(this.position, this.velocity, boids, this.autonomousTarget);
