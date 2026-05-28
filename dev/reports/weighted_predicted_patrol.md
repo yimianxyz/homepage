@@ -117,14 +117,26 @@ path that beats "keep the shipped NN, change the patrol."**
 Deploy candidate = shipped NN (unchanged) + weighted_predicted patrol, already
 JS-verified at +1.77 (z=3.02).
 
-## Shipping
+## Shipping — DEPLOYED 2026-05-28
 
-To ship, the production patrol logic (js/predator.js / js/simulation.js
-autonomous-target computation, currently flock_centroid) would change to
-weighted_predicted with lookahead=5 — a ~10-line change, same shape as
-the flock_centroid patch. The NN is unchanged (it reads the patrol target
-via the seek_auto_xy feature, so it adapts automatically). **Not yet
-applied to production — pending user go-ahead.**
+Shipped to production in `js/predator.js` `getAutonomousForce` (commit on
+`main`, GitHub Pages serves main root → https://yimianxyz.github.io/homepage/).
+The NN (`js/predator_weights.json`) is unchanged — it reads the patrol target
+via its seek_auto_xy feature and adapts automatically.
+
+Note discovered at deploy time: production `main` was still running the
+ORIGINAL random-canvas-point patrol — the flock_centroid +39% fix had only
+ever lived on the `rl/teacher` branch, never merged to main. So this deploy
+takes production from random patrol straight to weighted_predicted (the full
+jump: +39% from centroid targeting, plus the +1.77 from density-weighting +
+lookahead).
+
+Pre-deploy gate: headless Playwright run of the exact main artifact
+(`dev/verify_prod_patrol.js`, VERIFY_ROOT pointed at the deploy worktree) —
+page boots, predator catches actively (45 in 45s real-time), zero console
+errors. boid.js/vector.js diffs between main and rl/teacher are non-behavioral
+(Math.pow→x*x, for-in→indexed); policy_features.js diff is append-only (slots
+35–44), so the featureDim-35 NN reads identical features on both branches.
 
 ## Files
 
