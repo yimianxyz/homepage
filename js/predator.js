@@ -29,11 +29,12 @@ Predator.prototype = {
     // remains in plain JS. The simulation is gated on the weights being
     // loaded, so window.__predatorModel is always present here.
     //
-    // Patrol target = centroid of the live boid swarm. The predator
-    // heads toward where the boids actually are when none are in
-    // hunting range, instead of wandering toward random canvas points.
-    // Measured +39% catches/eval on the dev harness (z=3.55, held out
-    // on a second seed set at z=3.59) — see dev/reports/autotarget_*.
+    // Patrol target = weighted_predicted: a density-weighted centroid of the
+    // live boid swarm, pushed forward by a short lookahead of the swarm's
+    // density-weighted mean velocity. The predator heads toward the nearest
+    // dense cluster and anticipates where it's going, instead of wandering.
+    // +39% over random patrol, then a further +1.77 catches/eval over the
+    // plain centroid (JS 256-seed, z=3.02) — see dev/reports/.
     getAutonomousForce: function(boids) {
         var R = POLICY_R;
         var anyInRange = false;
