@@ -26,13 +26,17 @@ Predator.prototype = {
 
     // Autonomous movement. The steering policy is the trained neural
     // network in window.__predatorModel; only patrol-target bookkeeping
-    // (regenerating autoTarget on a 5 s timer or 30 px proximity) remains
-    // in plain JS. The simulation is gated on the weights being loaded,
-    // so window.__predatorModel is always present here.
+    // remains in plain JS. The simulation is gated on the weights being
+    // loaded, so window.__predatorModel is always present here.
+    //
+    // Patrol target = weighted_predicted: a density-weighted centroid of the
+    // live boid swarm, pushed forward by a short lookahead of the swarm's
+    // density-weighted mean velocity. The predator heads toward the nearest
+    // dense cluster and anticipates where it's going, instead of wandering.
+    // +39% over random patrol, then a further +1.77 catches/eval over the
+    // plain centroid (JS 256-seed, z=3.02) — see dev/reports/.
     getAutonomousForce: function(boids) {
         var R = POLICY_R;
-        var currentTime = simNow();
-
         var anyInRange = false;
         for (var i = 0; i < boids.length; i++) {
             if (this.position.getDistance(boids[i].position) < R) {
@@ -40,15 +44,27 @@ Predator.prototype = {
                 break;
             }
         }
-        if (!anyInRange) {
-            if (currentTime - this.targetChangeTime > this.targetChangeInterval) {
-                var margin = 50;
-                this.autonomousTarget.x = margin + simRandom() * (this.simulation.canvasWidth - 2 * margin);
-                this.autonomousTarget.y = margin + simRandom() * (this.simulation.canvasHeight - 2 * margin);
-                this.targetChangeTime = currentTime;
+        if (!anyInRange && boids.length > 0) {
+            // weighted_predicted patrol: density-weighted centroid + a short
+            // lookahead of the density-weighted mean velocity. Pulls toward the
+            // nearest dense cluster and anticipates where it's heading.
+            // +1.77 catches over the plain flock centroid (JS 256-seed, z=3.02);
+            // see dev/reports/weighted_predicted_patrol.md.
+            var LOOKAHEAD = 5; // frames
+            var wsum = 0, sx = 0, sy = 0, svx = 0, svy = 0;
+            for (var i = 0; i < boids.length; i++) {
+                var dx = boids[i].position.x - this.position.x;
+                var dy = boids[i].position.y - this.position.y;
+                var w = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+                wsum += w;
+                sx += boids[i].position.x * w;
+                sy += boids[i].position.y * w;
+                svx += boids[i].velocity.x * w;
+                svy += boids[i].velocity.y * w;
             }
-            if (this.position.getDistance(this.autonomousTarget) < 30) {
-                this.targetChangeTime = 0;
+            if (wsum > 0) {
+                this.autonomousTarget.x = sx / wsum + LOOKAHEAD * svx / wsum;
+                this.autonomousTarget.y = sy / wsum + LOOKAHEAD * svy / wsum;
             }
         }
 
