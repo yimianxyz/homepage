@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = process.env.VERIFY_ROOT || path.resolve(__dirname, '..');
 const PORT = 8771;
 const RUN_MS = 45000;
 
