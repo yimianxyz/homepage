@@ -50,6 +50,24 @@ It's the **combination at short lookahead** that wins.
 | 15 | 23.31 | +1.38 |
 
 Short lookahead (3–5) is best; the curve is noisy but stays positive.
+Fine sweep around the peak (256 seeds): la4=22.23, **la5=23.44**, la6=22.63,
+la7=22.87 — la5 is a clear, sharp optimum.
+
+## Distance-weighting exponent (sim_torch, 256 seeds, la=5)
+
+w = 1/(d²+1)^(weight_pow/2):
+
+| weight_pow | mean | note |
+|-----------:|-----:|------|
+| 0.5 | 22.55 | gentler falloff → closer to flock, worse |
+| **1.0** | **23.44** | current default = 1/sqrt(d²+1) |
+| 1.5 | 23.39 | ~equal |
+| 2.0 | 23.56 | marginally higher, within noise (SE≈0.42) |
+
+The exponent is not a meaningful lever in [1.0, 2.0] — all give ~+1.5 over
+flock. Keeping the simple, JS-validated `weight_pow=1` (1/sqrt). The mode is
+near-optimal in its (lookahead, weight_pow) parameter space; further gains
+would require a structurally different patrol target, not parameter tuning.
 
 ## Why this matters
 

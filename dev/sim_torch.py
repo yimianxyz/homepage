@@ -640,8 +640,12 @@ class Sim:
             cy = cy0 + lookahead * vy0
         elif mode == 'weighted_predicted':
             # Density-weighted centroid + lookahead × density-weighted mean velocity.
+            # weight_pow controls the distance falloff: w = 1/(d^2+1)^(weight_pow/2).
+            # weight_pow=1 → 1/sqrt(d^2+1) (default, the +1.77 winner);
+            # weight_pow=2 → 1/(d^2+1); weight_pow=0.5 → gentler falloff.
             lookahead = float(self.auto_target_opts.get('lookahead', 5))
-            w = 1.0 / torch.sqrt(dx * dx + dy * dy + 1.0)
+            weight_pow = float(self.auto_target_opts.get('weight_pow', 1.0))
+            w = (dx * dx + dy * dy + 1.0) ** (-weight_pow / 2.0)
             w = w * alive_f
             wsum = w.sum(dim=1)
             wsafe = torch.where(wsum > 0, wsum, torch.ones_like(wsum))
