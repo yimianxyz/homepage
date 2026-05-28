@@ -78,6 +78,28 @@ function computeAutoTarget(mode, predator, boids, defaultTarget, canvasWidth, ca
         const lookahead = 30; // frames
         return { x: sx / n + lookahead * svx / n, y: sy / n + lookahead * svy / n };
     }
+    if (mode === 'weighted_predicted' || mode === 'weighted_predicted_a5') {
+        // Density-weighted centroid + lookahead × density-weighted mean
+        // velocity. Combines weighted_centroid's pull toward the nearest
+        // cluster with a short anticipation of where that cluster is heading.
+        // lookahead=5 frames is the sim_torch-screened optimum.
+        if (boids.length === 0) return defaultTarget;
+        const lookahead = 5;
+        let wsum = 0, sx = 0, sy = 0, svx = 0, svy = 0;
+        for (let i = 0; i < boids.length; i++) {
+            const dx = boids[i].position.x - predator.position.x;
+            const dy = boids[i].position.y - predator.position.y;
+            const w = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+            wsum += w;
+            sx += boids[i].position.x * w;
+            sy += boids[i].position.y * w;
+            svx += boids[i].velocity.x * w;
+            svy += boids[i].velocity.y * w;
+        }
+        if (wsum === 0) return defaultTarget;
+        return { x: sx / wsum + lookahead * svx / wsum,
+                 y: sy / wsum + lookahead * svy / wsum };
+    }
     if (mode === 'weighted_centroid') {
         // Centroid weighted by 1/distance: emphasises nearby boids. The
         // raw centroid can sit in the middle of a sparse region between
