@@ -93,6 +93,30 @@ The two sim_torch bugs found and fixed earlier this session were:
 2. `_step_boids_sequential` did TWO flock passes per frame (live-page
    `tick()`+`render()`) instead of ONE (Oracle's render-only step).
 
+## Distillation attempt (does NOT beat the patrol-swap)
+
+Tested whether a NN distilled on weighted_predicted-patrol data beats the
+shipped NN when both run weighted_predicted (256 seeds, sim_torch):
+
+| policy | catches |
+|--------|--------:|
+| **shipped NN + weighted_predicted** | **23.44** |
+| distilled H4 (rule_v1 + wpred) + wpred | 22.31 |
+| distilled H8 (rule_v1 + wpred) + wpred | 21.66 |
+| shipped NN + flock (baseline) | 21.93 |
+
+The fresh NNs train to ~0 val loss because rule_v1's output is a gated copy
+of the seek-vector features (slots 29–32) — the NN reconstructs the rule
+exactly, so it scores like the bare rule (~22.3), not better. The shipped NN
+scores higher (23.44) because it was distilled from **random-patrol** data,
+which gave it a generalization/smoothing bonus that the matched-training copy
+loses. To put that bonus into a fresh NN you'd train on rule_v1 + random
+patrol — which just reproduces the shipped NN. So **there is no distillation
+path that beats "keep the shipped NN, change the patrol."**
+
+Deploy candidate = shipped NN (unchanged) + weighted_predicted patrol, already
+JS-verified at +1.77 (z=3.02).
+
 ## Shipping
 
 To ship, the production patrol logic (js/predator.js / js/simulation.js
