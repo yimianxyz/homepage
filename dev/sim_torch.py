@@ -773,6 +773,45 @@ class Sim:
             k_safe = torch.where(k_sum > 0, k_sum, torch.ones_like(k_sum))
             cx = (sel_x * sel_alive).sum(dim=1) / k_safe
             cy = (sel_y * sel_alive).sum(dim=1) / k_safe
+        elif mode == 'evolved':
+            # Unified, evolvable patrol target. Generalizes the whole lineage:
+            # weight each live boid by (local_density^dens_pow) * exp(-dist_pred
+            # / reach_scale), normalize by the per-env max and raise to `sharp`
+            # (sharp->inf picks the single densest-reachable boid like
+            # nearest_cluster; sharp->0 gives the broad/global centroid), then
+            # take the weighted centroid + mean velocity and lead by travel time.
+            # reach_scale is the NEW axis: the predator is slow, so a closer but
+            # slightly-less-dense cluster can beat a distant denser one.
+            o = self.auto_target_opts
+            Rc = float(o.get('cluster_r', 150.0))
+            dens_pow = float(o.get('dens_pow', 1.0))
+            reach_scale = float(o.get('reach_scale', 1e9))
+            sharp = float(o.get('sharp', 6.0))
+            lead_scale = float(o.get('lead_scale', 0.4))
+            lead_max = float(o.get('lead_max', 120.0))
+            bx = self.boid_pos[..., 0]
+            by = self.boid_pos[..., 1]
+            ddx_ij = bx.unsqueeze(2) - bx.unsqueeze(1)
+            ddy_ij = by.unsqueeze(2) - by.unsqueeze(1)
+            dist_ij = torch.sqrt(ddx_ij * ddx_ij + ddy_ij * ddy_ij)
+            pair_ok = (dist_ij < Rc) & self.boid_alive.unsqueeze(1) & self.boid_alive.unsqueeze(2)
+            ncount = pair_ok.double().sum(dim=2)            # (B,N) neighbors incl self
+            attract = (ncount + 1.0).pow(dens_pow) * torch.exp(-d / reach_scale)
+            attract = torch.where(self.boid_alive, attract, torch.zeros_like(attract))
+            amax = attract.max(dim=1, keepdim=True).values.clamp_min(1e-12)
+            w = (attract / amax).pow(sharp)
+            w = torch.where(self.boid_alive, w, torch.zeros_like(w))
+            wsum = w.sum(dim=1).clamp_min(1e-12)
+            cx0 = (bx * w).sum(dim=1) / wsum
+            cy0 = (by * w).sum(dim=1) / wsum
+            vx0 = (self.boid_vel[..., 0] * w).sum(dim=1) / wsum
+            vy0 = (self.boid_vel[..., 1] * w).sum(dim=1) / wsum
+            ddx2 = cx0 - self.pred_pos[:, 0]
+            ddy2 = cy0 - self.pred_pos[:, 1]
+            dcent = torch.sqrt(ddx2 * ddx2 + ddy2 * ddy2)
+            lead = torch.clamp(dcent / PREDATOR_MAX_SPEED * lead_scale, 0.0, lead_max)
+            cx = cx0 + lead * vx0
+            cy = cy0 + lead * vy0
         else:
             raise NotImplementedError(f"autoTargetMode={mode}")
 
