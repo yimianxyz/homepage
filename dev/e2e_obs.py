@@ -79,12 +79,14 @@ AUG_EXTRA = 8  # seek(3) + nearest boid(5)
 
 def build_obs_augmented(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
                         seek_xy, A=8, R=3, ring_edges=(40.0, 120.0, 1e9),
-                        vnorm=6.0, dnorm=120.0, seeknorm=300.0):
+                        vnorm=6.0, dnorm=120.0, seeknorm=300.0, cooldown=None):
     """Egocentric grid + injected hand-crafted signals so PPO starts from the
     known-good nearest_cluster behavior and learns to improve on it:
       - seek vector to the patrol target (unit dir 2 + norm dist 1)
       - nearest live boid (unit dir 2 + norm dist 1 + its velocity 2)
-    Returns (B, 3*A*R + 3 + 8) = (B, 83) for A=8,R=3.
+      - (optional) feed-cooldown remaining fraction (1) — info the deployed
+        policy ignores: 1.0 just after a catch (cannot eat), 0.0 when ready.
+    Returns (B, 75 + 8 [+1 if cooldown]) — 83 (or 84) for A=8,R=3.
     """
     base = build_obs_egocentric(pred_pos, pred_vel, boid_pos, boid_vel,
                                 boid_alive, A, R, ring_edges, vnorm, dnorm)
@@ -108,7 +110,10 @@ def build_obs_augmented(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
     nearest = torch.stack([(ndx / nd_safe).to(dt), (ndy / nd_safe).to(dt),
                            torch.clamp(ndist / dnorm, 0.0, 4.0).to(dt),
                            (nvx / vnorm).to(dt), (nvy / vnorm).to(dt)], dim=1)
-    return torch.cat([base, seek, nearest], dim=1)
+    parts = [base, seek, nearest]
+    if cooldown is not None:
+        parts.append(cooldown.to(dt).view(-1, 1))
+    return torch.cat(parts, dim=1)
 
 
 if __name__ == '__main__':

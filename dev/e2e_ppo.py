@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sim_torch import (Sim, fast_limit, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE,
-                       load_weights, nn_forward, build_features)
+                       PREDATOR_FEED_COOLDOWN_MS, load_weights, nn_forward, build_features)
 from e2e_obs import build_obs_egocentric, build_obs_augmented, AUG_EXTRA
 
 A, R = 8, 3
@@ -51,7 +51,8 @@ class PPOSim(Sim):
     hand-crafted signal and learns to improve on it.
     """
     def __init__(self, seeds, device='cuda', augment=False,
-                 residual=False, base_weights=None, resid_scale=0.05):
+                 residual=False, base_weights=None, resid_scale=0.05,
+                 cooldown_obs=False):
         w = {'featureDim': 45, 'inputMean': None, 'inputStd': None,
              'outputScale': 1.0, 'clipMagnitude': 0.0, 'layers': []}
         # residual mode rides on top of the deployed nearest_cluster policy, so
@@ -60,6 +61,7 @@ class PPOSim(Sim):
         self.augment = augment or residual
         self._base_w = base_weights
         self.resid_scale = resid_scale
+        self.cooldown_obs = cooldown_obs
         at = 'nearest_cluster' if self.augment else 'random'
         ato = NC_OPTS if self.augment else None
         super().__init__(seeds=seeds, weights=w, device=device,
@@ -83,12 +85,17 @@ class PPOSim(Sim):
         self.seeds = list(new_seeds)
         self._initialize()
 
+    def _cooldown_frac(self):
+        elapsed = self._frame_ms - self.pred_last_feed_ms
+        return torch.clamp((PREDATOR_FEED_COOLDOWN_MS - elapsed) / PREDATOR_FEED_COOLDOWN_MS, 0.0, 1.0)
+
     def current_obs(self):
         if self.augment:
             self._update_auto_target()
+            cd = self._cooldown_frac() if self.cooldown_obs else None
             return build_obs_augmented(self.pred_pos, self.pred_vel,
                                        self.boid_pos, self.boid_vel,
-                                       self.boid_alive, self.pred_auto)
+                                       self.boid_alive, self.pred_auto, cooldown=cd)
         return build_obs_egocentric(self.pred_pos, self.pred_vel,
                                     self.boid_pos, self.boid_vel, self.boid_alive)
 
@@ -143,16 +150,17 @@ def main():
     p.add_argument('--residual', action='store_true', help='learn a correction on top of the deployed policy (guaranteed 7.63 floor)')
     p.add_argument('--base_weights', default='js/predator_weights.json', help='deployed weights for residual base steering')
     p.add_argument('--resid_scale', type=float, default=0.05, help='residual action scale (force units)')
+    p.add_argument('--cooldown_obs', action='store_true', help='add feed-cooldown remaining to obs (info the base ignores)')
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--out', required=True)
     a = p.parse_args()
     use_aug = a.augment or a.residual
-    OBS_DIM = OBS_AUG if use_aug else OBS_RAW
+    OBS_DIM = (OBS_AUG if use_aug else OBS_RAW) + (1 if (use_aug and a.cooldown_obs) else 0)
     base_w = load_weights(a.base_weights, device=a.device) if a.residual else None
     mk = lambda seeds: PPOSim(seeds, device=a.device, augment=a.augment,
                               residual=a.residual, base_weights=base_w,
-                              resid_scale=a.resid_scale)
+                              resid_scale=a.resid_scale, cooldown_obs=a.cooldown_obs)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     logf = open(out / 'ppo_log.jsonl', 'a')
     def log(o): print(json.dumps(o), flush=True); logf.write(json.dumps(o) + '\n'); logf.flush()
