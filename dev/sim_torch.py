@@ -439,13 +439,15 @@ class Sim:
         self.boid_vel[..., 1] = new_vy
         self.boid_pos[..., 0] += new_vx
         self.boid_pos[..., 1] += new_vy
-        # Wrap
-        m = CANVAS_W + BORDER_OFFSET
-        self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] > m, torch.tensor(-BORDER_OFFSET, dtype=torch.float64, device=self.device), self.boid_pos[..., 0])
-        self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] < -BORDER_OFFSET, torch.tensor(m, dtype=torch.float64, device=self.device), self.boid_pos[..., 0])
-        m = CANVAS_H + BORDER_OFFSET
-        self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] > m, torch.tensor(-BORDER_OFFSET, dtype=torch.float64, device=self.device), self.boid_pos[..., 1])
-        self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] < -BORDER_OFFSET, torch.tensor(m, dtype=torch.float64, device=self.device), self.boid_pos[..., 1])
+        # Wrap — use pre-allocated scalars (graph-capture-safe; creating tensors
+        # inline here previously broke CUDA graph capture in parallel mode).
+        neg_b = self._wrap_neg_b
+        pos_mw = self._wrap_b_w_max
+        pos_mh = self._wrap_b_h_max
+        self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] > pos_mw, neg_b, self.boid_pos[..., 0])
+        self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] < neg_b, pos_mw, self.boid_pos[..., 0])
+        self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] > pos_mh, neg_b, self.boid_pos[..., 1])
+        self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] < neg_b, pos_mh, self.boid_pos[..., 1])
 
     def _compute_single_boid_acceleration(self, i):
         """Compute (ax, ay) for boid i across all B batches, using CURRENT
@@ -655,6 +657,109 @@ class Sim:
             vy0 = (self.boid_vel[..., 1] * w).sum(dim=1) / wsafe
             cx = cx0 + lookahead * vx0
             cy = cy0 + lookahead * vy0
+        elif mode == 'weighted_adaptive':
+            # Like weighted_predicted but the lookahead is ADAPTIVE: instead of
+            # a fixed 5 frames, lead = (dist from predator to the weighted
+            # centroid / predator_max_speed) * lead_scale, capped at lead_max.
+            # Far clusters get more lead (predator needs more frames to reach
+            # them); near clusters get less. Principled because the predator is
+            # slower than the boids, so the right lead depends on travel time.
+            lead_scale = float(self.auto_target_opts.get('lead_scale', 1.0))
+            lead_max = float(self.auto_target_opts.get('lead_max', 40.0))
+            weight_pow = float(self.auto_target_opts.get('weight_pow', 1.0))
+            w = (dx * dx + dy * dy + 1.0) ** (-weight_pow / 2.0)
+            w = w * alive_f
+            wsum = w.sum(dim=1)
+            wsafe = torch.where(wsum > 0, wsum, torch.ones_like(wsum))
+            cx0 = (self.boid_pos[..., 0] * w).sum(dim=1) / wsafe
+            cy0 = (self.boid_pos[..., 1] * w).sum(dim=1) / wsafe
+            vx0 = (self.boid_vel[..., 0] * w).sum(dim=1) / wsafe
+            vy0 = (self.boid_vel[..., 1] * w).sum(dim=1) / wsafe
+            ddx = cx0 - self.pred_pos[:, 0]
+            ddy = cy0 - self.pred_pos[:, 1]
+            dcent = torch.sqrt(ddx * ddx + ddy * ddy)
+            lead = torch.clamp(dcent / PREDATOR_MAX_SPEED * lead_scale, 0.0, lead_max)
+            cx = cx0 + lead * vx0
+            cy = cy0 + lead * vy0
+        elif mode == 'weighted_intercept':
+            # Solve the intercept quadratic: aim at C + t*Vc where t is the
+            # time for the predator (moving at PREDATOR_MAX_SPEED toward the
+            # aim point) to reach it. C = weighted centroid, Vc = weighted mean
+            # boid velocity. If no positive real root (cluster recedes faster
+            # than predator can chase), fall back to adaptive lead.
+            lead_max = float(self.auto_target_opts.get('lead_max', 60.0))
+            w = (dx * dx + dy * dy + 1.0) ** (-0.5)
+            w = w * alive_f
+            wsum = w.sum(dim=1)
+            wsafe = torch.where(wsum > 0, wsum, torch.ones_like(wsum))
+            cx0 = (self.boid_pos[..., 0] * w).sum(dim=1) / wsafe
+            cy0 = (self.boid_pos[..., 1] * w).sum(dim=1) / wsafe
+            vx0 = (self.boid_vel[..., 0] * w).sum(dim=1) / wsafe
+            vy0 = (self.boid_vel[..., 1] * w).sum(dim=1) / wsafe
+            Dx = cx0 - self.pred_pos[:, 0]
+            Dy = cy0 - self.pred_pos[:, 1]
+            Vp = PREDATOR_MAX_SPEED
+            a = vx0 * vx0 + vy0 * vy0 - Vp * Vp
+            b = 2.0 * (Dx * vx0 + Dy * vy0)
+            c = Dx * Dx + Dy * Dy
+            disc = b * b - 4.0 * a * c
+            sqrt_disc = torch.sqrt(torch.clamp(disc, min=0.0))
+            a_safe = torch.where(a.abs() > 1e-9, a, torch.full_like(a, 1e-9))
+            # two roots; want smallest positive
+            t1 = (-b - sqrt_disc) / (2.0 * a_safe)
+            t2 = (-b + sqrt_disc) / (2.0 * a_safe)
+            big = torch.full_like(t1, 1e9)
+            t1p = torch.where(t1 > 0, t1, big)
+            t2p = torch.where(t2 > 0, t2, big)
+            t = torch.minimum(t1p, t2p)
+            # adaptive-lead fallback when no valid intercept (disc<0 or t huge)
+            dcent = torch.sqrt(Dx * Dx + Dy * Dy)
+            fallback = dcent / Vp
+            valid = (disc >= 0) & (t < 1e8)
+            t = torch.where(valid, t, fallback)
+            t = torch.clamp(t, 0.0, lead_max)
+            cx = cx0 + t * vx0
+            cy = cy0 + t * vy0
+        elif mode == 'nearest_cluster':
+            # Densest-cluster centroid + adaptive lead. Find the live boid with
+            # the most live neighbors within cluster_r, target the centroid (and
+            # mean velocity) of that boid's neighborhood, then lead adaptively by
+            # travel time. Addresses the failure where a density-weighted
+            # centroid lands in the empty gap between two separate clusters.
+            cluster_r = float(self.auto_target_opts.get('cluster_r', 60.0))
+            lead_scale = float(self.auto_target_opts.get('lead_scale', 0.6))
+            lead_max = float(self.auto_target_opts.get('lead_max', 40.0))
+            bx = self.boid_pos[..., 0]
+            by = self.boid_pos[..., 1]
+            ddx_ij = bx.unsqueeze(2) - bx.unsqueeze(1)   # (B,N,N): i - j
+            ddy_ij = by.unsqueeze(2) - by.unsqueeze(1)
+            dist_ij = torch.sqrt(ddx_ij * ddx_ij + ddy_ij * ddy_ij)
+            pair_ok = (dist_ij < cluster_r) & self.boid_alive.unsqueeze(1) & self.boid_alive.unsqueeze(2)
+            ncount = pair_ok.double().sum(dim=2)         # (B,N) neighbors of i
+            ncount = torch.where(self.boid_alive, ncount, torch.full_like(ncount, -1.0))
+            dense_idx = ncount.argmax(dim=1)             # (B,)
+            # neighborhood mask of the densest boid, graph-safe via gather
+            sel = dense_idx.view(self.B, 1, 1).expand(self.B, 1, self.N)
+            mask = torch.gather(pair_ok, 1, sel).squeeze(1).double()   # (B,N)
+            # optional density weighting within the cluster: weight each member
+            # by its own neighbor count ^ centroid_pow (pulls the target toward
+            # the densest sub-region). centroid_pow=0 → uniform (default).
+            centroid_pow = float(self.auto_target_opts.get('centroid_pow', 0.0))
+            if centroid_pow != 0.0:
+                nc_pos = torch.clamp(ncount, min=0.0)
+                mask = mask * (nc_pos ** centroid_pow)
+            msum = mask.sum(dim=1)
+            msafe = torch.where(msum > 0, msum, torch.ones_like(msum))
+            cx0 = (bx * mask).sum(dim=1) / msafe
+            cy0 = (by * mask).sum(dim=1) / msafe
+            vx0 = (self.boid_vel[..., 0] * mask).sum(dim=1) / msafe
+            vy0 = (self.boid_vel[..., 1] * mask).sum(dim=1) / msafe
+            ddx2 = cx0 - self.pred_pos[:, 0]
+            ddy2 = cy0 - self.pred_pos[:, 1]
+            dcent = torch.sqrt(ddx2 * ddx2 + ddy2 * ddy2)
+            lead = torch.clamp(dcent / PREDATOR_MAX_SPEED * lead_scale, 0.0, lead_max)
+            cx = cx0 + lead * vx0
+            cy = cy0 + lead * vy0
         elif mode == 'nearest_K_centroid':
             # Centroid of the K nearest live boids.
             K = int(self.auto_target_opts.get('K', 8))
