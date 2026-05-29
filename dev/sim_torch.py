@@ -816,6 +816,25 @@ class Sim:
             cy0 = (by * w).sum(dim=1) / wsum
             vx0 = (self.boid_vel[..., 0] * w).sum(dim=1) / wsum
             vy0 = (self.boid_vel[..., 1] * w).sum(dim=1) / wsum
+            # nbhd blend: mix in the *neighborhood centroid* of the single most-
+            # attractive boid (discrete select, like nearest_cluster — avoids the
+            # smooth centroid landing in the empty gap between two clusters).
+            # nbhd=0 is a no-op (smooth weighted centroid); nbhd=1 = pure
+            # densest-attract-boid neighborhood. Graph-safe (argmax + gather).
+            nbhd = _pv('nbhd', 0.0, 0)
+            best_idx = attract.argmax(dim=1)
+            sel = best_idx.view(self.B, 1, 1).expand(self.B, 1, self.N)
+            nbr = torch.gather(pair_ok, 1, sel).squeeze(1).double()
+            nbr = torch.where(self.boid_alive, nbr, torch.zeros_like(nbr))
+            nsum = nbr.sum(dim=1).clamp_min(1e-12)
+            ncx = (bx * nbr).sum(dim=1) / nsum
+            ncy = (by * nbr).sum(dim=1) / nsum
+            nvx = (self.boid_vel[..., 0] * nbr).sum(dim=1) / nsum
+            nvy = (self.boid_vel[..., 1] * nbr).sum(dim=1) / nsum
+            cx0 = (1.0 - nbhd) * cx0 + nbhd * ncx
+            cy0 = (1.0 - nbhd) * cy0 + nbhd * ncy
+            vx0 = (1.0 - nbhd) * vx0 + nbhd * nvx
+            vy0 = (1.0 - nbhd) * vy0 + nbhd * nvy
             ddx2 = cx0 - self.pred_pos[:, 0]
             ddy2 = cy0 - self.pred_pos[:, 1]
             dcent = torch.sqrt(ddx2 * ddx2 + ddy2 * ddy2)
