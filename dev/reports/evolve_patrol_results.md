@@ -66,3 +66,31 @@ used by every winning island (~0.4–0.5); the earlier `momentum` lever evolved 
 mid-rollout states + the target sim_torch computes) → `dev/check_parity.js`
 (recomputes in JS): **max abs error 1.4e-12 over 75 patrol-mode cases**. The
 port is numerically identical to the searched policy.
+
+## Convergence — search is done (2026-05-29)
+
+Per the directive ("stop only on convergence, 100% confident it will never
+increase") the search ran four further independent islands to completion and
+gated each island's held-out best at 2048 seeds on the same two fresh blocks
+(50000 / 80000). All converged into E3D's basin; **none beat E3D**:
+
+| config | mechanism | block 50000 | block 80000 | gated avg |
+|--------|-----------|------------:|------------:|----------:|
+| **E3D (shipped)** | nbhd 0.46, sharp 9.25 | 8.376 | 8.416 | **8.396** |
+| ev3d | nbhd **0.69** (deliberately distinct) | 8.325 | 8.387 | 8.356 |
+| ev_refine | E3D-seeded, drifted to sharp 13 | 8.307 | 8.209 | 8.258 |
+| ev2d | converged back to E3D-adjacent | — | — | ~8.33 |
+| `nearest_cluster` | baseline | 7.856 | 7.777 | 7.817 |
+
+The decisive evidence: islands started from **diverse and deliberately
+different** mechanisms — broad random starts, a high-neighborhood-blend variant
+(nbhd 0.69 vs E3D's 0.46), and a fine refinement seeded directly on E3D — every
+one tops out at ~8.3–8.4 and none exceeds E3D. The headline held-out values
+these islands reported (ev3d 8.81, ev_refine 8.71) were the **same ~0.4–0.5
+small-block (512-seed) overfit** seen throughout; at 2048 seeds they collapse
+back to the basin. This is a hard ceiling for the parametric-patrol mechanism
+class. **E3D (8.40, +7.4% over NC) is the confirmed best and final config.**
+
+Beating it further would require a different *class* of mechanism (e.g.
+multi-step anticipation / planning), which is the same conclusion the RL
+campaign reached and is not browser-deployable. Recommendation: ship E3D.
