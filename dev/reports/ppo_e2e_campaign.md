@@ -25,7 +25,27 @@ the boid policy is fixed. Eval is GPU-only (sim_torch), gated on held-out seeds.
 | e2e from random | polar grid 75 | ES | central ~5.4 | sample-inefficient |
 | e2e from random | polar grid 75 | PPO | best ~6.0, plateau | local optimum |
 | e2e augmented | grid + cluster/nearest 83 | PPO | best ~5.6–5.8, plateau | **target-as-feature did not help** |
-| **residual** | grid+cluster/nearest 83 | PPO on top of deployed | floor ~7.6 confirmed | in progress |
+| **residual** | grid+cluster/nearest 83 | PPO on top of deployed | **7.86 ± 0.18** | = base, no gain |
+| residual+cooldown | + cooldown 84 | PPO on top of deployed | **7.70–7.74** | = base, no gain |
+| from-scratch+shape | grid 75 | PPO + dense shaping | in progress | testing sparse-reward |
+| target-residual | grid+cluster/nearest 83 | PPO offsets aim, base steers | in progress | testing aim-control |
+
+### Decisive 512-seed gates (seedStart 5000, 1500f)
+
+The 64-seed training holdout has SE ≈ 0.4, so the **max** over ~20 eval points is
+inflated ~1.5–2 SE by selection bias — "best holdout 8.5–9.3" was a mirage. Gating
+the saved best.pt at 512 seeds (SE ≈ 0.17) against the same policy with
+`--resid_scale 0` (= exact base) is the honest test:
+
+| policy | base @512 | trained @512 | Δ |
+|---|---|---|---|
+| residual (scale 0.05) | 7.838 | 7.859 | +0.02 |
+| residual+cooldown (VM1, 0.05) | 7.838 | 7.697 | −0.14 |
+| residual+cooldown (VM2, 0.08) | 7.838 | 7.738 | −0.10 |
+
+Every learned policy converges to ≈ base (the residual learns ≈0). Giving it the
+cluster target, the nearest boid, and the feed-cooldown state — info the base
+ignores — produced **no** improvement.
 
 ### Key negative result
 
