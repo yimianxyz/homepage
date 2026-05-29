@@ -3,6 +3,94 @@ var PREDATOR_MAX_SPEED = 2.5;
 var PREDATOR_MAX_FORCE = 0.05;
 var PREDATOR_SIZE = 12;
 
+// Evolved patrol-target params (the deployed policy). Found by GPU-batched
+// evolutionary search (CEM over the sim_torch 'evolved' target, AlphaEvolve
+// flavor) — beats the previous nearest_cluster patrol by ~+0.52 catches/eval
+// (8.38 vs 7.86, 2048 fresh seeds, ~4 SE) on the GPU sim. See
+// dev/reports/evolve_patrol_results.md and dev/sim_torch.py 'evolved' branch
+// (this JS is a line-for-line port of that computation).
+var EVOLVED_PATROL = {
+    cluster_r: 178.09,   // neighbor radius for the density count
+    dens_pow: 2.373,     // exponent on (neighbors+1) — how much density attracts
+    reach_scale: 1515.0, // exp(-distPred/reach_scale) — slow predator prefers near
+    sharp: 9.25,         // peakiness of the softmax-like weighting (->densest boid)
+    lead_scale: 0.454,   // adaptive travel-time lead gain
+    lead_max: 230.6,     // cap on lead distance
+    nbhd: 0.461,         // blend toward the densest boid's neighborhood centroid
+    momentum: 0.0        // frame-to-frame target smoothing (0 = off)
+};
+
+// Patrol target = the evolved heuristic. For each live boid, attractiveness =
+// (localNeighbors+1)^dens_pow * exp(-distToPredator/reach_scale); normalize to
+// the per-frame max and raise to `sharp` to get soft weights, then take the
+// weighted centroid + mean velocity, blend in the densest boid's neighborhood
+// centroid (nbhd), and lead forward by the predator's travel time (capped).
+// Mirrors sim_torch's 'evolved' _update_auto_target exactly.
+function computeEvolvedTarget(predPos, boids, opt, prevTarget) {
+    var n = boids.length;
+    if (n === 0) return null;
+    var R2 = opt.cluster_r * opt.cluster_r;
+    var px = predPos.x, py = predPos.y;
+    var attract = new Array(n);
+    var amax = 1e-12, bestIdx = 0, bestA = -1;
+    for (var i = 0; i < n; i++) {
+        var bxi = boids[i].position.x, byi = boids[i].position.y;
+        var cnt = 0; // neighbors within cluster_r (includes self)
+        for (var j = 0; j < n; j++) {
+            var ex = boids[j].position.x - bxi, ey = boids[j].position.y - byi;
+            if (ex * ex + ey * ey < R2) cnt++;
+        }
+        var ddx = bxi - px, ddy = byi - py;
+        var dpred = Math.sqrt(ddx * ddx + ddy * ddy);
+        var a = Math.pow(cnt + 1, opt.dens_pow) * Math.exp(-dpred / opt.reach_scale);
+        attract[i] = a;
+        if (a > amax) amax = a;
+        if (a > bestA) { bestA = a; bestIdx = i; }
+    }
+    var wsum = 0, cx0 = 0, cy0 = 0, vx0 = 0, vy0 = 0;
+    for (var k = 0; k < n; k++) {
+        var w = Math.pow(attract[k] / amax, opt.sharp);
+        wsum += w;
+        cx0 += w * boids[k].position.x; cy0 += w * boids[k].position.y;
+        vx0 += w * boids[k].velocity.x; vy0 += w * boids[k].velocity.y;
+    }
+    if (wsum < 1e-12) wsum = 1e-12;
+    cx0 /= wsum; cy0 /= wsum; vx0 /= wsum; vy0 /= wsum;
+    var nbhd = opt.nbhd || 0;
+    if (nbhd > 0) {
+        var bx = boids[bestIdx].position.x, by = boids[bestIdx].position.y;
+        var nsum = 0, ncx = 0, ncy = 0, nvx = 0, nvy = 0;
+        for (var m = 0; m < n; m++) {
+            var gx = boids[m].position.x - bx, gy = boids[m].position.y - by;
+            if (gx * gx + gy * gy < R2) {
+                ncx += boids[m].position.x; ncy += boids[m].position.y;
+                nvx += boids[m].velocity.x; nvy += boids[m].velocity.y; nsum++;
+            }
+        }
+        if (nsum < 1e-12) nsum = 1e-12;
+        ncx /= nsum; ncy /= nsum; nvx /= nsum; nvy /= nsum;
+        cx0 = (1 - nbhd) * cx0 + nbhd * ncx;
+        cy0 = (1 - nbhd) * cy0 + nbhd * ncy;
+        vx0 = (1 - nbhd) * vx0 + nbhd * nvx;
+        vy0 = (1 - nbhd) * vy0 + nbhd * nvy;
+    }
+    var dx2 = cx0 - px, dy2 = cy0 - py;
+    var dcent = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    var lead = dcent / PREDATOR_MAX_SPEED * opt.lead_scale;
+    if (lead < 0) lead = 0;
+    if (lead > opt.lead_max) lead = opt.lead_max;
+    var tx = cx0 + lead * vx0, ty = cy0 + lead * vy0;
+    var mom = opt.momentum || 0;
+    if (mom > 0 && prevTarget) {
+        tx = mom * prevTarget.x + (1 - mom) * tx;
+        ty = mom * prevTarget.y + (1 - mom) * ty;
+    }
+    return { x: tx, y: ty };
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { computeEvolvedTarget: computeEvolvedTarget, EVOLVED_PATROL: EVOLVED_PATROL };
+}
+
 function Predator(x, y, simulation) {
     this.position = new Vector(x, y);
     this.velocity = new Vector(simRandom() * 2 - 1, simRandom() * 2 - 1); // Start with some velocity
@@ -29,13 +117,11 @@ Predator.prototype = {
     // remains in plain JS. The simulation is gated on the weights being
     // loaded, so window.__predatorModel is always present here.
     //
-    // Patrol target = nearest_cluster: the predator heads toward the centroid
-    // of the densest local cluster of boids (not the global centre of mass,
-    // which sits in sparse gaps), led forward by its own travel time so it
-    // anticipates where that cluster will be. Successive structural wins over
-    // the original random patrol: flock centroid (+39%), density-weighting +
-    // lookahead, then densest-cluster + adaptive travel-time lead — ~+41%
-    // over the flock centroid (GPU sim, fresh seeds, z=22.9). See dev/reports/.
+    // Patrol target = the evolved heuristic (see computeEvolvedTarget above):
+    // attractiveness-weighted centroid of the densest *reachable* cluster, led
+    // forward by the predator's travel time. Replaces the previous
+    // nearest_cluster patrol; ~+0.52 catches/eval (8.38 vs 7.86, GPU sim, 2048
+    // fresh seeds). The CHASE itself is still the trained NN below.
     getAutonomousForce: function(boids) {
         var R = POLICY_R;
         var anyInRange = false;
@@ -46,43 +132,8 @@ Predator.prototype = {
             }
         }
         if (!anyInRange && boids.length > 0) {
-            // nearest_cluster patrol: aim at the centroid of the densest local
-            // cluster (the boid with the most neighbors within CLUSTER_R, plus
-            // those neighbors), led forward by the predator's travel time to it
-            // (lead = dist/maxSpeed * LEAD_SCALE, capped at LEAD_MAX) along the
-            // cluster's mean velocity. Beats the plain flock centroid by ~+41%
-            // catches/eval (GPU sim, 512 fresh seeds, z=22.9) — see
-            // dev/reports/nearest_cluster_patrol.md.
-            var CLUSTER_R2 = 150 * 150, LEAD_SCALE = 0.4, VP = 2.5, LEAD_MAX = 120;
-            var n = boids.length;
-            // densest boid = most neighbors within CLUSTER_R
-            var bestIdx = 0, bestCount = -1;
-            for (var i = 0; i < n; i++) {
-                var cnt = 0, pix = boids[i].position.x, piy = boids[i].position.y;
-                for (var j = 0; j < n; j++) {
-                    var ex = boids[j].position.x - pix, ey = boids[j].position.y - piy;
-                    if (ex * ex + ey * ey < CLUSTER_R2) cnt++;
-                }
-                if (cnt > bestCount) { bestCount = cnt; bestIdx = i; }
-            }
-            // centroid + mean velocity of that boid's neighborhood
-            var bx = boids[bestIdx].position.x, by = boids[bestIdx].position.y;
-            var cx = 0, cy = 0, cvx = 0, cvy = 0, m = 0;
-            for (var k = 0; k < n; k++) {
-                var gx = boids[k].position.x - bx, gy = boids[k].position.y - by;
-                if (gx * gx + gy * gy < CLUSTER_R2) {
-                    cx += boids[k].position.x; cy += boids[k].position.y;
-                    cvx += boids[k].velocity.x; cvy += boids[k].velocity.y; m++;
-                }
-            }
-            if (m > 0) {
-                cx /= m; cy /= m; cvx /= m; cvy /= m;
-                var ddx = cx - this.position.x, ddy = cy - this.position.y;
-                var dcent = Math.sqrt(ddx * ddx + ddy * ddy);
-                var lead = Math.min(dcent / VP * LEAD_SCALE, LEAD_MAX);
-                this.autonomousTarget.x = cx + lead * cvx;
-                this.autonomousTarget.y = cy + lead * cvy;
-            }
+            var t = computeEvolvedTarget(this.position, boids, EVOLVED_PATROL, this.autonomousTarget);
+            if (t) { this.autonomousTarget.x = t.x; this.autonomousTarget.y = t.y; }
         }
 
         var features = buildPredatorFeatures(this.position, this.velocity, boids, this.autonomousTarget);
@@ -203,11 +254,15 @@ Predator.prototype = {
 // Load the trained NN weights at page boot. The simulation start (in
 // boids.js) awaits window.__predatorReady before constructing the
 // Simulation, so the NN is guaranteed to be present from frame 1.
-window.__predatorReady = fetch('js/predator_weights.json', { cache: 'no-cache' })
-    .then(function (r) {
-        if (!r.ok) throw new Error('predator weights fetch failed: ' + r.status);
-        return r.json();
-    })
-    .then(function (json) {
-        window.__predatorModel = PredatorNN.loadModel(json);
-    });
+// Guarded so the file can also be require()'d in node (parity tests) where
+// there is no window/fetch.
+if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+    window.__predatorReady = fetch('js/predator_weights.json', { cache: 'no-cache' })
+        .then(function (r) {
+            if (!r.ok) throw new Error('predator weights fetch failed: ' + r.status);
+            return r.json();
+        })
+        .then(function (json) {
+            window.__predatorModel = PredatorNN.loadModel(json);
+        });
+}
