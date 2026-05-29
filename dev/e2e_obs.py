@@ -74,6 +74,43 @@ def build_obs_egocentric(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
     return obs
 
 
+AUG_EXTRA = 8  # seek(3) + nearest boid(5)
+
+
+def build_obs_augmented(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
+                        seek_xy, A=8, R=3, ring_edges=(40.0, 120.0, 1e9),
+                        vnorm=6.0, dnorm=120.0, seeknorm=300.0):
+    """Egocentric grid + injected hand-crafted signals so PPO starts from the
+    known-good nearest_cluster behavior and learns to improve on it:
+      - seek vector to the patrol target (unit dir 2 + norm dist 1)
+      - nearest live boid (unit dir 2 + norm dist 1 + its velocity 2)
+    Returns (B, 3*A*R + 3 + 8) = (B, 83) for A=8,R=3.
+    """
+    base = build_obs_egocentric(pred_pos, pred_vel, boid_pos, boid_vel,
+                                boid_alive, A, R, ring_edges, vnorm, dnorm)
+    dt = base.dtype
+    # seek vector to patrol target
+    sdx = (seek_xy[:, 0] - pred_pos[:, 0]).to(dt)
+    sdy = (seek_xy[:, 1] - pred_pos[:, 1]).to(dt)
+    sdist = torch.sqrt(sdx * sdx + sdy * sdy + 1e-9)
+    seek = torch.stack([sdx / sdist, sdy / sdist,
+                        torch.clamp(sdist / seeknorm, 0.0, 4.0)], dim=1)
+    # nearest live boid
+    bdx = (boid_pos[..., 0] - pred_pos[:, None, 0])
+    bdy = (boid_pos[..., 1] - pred_pos[:, None, 1])
+    bd = torch.sqrt(bdx * bdx + bdy * bdy + 1e-9)
+    bd = torch.where(boid_alive, bd, torch.full_like(bd, 1e18))
+    ni = bd.argmin(dim=1)                          # (B,)
+    r = torch.arange(pred_pos.shape[0], device=pred_pos.device)
+    ndx = bdx[r, ni]; ndy = bdy[r, ni]; ndist = bd[r, ni].clamp_max(1e9)
+    nd_safe = ndist.clamp_min(1e-6)
+    nvx = boid_vel[r, ni, 0]; nvy = boid_vel[r, ni, 1]
+    nearest = torch.stack([(ndx / nd_safe).to(dt), (ndy / nd_safe).to(dt),
+                           torch.clamp(ndist / dnorm, 0.0, 4.0).to(dt),
+                           (nvx / vnorm).to(dt), (nvy / vnorm).to(dt)], dim=1)
+    return torch.cat([base, seek, nearest], dim=1)
+
+
 if __name__ == '__main__':
     # CPU shape/sanity test
     torch.manual_seed(0)

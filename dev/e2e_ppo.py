@@ -17,14 +17,17 @@ import torch
 import torch.nn as nn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sim_torch import Sim, fast_limit, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE
-from e2e_obs import build_obs_egocentric
+from e2e_obs import build_obs_egocentric, build_obs_augmented, AUG_EXTRA
 
 A, R = 8, 3
-OBS_DIM = 3 * A * R + 3  # 75
+OBS_RAW = 3 * A * R + 3      # 75
+OBS_AUG = OBS_RAW + AUG_EXTRA  # 83
+# nearest_cluster patrol opts matching the deployed production policy
+NC_OPTS = {'cluster_r': 150.0, 'lead_scale': 0.4, 'lead_max': 120.0}
 
 
 class ActorCritic(nn.Module):
-    def __init__(self, obs_dim=OBS_DIM, hidden=64, act_dim=2):
+    def __init__(self, obs_dim=OBS_RAW, hidden=64, act_dim=2):
         super().__init__()
         self.body = nn.Sequential(nn.Linear(obs_dim, hidden), nn.Tanh(),
                                   nn.Linear(hidden, hidden), nn.Tanh())
@@ -40,12 +43,20 @@ class ActorCritic(nn.Module):
 
 
 class PPOSim(Sim):
-    """Sim where the predator is driven by an external action set each step."""
-    def __init__(self, seeds, device='cuda'):
+    """Sim where the predator is driven by an external action set each step.
+
+    augment=True injects the nearest_cluster patrol target + nearest-boid
+    features into the observation (obs_dim 83) so PPO starts from the known-good
+    hand-crafted signal and learns to improve on it.
+    """
+    def __init__(self, seeds, device='cuda', augment=False):
         w = {'featureDim': 45, 'inputMean': None, 'inputStd': None,
              'outputScale': 1.0, 'clipMagnitude': 0.0, 'layers': []}
+        self.augment = augment
+        at = 'nearest_cluster' if augment else 'random'
+        ato = NC_OPTS if augment else None
         super().__init__(seeds=seeds, weights=w, device=device,
-                         sequential=False, auto_target='random')
+                         sequential=False, auto_target=at, auto_target_opts=ato)
         self._action = torch.zeros((self.B, 2), dtype=torch.float64, device=device)
 
     def reset(self, new_seeds):
@@ -55,6 +66,11 @@ class PPOSim(Sim):
         self._initialize()
 
     def current_obs(self):
+        if self.augment:
+            self._update_auto_target()
+            return build_obs_augmented(self.pred_pos, self.pred_vel,
+                                       self.boid_pos, self.boid_vel,
+                                       self.boid_alive, self.pred_auto)
         return build_obs_egocentric(self.pred_pos, self.pred_vel,
                                     self.boid_pos, self.boid_vel, self.boid_alive)
 
@@ -97,17 +113,19 @@ def main():
     p.add_argument('--seedStart', type=int, default=100000, help='training seed pool start (kept disjoint from holdout 9000-9999)')
     p.add_argument('--holdout', type=int, default=64)
     p.add_argument('--eval_frames', type=int, default=1500)
+    p.add_argument('--augment', action='store_true', help='inject nearest_cluster + nearest-boid features (obs_dim 83)')
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--out', required=True)
     a = p.parse_args()
+    OBS_DIM = OBS_AUG if a.augment else OBS_RAW
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     logf = open(out / 'ppo_log.jsonl', 'a')
     def log(o): print(json.dumps(o), flush=True); logf.write(json.dumps(o) + '\n'); logf.flush()
     dev = a.device
     torch.manual_seed(a.seed)
 
-    ac = ActorCritic(hidden=a.hidden).to(dev)
+    ac = ActorCritic(obs_dim=OBS_DIM, hidden=a.hidden).to(dev)
     opt = torch.optim.Adam(ac.parameters(), lr=a.lr)
 
     # training env (B envs). Boids don't respawn, so we run fixed-horizon
@@ -121,7 +139,7 @@ def main():
         if next_seed > a.seedStart + 500000:
             next_seed = a.seedStart
         return s
-    env = PPOSim(fresh_seeds(), device=dev)
+    env = PPOSim(fresh_seeds(), device=dev, augment=a.augment)
     ep_frame = 0  # frames since last reset (all B envs synchronized)
     DNORM = 1.0 / 200.0
 
@@ -199,7 +217,7 @@ def main():
         # periodic deterministic holdout eval (fresh env)
         if it % 5 == 0 or it == a.iters - 1:
             hs = list(range(9000, 9000 + a.holdout))
-            heval = PPOSim(hs, device=dev)
+            heval = PPOSim(hs, device=dev, augment=a.augment)
             with torch.no_grad():
                 for _ in range(a.eval_frames):
                     o = heval.current_obs(); mu, _ = ac(o)
