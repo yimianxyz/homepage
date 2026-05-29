@@ -804,12 +804,12 @@ class Sim:
             dist_ij = torch.sqrt(ddx_ij * ddx_ij + ddy_ij * ddy_ij)
             pair_ok = (dist_ij < Rc) & self.boid_alive.unsqueeze(1) & self.boid_alive.unsqueeze(2)
             ncount = pair_ok.double().sum(dim=2)            # (B,N) neighbors incl self
-            dens_pow_t = dens_pow if torch.is_tensor(dens_pow) else torch.tensor(dens_pow, dtype=ncount.dtype, device=ncount.device)
-            attract = (ncount + 1.0).pow(dens_pow_t) * torch.exp(-d / reach_scale)
+            # .pow() accepts a python float or a (B,1) tensor; both graph-safe
+            # (no host->device tensor creation inside the captured step).
+            attract = (ncount + 1.0).pow(dens_pow) * torch.exp(-d / reach_scale)
             attract = torch.where(self.boid_alive, attract, torch.zeros_like(attract))
             amax = attract.max(dim=1, keepdim=True).values.clamp_min(1e-12)
-            sharp_t = sharp if torch.is_tensor(sharp) else torch.tensor(sharp, dtype=attract.dtype, device=attract.device)
-            w = (attract / amax).pow(sharp_t)
+            w = (attract / amax).pow(sharp)
             w = torch.where(self.boid_alive, w, torch.zeros_like(w))
             wsum = w.sum(dim=1).clamp_min(1e-12)
             cx0 = (bx * w).sum(dim=1) / wsum
@@ -820,8 +820,10 @@ class Sim:
             ddy2 = cy0 - self.pred_pos[:, 1]
             dcent = torch.sqrt(ddx2 * ddx2 + ddy2 * ddy2)
             lead = (dcent / PREDATOR_MAX_SPEED * lead_scale).clamp_min(0.0)
-            lead = torch.minimum(lead, lead_max if torch.is_tensor(lead_max)
-                                 else torch.full_like(lead, lead_max))
+            if torch.is_tensor(lead_max):
+                lead = torch.minimum(lead, lead_max)
+            else:
+                lead = lead.clamp_max(lead_max)
             cx = cx0 + lead * vx0
             cy = cy0 + lead * vy0
         else:
