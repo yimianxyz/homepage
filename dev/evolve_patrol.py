@@ -47,13 +47,17 @@ def fit(xn, seeds, frames, device, use_graph):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--gens', type=int, default=150)
-    p.add_argument('--pop', type=int, default=16)
+    p.add_argument('--pop', type=int, default=18)
     p.add_argument('--elite', type=int, default=5)
-    p.add_argument('--seeds', type=int, default=256)
+    p.add_argument('--seeds', type=int, default=256, help='seeds per generation (resampled each gen)')
     p.add_argument('--frames', type=int, default=1500)
-    p.add_argument('--seedStart', type=int, default=6000)
+    p.add_argument('--poolStart', type=int, default=10000)
+    p.add_argument('--poolSize', type=int, default=20000, help='training seed pool (resampled per gen, disjoint from val/gate)')
+    p.add_argument('--valStart', type=int, default=5000)
+    p.add_argument('--valSeeds', type=int, default=512)
+    p.add_argument('--valEvery', type=int, default=4)
     p.add_argument('--sigma0', type=float, default=0.30)
-    p.add_argument('--sigma_floor', type=float, default=0.02)
+    p.add_argument('--sigma_floor', type=float, default=0.05)
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed', type=int, default=1)
     p.add_argument('--no_graph', action='store_true')
@@ -63,34 +67,43 @@ def main():
     logf = open(out / 'evolve_log.jsonl', 'a')
     def log(o): print(json.dumps(o), flush=True); logf.write(json.dumps(o) + '\n'); logf.flush()
     rng = np.random.default_rng(a.seed)
-    seeds = list(range(a.seedStart, a.seedStart + a.seeds))
     use_graph = (not a.no_graph) and a.device == 'cuda'
     D = len(PARAMS)
+    val_seeds = list(range(a.valStart, a.valStart + a.valSeeds))
 
     mu = (INIT - LO) / (HI - LO)            # init mean in [0,1]
     sig = np.full(D, a.sigma0)
-    best_f = -1.0; best_opts = None
+    best_val = -1.0; best_opts = None
     log({'phase': 'start', 'params': NAMES, 'pop': a.pop, 'elite': a.elite,
-         'seeds': a.seeds, 'frames': a.frames, 'seedStart': a.seedStart})
-    # always include the current mean as a candidate (elitism on the mean)
+         'seeds': a.seeds, 'frames': a.frames, 'pool': [a.poolStart, a.poolStart + a.poolSize],
+         'valStart': a.valStart, 'valSeeds': a.valSeeds, 'resample': True})
     for gen in range(a.gens):
         t0 = time.time()
+        # fresh seed block each gen -> CEM optimizes EXPECTED catches, not a
+        # fixed noisy block (kills the seed-overfitting we saw at gen 0).
+        base = int(rng.integers(a.poolStart, a.poolStart + a.poolSize - a.seeds))
+        seeds = list(range(base, base + a.seeds))
         X = np.clip(mu + sig * rng.standard_normal((a.pop, D)), 0, 1)
-        X[0] = np.clip(mu, 0, 1)            # evaluate the mean itself
+        X[0] = np.clip(mu, 0, 1)            # carry the mean as a candidate
         fits = np.array([fit(x, seeds, a.frames, a.device, use_graph) for x in X])
         order = np.argsort(-fits)
         elite = X[order[:a.elite]]
         mu = elite.mean(axis=0)
         sig = np.maximum(elite.std(axis=0), a.sigma_floor)
-        gi = int(order[0])
-        if fits[gi] > best_f:
-            best_f = float(fits[gi]); best_opts = to_opts(X[gi])
-            json.dump({'mean_catches': best_f, 'opts': best_opts, 'gen': gen,
-                       'seeds': a.seeds, 'frames': a.frames}, open(out / 'best.json', 'w'), indent=2)
-        log({'gen': gen, 'gen_best': float(fits[gi]), 'gen_mean': float(fits.mean()),
-             'best_so_far': best_f, 'best_opts': best_opts,
-             'mu_opts': to_opts(mu), 'sig': sig.tolist(), 'gen_s': round(time.time() - t0, 1)})
-    log({'phase': 'done', 'best': best_f, 'best_opts': best_opts})
+        rec = {'gen': gen, 'gen_best': float(fits[order[0]]), 'gen_mean': float(fits.mean()),
+               'mu_opts': to_opts(mu), 'sig': [round(s, 3) for s in sig.tolist()],
+               'seed_base': base, 'gen_s': round(time.time() - t0, 1)}
+        # validate the robust center (mu) on the FIXED held-out block
+        if gen % a.valEvery == 0 or gen == a.gens - 1:
+            vmu = fit(mu, val_seeds, a.frames, a.device, use_graph)
+            rec['val_mu'] = float(vmu)
+            if vmu > best_val:
+                best_val = float(vmu); best_opts = to_opts(mu)
+                json.dump({'val_mu': best_val, 'opts': best_opts, 'gen': gen,
+                           'valSeeds': a.valSeeds, 'frames': a.frames}, open(out / 'best.json', 'w'), indent=2)
+            rec['best_val'] = best_val
+        log(rec)
+    log({'phase': 'done', 'best_val': best_val, 'best_opts': best_opts})
 
 
 if __name__ == '__main__':
