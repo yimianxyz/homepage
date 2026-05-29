@@ -16,7 +16,8 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from sim_torch import Sim, fast_limit, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE
+from sim_torch import (Sim, fast_limit, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE,
+                       load_weights, nn_forward, build_features)
 from e2e_obs import build_obs_egocentric, build_obs_augmented, AUG_EXTRA
 
 A, R = 8, 3
@@ -49,15 +50,32 @@ class PPOSim(Sim):
     features into the observation (obs_dim 83) so PPO starts from the known-good
     hand-crafted signal and learns to improve on it.
     """
-    def __init__(self, seeds, device='cuda', augment=False):
+    def __init__(self, seeds, device='cuda', augment=False,
+                 residual=False, base_weights=None, resid_scale=0.05):
         w = {'featureDim': 45, 'inputMean': None, 'inputStd': None,
              'outputScale': 1.0, 'clipMagnitude': 0.0, 'layers': []}
-        self.augment = augment
-        at = 'nearest_cluster' if augment else 'random'
-        ato = NC_OPTS if augment else None
+        # residual mode rides on top of the deployed nearest_cluster policy, so
+        # it always uses the cluster patrol target + augmented obs.
+        self.residual = residual
+        self.augment = augment or residual
+        self._base_w = base_weights
+        self.resid_scale = resid_scale
+        at = 'nearest_cluster' if self.augment else 'random'
+        ato = NC_OPTS if self.augment else None
         super().__init__(seeds=seeds, weights=w, device=device,
                          sequential=False, auto_target=at, auto_target_opts=ato)
         self._action = torch.zeros((self.B, 2), dtype=torch.float64, device=device)
+
+    def _base_steer(self):
+        """Deployed production steering (nearest_cluster + distilled NN),
+        already magnitude-clipped to clipMagnitude=0.05. pred_auto must be
+        fresh (updated this frame)."""
+        feats = build_features(
+            self.pred_pos.float(), self.pred_vel.float(),
+            self.boid_pos.float(), self.boid_vel.float(), self.boid_alive,
+            self.pred_auto.float(), self._base_w['featureDim'], self.device,
+            dtype=torch.float32)
+        return nn_forward(feats, self._base_w).double()
 
     def reset(self, new_seeds):
         """Re-init episode state with fresh seeds (boids don't respawn, so each
@@ -82,7 +100,15 @@ class PPOSim(Sim):
         return d.min(dim=1).values
 
     def _step_predator(self):
-        sx, sy = fast_limit(self._action[:, 0], self._action[:, 1], PREDATOR_MAX_FORCE)
+        if self.residual:
+            self._update_auto_target()
+            base = self._base_steer()                       # (B,2), already clipped to 0.05
+            rx = base[:, 0] + self._action[:, 0] * self.resid_scale
+            ry = base[:, 1] + self._action[:, 1] * self.resid_scale
+            sx, sy = fast_limit(rx, ry, PREDATOR_MAX_FORCE)  # total capped to 0.05 (resid=0 -> base)
+        else:
+            sx, sy = fast_limit(self._action[:, 0] * PREDATOR_MAX_FORCE,
+                                self._action[:, 1] * PREDATOR_MAX_FORCE, PREDATOR_MAX_FORCE)
         nvx = self.pred_vel[:, 0] + sx
         nvy = self.pred_vel[:, 1] + sy
         nvx, nvy = fast_limit(nvx, nvy, PREDATOR_MAX_SPEED)
@@ -114,11 +140,19 @@ def main():
     p.add_argument('--holdout', type=int, default=64)
     p.add_argument('--eval_frames', type=int, default=1500)
     p.add_argument('--augment', action='store_true', help='inject nearest_cluster + nearest-boid features (obs_dim 83)')
+    p.add_argument('--residual', action='store_true', help='learn a correction on top of the deployed policy (guaranteed 7.63 floor)')
+    p.add_argument('--base_weights', default='js/predator_weights.json', help='deployed weights for residual base steering')
+    p.add_argument('--resid_scale', type=float, default=0.05, help='residual action scale (force units)')
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--out', required=True)
     a = p.parse_args()
-    OBS_DIM = OBS_AUG if a.augment else OBS_RAW
+    use_aug = a.augment or a.residual
+    OBS_DIM = OBS_AUG if use_aug else OBS_RAW
+    base_w = load_weights(a.base_weights, device=a.device) if a.residual else None
+    mk = lambda seeds: PPOSim(seeds, device=a.device, augment=a.augment,
+                              residual=a.residual, base_weights=base_w,
+                              resid_scale=a.resid_scale)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     logf = open(out / 'ppo_log.jsonl', 'a')
     def log(o): print(json.dumps(o), flush=True); logf.write(json.dumps(o) + '\n'); logf.flush()
@@ -139,7 +173,7 @@ def main():
         if next_seed > a.seedStart + 500000:
             next_seed = a.seedStart
         return s
-    env = PPOSim(fresh_seeds(), device=dev, augment=a.augment)
+    env = mk(fresh_seeds())
     ep_frame = 0  # frames since last reset (all B envs synchronized)
     DNORM = 1.0 / 200.0
 
@@ -154,7 +188,7 @@ def main():
                 logp = (-0.5 * (((act - mu) / std) ** 2 + 2 * ac.log_std + math.log(2 * math.pi))).sum(-1)
             else:
                 act = mu; logp = None
-        env._action = (act.detach().double()) * PREDATOR_MAX_FORCE  # scale into force range
+        env._action = act.detach().double()  # raw; _step_predator applies scaling/clip
         prev = env.catches.clone()
         prev_d = env.min_boid_dist() if a.shape > 0 else None
         env.step()
@@ -217,11 +251,11 @@ def main():
         # periodic deterministic holdout eval (fresh env)
         if it % 5 == 0 or it == a.iters - 1:
             hs = list(range(9000, 9000 + a.holdout))
-            heval = PPOSim(hs, device=dev, augment=a.augment)
+            heval = mk(hs)
             with torch.no_grad():
                 for _ in range(a.eval_frames):
                     o = heval.current_obs(); mu, _ = ac(o)
-                    heval._action = mu.double() * PREDATOR_MAX_FORCE
+                    heval._action = mu.double()
                     heval.step()
             hscore = heval.catches.float().mean().item()
             if hscore > best_eval:

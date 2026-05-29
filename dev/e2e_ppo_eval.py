@@ -9,13 +9,17 @@ matching the training holdout but on a held-out seed block and any horizon.
 import argparse, json, sys, os
 import torch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from e2e_ppo import PPOSim, ActorCritic, OBS_RAW, OBS_AUG, PREDATOR_MAX_FORCE
+from e2e_ppo import PPOSim, ActorCritic, OBS_RAW, OBS_AUG
+from sim_torch import load_weights
 
 
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--ckpt', required=True)
     p.add_argument('--augment', action='store_true')
+    p.add_argument('--residual', action='store_true')
+    p.add_argument('--base_weights', default='js/predator_weights.json')
+    p.add_argument('--resid_scale', type=float, default=0.05)
     p.add_argument('--seeds', type=int, default=256)
     p.add_argument('--seedStart', type=int, default=5000)
     p.add_argument('--frames', type=int, default=1500)
@@ -23,16 +27,18 @@ def main():
     a = p.parse_args()
     ck = torch.load(a.ckpt, map_location=a.device, weights_only=False)
     hidden = ck['hidden']
-    obs_dim = OBS_AUG if a.augment else OBS_RAW
+    obs_dim = OBS_AUG if (a.augment or a.residual) else OBS_RAW
     ac = ActorCritic(obs_dim=obs_dim, hidden=hidden).to(a.device)
     ac.load_state_dict(ck['state'])
     ac.eval()
+    base_w = load_weights(a.base_weights, device=a.device) if a.residual else None
     seeds = list(range(a.seedStart, a.seedStart + a.seeds))
-    env = PPOSim(seeds, device=a.device, augment=a.augment)
+    env = PPOSim(seeds, device=a.device, augment=a.augment,
+                 residual=a.residual, base_weights=base_w, resid_scale=a.resid_scale)
     with torch.no_grad():
         for _ in range(a.frames):
             mu, _ = ac(env.current_obs())
-            env._action = mu.double() * PREDATOR_MAX_FORCE
+            env._action = mu.double()
             env.step()
     per = env.catches.float()
     m = per.mean().item(); sd = per.std().item(); se = sd / (a.seeds ** 0.5)
