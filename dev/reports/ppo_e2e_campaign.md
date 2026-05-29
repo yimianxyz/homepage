@@ -27,8 +27,9 @@ the boid policy is fixed. Eval is GPU-only (sim_torch), gated on held-out seeds.
 | e2e augmented | grid + cluster/nearest 83 | PPO | best ~5.6–5.8, plateau | **target-as-feature did not help** |
 | **residual** | grid+cluster/nearest 83 | PPO on top of deployed | **7.86 ± 0.18** | = base, no gain |
 | residual+cooldown | + cooldown 84 | PPO on top of deployed | **7.70–7.74** | = base, no gain |
-| from-scratch+shape | grid 75 | PPO + dense shaping | in progress | testing sparse-reward |
-| target-residual | grid+cluster/nearest 83 | PPO offsets aim, base steers | in progress | testing aim-control |
+| from-scratch+shape | grid 75 | PPO + dense shaping | ~4.5 | shaping HURT (biased off catches) |
+| residual+cooldown+shape | + cooldown 84 | PPO + shaping on deployed | 8.01 vs 7.84 base | +0.17, <1 SE — not significant |
+| target-residual | grid+cluster/nearest 83 | PPO offsets aim, base steers | 7.75 vs 8.13 base | worse than base |
 
 ### Decisive 512-seed gates (seedStart 5000, 1500f)
 
@@ -46,6 +47,40 @@ the saved best.pt at 512 seeds (SE ≈ 0.17) against the same policy with
 Every learned policy converges to ≈ base (the residual learns ≈0). Giving it the
 cluster target, the nearest boid, and the feed-cooldown state — info the base
 ignores — produced **no** improvement.
+
+### True baseline (reconciliation, dev/reconcile_base.py @512 seeds 5000, 1500f)
+
+The residual eval path applies an extra `fast_limit` to the already-clipped base
+steering; though algebraically idempotent, fp at the 0.05 boundary perturbs
+steering enough to compound over 1500 chaotic frames, dropping the *base* by ~0.2.
+The faithful number matches the canonical deployed sim:
+
+| path | catches |
+|---|---|
+| residual-path base (extra fast_limit) | 7.838 |
+| target-path base (adds clipped NN out directly, like production) | 8.125 |
+| canonical Sim, parallel boids, nearest_cluster | 8.064 |
+| canonical Sim, sequential (Oracle) boids, nearest_cluster | 8.027 |
+
+**Deployed baseline ≈ 8.05 catches @1500f.** No learned variant beats it.
+
+## Conclusion
+
+Across ES and PPO — from-scratch (raw & augmented obs), residual on the deployed
+policy, with feed-cooldown observation, dense reward shaping, and learned-aim
+(target) control — **nothing beats the deployed nearest_cluster policy (~8.05).**
+The learned residual reliably collapses to ≈0 (i.e. to the base), and richer obs,
+denser reward, and alternate action parameterizations do not open headroom. Two
+hypotheses for "PPO is just under-optimized" were tested and rejected: dense
+shaping *hurt* (biased the policy off true catches), and aim-control was *worse*.
+
+Interpretation: for a **reactive** policy under these dynamics (predator slower
+than prey, 0.05 steering cap → ~50 frames to top speed), the hand-crafted
+seek-densest-cluster + travel-time-lead law is at or very near the achievable
+ceiling. Beating it would likely require non-reactive multi-step anticipation
+(planning/MPC), which is not deployable to the browser homepage. **Recommendation:
+keep the deployed nearest_cluster policy.** The end-to-end-NN hypothesis was
+tested thoroughly and does not pay off here.
 
 ### Key negative result
 
