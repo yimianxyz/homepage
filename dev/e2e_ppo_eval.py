@@ -21,6 +21,8 @@ def main():
     p.add_argument('--base_weights', default='js/predator_weights.json')
     p.add_argument('--resid_scale', type=float, default=0.05)
     p.add_argument('--cooldown_obs', action='store_true')
+    p.add_argument('--target_residual', action='store_true')
+    p.add_argument('--target_scale', type=float, default=150.0)
     p.add_argument('--seeds', type=int, default=256)
     p.add_argument('--seedStart', type=int, default=5000)
     p.add_argument('--frames', type=int, default=1500)
@@ -28,16 +30,17 @@ def main():
     a = p.parse_args()
     ck = torch.load(a.ckpt, map_location=a.device, weights_only=False)
     hidden = ck['hidden']
-    use_aug = a.augment or a.residual
+    use_aug = a.augment or a.residual or a.target_residual
     obs_dim = (OBS_AUG if use_aug else OBS_RAW) + (1 if (use_aug and a.cooldown_obs) else 0)
     ac = ActorCritic(obs_dim=obs_dim, hidden=hidden).to(a.device)
     ac.load_state_dict(ck['state'])
     ac.eval()
-    base_w = load_weights(a.base_weights, device=a.device) if a.residual else None
+    base_w = load_weights(a.base_weights, device=a.device) if (a.residual or a.target_residual) else None
     seeds = list(range(a.seedStart, a.seedStart + a.seeds))
     env = PPOSim(seeds, device=a.device, augment=a.augment,
                  residual=a.residual, base_weights=base_w, resid_scale=a.resid_scale,
-                 cooldown_obs=a.cooldown_obs)
+                 cooldown_obs=a.cooldown_obs, target_residual=a.target_residual,
+                 target_scale=a.target_scale)
     with torch.no_grad():
         for _ in range(a.frames):
             mu, _ = ac(env.current_obs())

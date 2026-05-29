@@ -52,15 +52,17 @@ class PPOSim(Sim):
     """
     def __init__(self, seeds, device='cuda', augment=False,
                  residual=False, base_weights=None, resid_scale=0.05,
-                 cooldown_obs=False):
+                 cooldown_obs=False, target_residual=False, target_scale=150.0):
         w = {'featureDim': 45, 'inputMean': None, 'inputStd': None,
              'outputScale': 1.0, 'clipMagnitude': 0.0, 'layers': []}
-        # residual mode rides on top of the deployed nearest_cluster policy, so
-        # it always uses the cluster patrol target + augmented obs.
+        # residual / target_residual ride on the deployed nearest_cluster policy,
+        # so they always use the cluster patrol target + augmented obs.
         self.residual = residual
-        self.augment = augment or residual
+        self.target_residual = target_residual
+        self.augment = augment or residual or target_residual
         self._base_w = base_weights
         self.resid_scale = resid_scale
+        self.target_scale = target_scale
         self.cooldown_obs = cooldown_obs
         at = 'nearest_cluster' if self.augment else 'random'
         ato = NC_OPTS if self.augment else None
@@ -107,7 +109,19 @@ class PPOSim(Sim):
         return d.min(dim=1).values
 
     def _step_predator(self):
-        if self.residual:
+        if self.target_residual:
+            self._update_auto_target()
+            # policy offsets the patrol aim (pixels); base NN does the steering.
+            pa = self.pred_auto.clone()
+            pa[:, 0] = pa[:, 0] + self._action[:, 0] * self.target_scale
+            pa[:, 1] = pa[:, 1] + self._action[:, 1] * self.target_scale
+            feats = build_features(
+                self.pred_pos.float(), self.pred_vel.float(),
+                self.boid_pos.float(), self.boid_vel.float(), self.boid_alive,
+                pa.float(), self._base_w['featureDim'], self.device, dtype=torch.float32)
+            base = nn_forward(feats, self._base_w).double()
+            sx, sy = base[:, 0], base[:, 1]                 # already clipped to 0.05 (offset=0 -> base)
+        elif self.residual:
             self._update_auto_target()
             base = self._base_steer()                       # (B,2), already clipped to 0.05
             rx = base[:, 0] + self._action[:, 0] * self.resid_scale
@@ -151,16 +165,19 @@ def main():
     p.add_argument('--base_weights', default='js/predator_weights.json', help='deployed weights for residual base steering')
     p.add_argument('--resid_scale', type=float, default=0.05, help='residual action scale (force units)')
     p.add_argument('--cooldown_obs', action='store_true', help='add feed-cooldown remaining to obs (info the base ignores)')
+    p.add_argument('--target_residual', action='store_true', help='policy offsets the patrol aim (pixels); base NN steers')
+    p.add_argument('--target_scale', type=float, default=150.0, help='aim-offset scale in pixels for target_residual')
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed', type=int, default=0)
     p.add_argument('--out', required=True)
     a = p.parse_args()
-    use_aug = a.augment or a.residual
+    use_aug = a.augment or a.residual or a.target_residual
     OBS_DIM = (OBS_AUG if use_aug else OBS_RAW) + (1 if (use_aug and a.cooldown_obs) else 0)
-    base_w = load_weights(a.base_weights, device=a.device) if a.residual else None
+    base_w = load_weights(a.base_weights, device=a.device) if (a.residual or a.target_residual) else None
     mk = lambda seeds: PPOSim(seeds, device=a.device, augment=a.augment,
                               residual=a.residual, base_weights=base_w,
-                              resid_scale=a.resid_scale, cooldown_obs=a.cooldown_obs)
+                              resid_scale=a.resid_scale, cooldown_obs=a.cooldown_obs,
+                              target_residual=a.target_residual, target_scale=a.target_scale)
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
     logf = open(out / 'ppo_log.jsonl', 'a')
     def log(o): print(json.dumps(o), flush=True); logf.write(json.dumps(o) + '\n'); logf.flush()
