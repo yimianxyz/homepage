@@ -62,6 +62,9 @@ def main():
     p.add_argument('--device', default='cuda')
     p.add_argument('--seed', type=int, default=1)
     p.add_argument('--no_graph', action='store_true')
+    p.add_argument('--initOpts', default=None,
+                   help='JSON param->value to center the initial CEM mean on '
+                        '(refinement around a known-good config). Defaults to INIT.')
     p.add_argument('--out', required=True)
     a = p.parse_args()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
@@ -72,7 +75,13 @@ def main():
     D = len(PARAMS)
     val_seeds = list(range(a.valStart, a.valStart + a.valSeeds))
 
-    mu = (INIT - LO) / (HI - LO)            # init mean in [0,1]
+    init = INIT.copy()
+    if a.initOpts:
+        io = json.loads(a.initOpts)
+        for i, nm in enumerate(NAMES):
+            if nm in io:
+                init[i] = float(io[nm])
+    mu = np.clip((init - LO) / (HI - LO), 0, 1)   # init mean in [0,1]
     sig = np.full(D, a.sigma0)
     best_val = -1.0; best_opts = None
     log({'phase': 'start', 'params': NAMES, 'pop': a.pop, 'elite': a.elite,
