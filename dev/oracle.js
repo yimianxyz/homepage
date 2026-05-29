@@ -100,6 +100,62 @@ function computeAutoTarget(mode, predator, boids, defaultTarget, canvasWidth, ca
         return { x: sx / wsum + lookahead * svx / wsum,
                  y: sy / wsum + lookahead * svy / wsum };
     }
+    if (mode === 'nearest_cluster') {
+        // Densest-cluster centroid + adaptive travel-time lead. Matches
+        // sim_torch nearest_cluster (cluster_r=150, lead_scale=0.4, lead_max=120).
+        if (boids.length === 0) return defaultTarget;
+        var CLUSTER_R2 = 150 * 150, LEAD_SCALE = 0.4, VP = 2.5, LEAD_MAX = 120;
+        var n = boids.length;
+        var bestIdx = 0, bestCount = -1;
+        for (var i = 0; i < n; i++) {
+            var cnt = 0, pix = boids[i].position.x, piy = boids[i].position.y;
+            for (var j = 0; j < n; j++) {
+                var ex = boids[j].position.x - pix, ey = boids[j].position.y - piy;
+                if (ex * ex + ey * ey < CLUSTER_R2) cnt++;
+            }
+            if (cnt > bestCount) { bestCount = cnt; bestIdx = i; }
+        }
+        var bx = boids[bestIdx].position.x, by = boids[bestIdx].position.y;
+        var cx = 0, cy = 0, cvx = 0, cvy = 0, m = 0;
+        for (var k = 0; k < n; k++) {
+            var gx = boids[k].position.x - bx, gy = boids[k].position.y - by;
+            if (gx * gx + gy * gy < CLUSTER_R2) {
+                cx += boids[k].position.x; cy += boids[k].position.y;
+                cvx += boids[k].velocity.x; cvy += boids[k].velocity.y; m++;
+            }
+        }
+        if (m === 0) return defaultTarget;
+        cx /= m; cy /= m; cvx /= m; cvy /= m;
+        var ddx = cx - predator.position.x, ddy = cy - predator.position.y;
+        var dcent = Math.sqrt(ddx * ddx + ddy * ddy);
+        var lead = Math.min(dcent / VP * LEAD_SCALE, LEAD_MAX);
+        return { x: cx + lead * cvx, y: cy + lead * cvy };
+    }
+    if (mode === 'weighted_adaptive') {
+        // weighted_predicted with an ADAPTIVE lead: lead time scales with how
+        // far the weighted centroid is from the (slow) predator, instead of a
+        // fixed 5 frames. lead = (dist / predator_max_speed) * LEAD_SCALE,
+        // capped at LEAD_MAX. Held-out +1.4 catches over weighted_predicted.
+        if (boids.length === 0) return defaultTarget;
+        var LEAD_SCALE = 0.6, VP = 2.5, LEAD_MAX = 40;
+        var wsum = 0, sx = 0, sy = 0, svx = 0, svy = 0;
+        for (var i = 0; i < boids.length; i++) {
+            var dx = boids[i].position.x - predator.position.x;
+            var dy = boids[i].position.y - predator.position.y;
+            var w = 1 / Math.sqrt(dx * dx + dy * dy + 1);
+            wsum += w;
+            sx += boids[i].position.x * w;
+            sy += boids[i].position.y * w;
+            svx += boids[i].velocity.x * w;
+            svy += boids[i].velocity.y * w;
+        }
+        if (wsum === 0) return defaultTarget;
+        var cx0 = sx / wsum, cy0 = sy / wsum, vx0 = svx / wsum, vy0 = svy / wsum;
+        var ddx = cx0 - predator.position.x, ddy = cy0 - predator.position.y;
+        var dcent = Math.sqrt(ddx * ddx + ddy * ddy);
+        var lead = Math.min(dcent / VP * LEAD_SCALE, LEAD_MAX);
+        return { x: cx0 + lead * vx0, y: cy0 + lead * vy0 };
+    }
     if (mode === 'weighted_centroid') {
         // Centroid weighted by 1/distance: emphasises nearby boids. The
         // raw centroid can sit in the middle of a sparse region between
