@@ -48,6 +48,12 @@ class PPOSim(Sim):
                          sequential=False, auto_target='random')
         self._action = torch.zeros((self.B, 2), dtype=torch.float64, device=device)
 
+    def reset(self, new_seeds):
+        """Re-init episode state with fresh seeds (boids don't respawn, so each
+        rollout segment past the horizon must start a fresh episode)."""
+        self.seeds = list(new_seeds)
+        self._initialize()
+
     def current_obs(self):
         return build_obs_egocentric(self.pred_pos, self.pred_vel,
                                     self.boid_pos, self.boid_vel, self.boid_alive)
@@ -87,7 +93,8 @@ def main():
     p.add_argument('--ent', type=float, default=0.003)
     p.add_argument('--vf', type=float, default=0.5)
     p.add_argument('--shape', type=float, default=0.0, help='proximity shaping weight')
-    p.add_argument('--seedStart', type=int, default=2000)
+    p.add_argument('--episode', type=int, default=1500, help='episode horizon (env resets here; boids do not respawn)')
+    p.add_argument('--seedStart', type=int, default=100000, help='training seed pool start (kept disjoint from holdout 9000-9999)')
     p.add_argument('--holdout', type=int, default=64)
     p.add_argument('--eval_frames', type=int, default=1500)
     p.add_argument('--device', default='cuda')
@@ -103,9 +110,19 @@ def main():
     ac = ActorCritic(hidden=a.hidden).to(dev)
     opt = torch.optim.Adam(ac.parameters(), lr=a.lr)
 
-    # persistent training env (B envs); reset by re-seeding when it runs long
-    seeds = list(range(a.seedStart, a.seedStart + a.B))
-    env = PPOSim(seeds, device=dev)
+    # training env (B envs). Boids don't respawn, so we run fixed-horizon
+    # episodes and reset with fresh seeds at the horizon. next_seed walks a
+    # wide pool disjoint from the holdout (9000-9999).
+    next_seed = a.seedStart
+    def fresh_seeds():
+        nonlocal next_seed
+        s = list(range(next_seed, next_seed + a.B))
+        next_seed += a.B
+        if next_seed > a.seedStart + 500000:
+            next_seed = a.seedStart
+        return s
+    env = PPOSim(fresh_seeds(), device=dev)
+    ep_frame = 0  # frames since last reset (all B envs synchronized)
     DNORM = 1.0 / 200.0
 
     def policy_step(collect=True):
@@ -132,21 +149,30 @@ def main():
     gstep = 0
     for it in range(a.iters):
         t0 = time.time()
-        obs_b, act_b, logp_b, val_b, rew_b = [], [], [], [], []
+        obs_b, act_b, logp_b, val_b, rew_b, done_b = [], [], [], [], [], []
+        ep_catches = []  # completed-episode catch totals seen this rollout
         for t in range(a.rollout):
             o, ac_, lp, v, r = policy_step(collect=True)
+            ep_frame += 1
+            done = ep_frame >= a.episode
             obs_b.append(o); act_b.append(ac_); logp_b.append(lp); val_b.append(v); rew_b.append(r)
+            done_b.append(1.0 if done else 0.0)
             gstep += 1
+            if done:
+                ep_catches.append(env.catches.float().mean().item())
+                env.reset(fresh_seeds()); ep_frame = 0
         with torch.no_grad():
             _, last_v = ac(env.current_obs())
         obs_b = torch.stack(obs_b); act_b = torch.stack(act_b)
         logp_b = torch.stack(logp_b); val_b = torch.stack(val_b); rew_b = torch.stack(rew_b)  # (T,B)
-        # GAE
+        done_t = torch.tensor(done_b, device=dev)  # (T,)
+        # GAE with episodic termination (no bootstrap across a reset)
         adv = torch.zeros_like(rew_b); lastgae = torch.zeros(a.B, device=dev)
         for t in reversed(range(a.rollout)):
-            nextv = last_v if t == a.rollout - 1 else val_b[t + 1]
+            mask = 1.0 - done_t[t]
+            nextv = (last_v if t == a.rollout - 1 else val_b[t + 1]) * mask
             delta = rew_b[t] + a.gamma * nextv - val_b[t]
-            lastgae = delta + a.gamma * a.lam * lastgae
+            lastgae = delta + a.gamma * a.lam * mask * lastgae
             adv[t] = lastgae
         ret = adv + val_b
         # flatten
@@ -184,11 +210,13 @@ def main():
                 best_eval = hscore
                 torch.save({'state': ac.state_dict(), 'hidden': a.hidden}, out / 'best.pt')
             log({'iter': it, 'gstep': gstep, 'holdout': hscore, 'best': best_eval,
+                 'ep_catch': (sum(ep_catches) / len(ep_catches)) if ep_catches else None,
                  'mean_rew': rew_b.sum(0).mean().item(), 'it_s': time.time() - t0,
                  'log_std': ac.log_std.detach().tolist()})
         else:
-            log({'iter': it, 'gstep': gstep, 'mean_rew': rew_b.sum(0).mean().item(),
-                 'it_s': time.time() - t0})
+            log({'iter': it, 'gstep': gstep,
+                 'ep_catch': (sum(ep_catches) / len(ep_catches)) if ep_catches else None,
+                 'mean_rew': rew_b.sum(0).mean().item(), 'it_s': time.time() - t0})
     log({'phase': 'done', 'best_holdout': best_eval})
 
 
