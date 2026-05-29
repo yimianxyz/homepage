@@ -826,6 +826,12 @@ class Sim:
                 lead = lead.clamp_max(lead_max)
             cx = cx0 + lead * vx0
             cy = cy0 + lead * vy0
+            # target momentum: smooth the patrol target across frames to stop the
+            # slow predator dithering between competing clusters. momentum=0 is a
+            # no-op (default), so this is backward-compatible.
+            momentum = _pv('momentum', 0.0, 0)
+            cx = momentum * self.pred_auto[:, 0] + (1.0 - momentum) * cx
+            cy = momentum * self.pred_auto[:, 1] + (1.0 - momentum) * cy
         else:
             raise NotImplementedError(f"autoTargetMode={mode}")
 

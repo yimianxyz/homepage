@@ -23,6 +23,7 @@ PARAMS = [
     ('sharp',        0.5,   25.0,   6.0),
     ('lead_scale',   0.0,    1.5,   0.4),
     ('lead_max',     0.0,  300.0, 120.0),
+    ('momentum',     0.0,   0.85,   0.0),
 ]
 LO = np.array([p[1] for p in PARAMS])
 HI = np.array([p[2] for p in PARAMS])
