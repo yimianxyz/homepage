@@ -77,6 +77,34 @@ direction with NO histogram quantization and NO attention-averaging. Three VMs i
 Decision metric: patrol_e2e and val patrol angle vs grid 7.18 / 10.8°. If density-deepsets
 beats the grid at far fewer params, it is the elegant minimal answer.
 
+RESULTS (512-seed decompose, 70000+):
+| config | params | patrol_e2e | chase_e2e | full | val ang pat |
+|---|---|---|---|---|---|
+| control deepsets-MEAN, NO density | 6.0k | 5.996 | 8.217 | 5.49 | 43.4 |
+| density deepsets-MEAN, 3 radii | 6.2k | 5.715 | 7.94 | 5.35 | 40.5 |
+| density deepsets-MEAN, 4 radii | 6.2k | 5.711 | 8.01 | 5.04 | 40.7 |
+| density deepsets-MEAN, d64 rho128,64 | 21.7k | 5.912 | 7.89 | 5.57 | 34.1 |
+| **density + attn-POOL, 4 radii** | 13.4k | **7.123** | 8.305 | 6.906 | 32.6 |
+
+Two clean conclusions:
+1. **Density + mean-pool does NOT help** (5.7 ≈ 6.0 control). The earlier theory ("mean-pool =
+   un-normalised weighted sum = same direction as centroid") was WRONG: production patrol is a
+   cluster **SELECTION** (dens_pow=2.37 picks the single densest cluster, ignoring sparse boids),
+   which is an argmax-like op a smooth pooled MEAN cannot represent — it averages across all
+   clusters. Same failure as the soft-argmax-centroid head (54°). Scaling capacity (21.7k) or
+   radii (4 vs 3) barely moved it. So the bottleneck was never density materialization alone — it
+   is SELECTION.
+2. **Density + attn-POOL = patrol 7.12 at 13.4k params** — matches the grid's 7.18 with **32×
+   fewer params** (grid needs 430k @ G21). And vs the NO-density attn-pool set-transformer (6.15),
+   adding the exact density feature lifted patrol **+0.97**. So BOTH ingredients are required:
+   exact per-boid density (input feature) AND attention selection (attn-pool, not mean-pool). The
+   cross-attention softmax IS the cluster selection; the density feature is what it selects on.
+
+This is the elegant minimal patrol encoder: phi(boid+density) → cross-attn pool → rho → Reynolds,
+13k params ≈ grid's 7.18 patrol. NEXT (round 2): push past 7.18 toward prod 8.19 by sharpening
+selection — self-attn block(s) before the attn-pool (refine per-boid density), more heads, 3-radii
+on the same arch, and more data (2048 seeds). Chase is already solved (8.3, attn-pool 3.6°).
+
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
 resolution (G9→G13), capacity (44k→170k), data (512→1024 seeds) and epochs (→250) moved
