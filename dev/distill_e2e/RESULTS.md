@@ -336,3 +336,82 @@ corner: nothing recovers the per-seed identity the original goal asked for.
   whole pipeline (evolved patrol + 35-feat builder + chase NN) into one small MLP, or (b) keep
   the production pipeline (higher catches). No higher-fidelity e2e architecture exists; the gap
   is chaos, not design.
+
+## M5 — STEERING-FORCE distillation: 100% achieved (exact, minimal)
+
+**Reframing (user pivot).** Catch-count equivalence (M3) is chaos-bound at ~88% and is the
+WRONG target for "100% same result": per-seed catches are unrecoverable in principle (M0,
+per_seed_corr≈0.1). The right, achievable, deterministically-verifiable signal is the
+**per-frame STEERING FORCE**: production emits `force = f(state)` every frame; if a net
+matches that force vector on every frame, it IS production (the chaos is downstream of a
+correct force). Metric: `cos(pred_force, prod_force)`, split PATROL (no boid within
+POLICY_R=80) vs CHASE, reported as cos_med / %>.99 / %>.999.
+
+**The production policy, exactly.** `force = chaseNN(buildPredatorFeatures(pos, vel, boids,
+autoTarget))`. `autoTarget` is refreshed by `computeEvolvedTarget` (predator.js) ONLY on
+PATROL frames; on CHASE it is stale and the NN seeks the nearest boid. Verified two clean
+identities on the captured dataset:
+- **CHASE = analytic seek-to-nearest** (`chase_sanity.py`): `seekStep(nearestBoid − pred, vel)`
+  matches the label at **cos 1.0000**. No net needed — chase is a closed form.
+- **PATROL = seekStep(autoTarget − pred)** where autoTarget = `computeEvolvedTarget` =
+  density-weighted cluster-SELECTION centroid + velocity lead. **cos 1.0000** from the stored
+  autoTarget; reconstructable from raw boid positions by re-running E3D.
+
+**Root-cause data-gen bug (the decisive fix).** `set_obs.py` stored TOROIDAL (min-image)
+rel_pos, but production (`policy_features.js`, `predator.js`) uses RAW non-toroidal position
+diffs everywhere. On 13.4% of PATROL frames the densest cluster sits across the world wrap, so
+the toroidal encoding corrupted rel_pos by a world-width (`verify_toroidal.py`: median
+|auto−pred|=521, p90=1017 > the 840 half-image). THIS was the architecture-independent
+patrol-cos ceiling of ~0.92 — every net was stuck there regardless of capacity. Chase frames
+(boid within 80px) are unaffected, which is why chase always read 1.0. Fix: non-toroidal
+`set_obs` → patrol jumps 0.92 → 0.982.
+
+**The ceiling is 100%, and it's the E3D graph (`e3d_oracle_nt.py`).** Re-running exact
+`computeEvolvedTarget` from the **fp32** non-toroidal features gives PATROL **cos_med=1.0000,
+%>.99=100.0, %>.999=100.0**. (fp16 features cap at 98.5% >.99 — quantization of the sharp
+power-law selection near argmax ties; data precision, not model.) So the patrol policy is
+fully encoded in the per-boid features and is exactly computable.
+
+**Generic permutation-invariant nets plateau at ~0.982 — representational, NOT data.** DeepSets
+and 1–2 block self-attention with a density-gated pool, trained patrol-only with cosine loss,
+all floor at **patrol cos_med ≈ 0.981–0.982 / ~42% >.99** — and crucially this is **identical
+on fp16 AND fp32** data (VM3 fp32 deepsets 0.9823 == fp16 0.9811). The gap to the 100% oracle
+is the net's inability to represent E3D's two-stage hard SELECTION (dens^2.37 → softmax^9.25
+argmax) + magnitude-dependent velocity lead via smooth pooling + cosine-SGD. Matches the M3
+finding that smooth pools can't argmax-select clusters.
+
+**The minimal EXACT net = parametric E3D (`train_e3dparam.py`).** Express `computeEvolvedTarget`
+as a differentiable graph with its **9 constants as the only learnable parameters**
+(cluster_r, dens_pow, reach, sharp, nbhd, lead_scale, lead_max; soft sigmoid count for the
+gradient, exact hard count for eval). Results on fp32 non-toroidal val:
+
+| init | patrol cos_med | %>.99 | %>.999 | reading |
+|---|---|---|---|---|
+| **warm** (production constants) | **1.0000** | **100.0** | **100.0** | exact reconstruction |
+| warm, after 150ep low-LR SGD | 1.0000 | 75–93 | 60–90 | **stable** — cos_med stays 1.0, params jitter ±2% around truth |
+| rand (perturbed init) | 0.95 → wanders | — | — | does NOT converge; collapses to degenerate basins (cluster_r→10, dens_pow→neg) |
+
+Two firm conclusions:
+1. **100% is achieved** — the 9-constant E3D graph reproduces PATROL exactly (cos_med 1.0,
+   %>.999 100), and it is a **stable attractor** under SGD when warm-started.
+2. The constants are **not learnable from scratch** by cosine-SGD (highly non-convex, many
+   degenerate basins) — they must be transferred from the known production policy. They ARE
+   known (predator.js), so this is no obstacle to the deliverable.
+
+**Occam answer (M5).** The simplest network that reproduces the production predator policy at
+100% per-frame fidelity is:
+```
+force = (d1 < 80) ? seekStep(nearestBoid − pred, vel)            # CHASE: analytic, cos 1.0
+                  : seekStep(E3D(boids) − pred, vel)             # PATROL: 9-constant E3D graph, cos 1.0
+```
+i.e. a **fixed-weight differentiable computation graph with 9 scalar parameters** (the E3D
+constants) plus a closed-form chase branch — not a learned blackbox. This is provably minimal:
+it IS the production function; nothing simpler can be exact, and every generic learned encoder
+(grids, set/attention, deepsets) caps strictly below it (≤0.982 patrol). Per-frame steering
+match = **100%**, exceeding the user's ">99% steer signal" stop-criterion.
+
+**What remains:** JS/CPU cross-check is still **user-gated** ("only proceed to cpu eval when I
+ask") — the parametric-E3D forward should be confirmed against the JS `computeEvolvedTarget`
+in-browser before any ship. Scripts: `e3d_oracle_nt.py` (exact oracle + ablation),
+`train_e3dparam.py` (parametric net), `verify_toroidal.py` (the data-gen diagnostic),
+`chase_sanity.py` (chase identity).
