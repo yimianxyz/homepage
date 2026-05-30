@@ -111,6 +111,26 @@ the softmax over per-boid density is too soft to match the dens_pow=2.37 hard ar
 uses. Chase IS solved by the set path (attn-pool ~5° angle, 8.3 catches). The grid histogram
 remains the best patrol encoder found (10.8° @ G21, plateaus ~7.18 at 430k params).
 
+### GatePool (density-gated self-weighted pool) — the FINAL pooling test, also ~36°
+Hypothesis: the attn-pool failed because it queried from pred_vel, but production patrol
+selection is predator-INDEPENDENT (weight each boid by its OWN density^2.37). GatePool
+implements exactly that: per-boid scalar score → softmax(score/tau) with a LEARNABLE
+temperature → weighted sum of values = Σ(dens^p·pos)/Σ dens^p. Result: **val patrol angle
+still 36–40°** (3-radii d48: 36.1/37.2; 4-radii: 37.0/37.6; d32: 39.3; d24: 39.4). Predator-
+independent gating did NOT sharpen patrol. **DECISIVE variance evidence** — the SAME config
+(gate_d48, 3-radii) two seeds gave full-e2e **7.047 vs 4.945** at near-identical angle
+(36.1° vs 37.2°): a 2.1-catch swing from sim chaos at the same direction accuracy. This is the
+SAME trap as the "7.12 winner" — catch-count is noise; angle is the signal. Confirmed twice now.
+
+**FINAL VERDICT on the set path:** every permutation-invariant pooling mechanism (mean,
+cross-attention, density-gated self-weighted) floors at ~36–40° patrol angle. The bottleneck is
+NOT the pool — it is the set bottleneck itself: compressing all boids into one D-dim pooled
+vector destroys the absolute spatial structure needed to SELECT one cluster and emit a precise
+direction. The Cartesian grid keeps that structure (each cell = a fixed direction) and the MLP
+reads off the densest cell → 10.8°. Set path closed for patrol; grid is the encoder of record.
+Note minimality upside not realized: gate-pool at 8.6k params is 50× smaller than grid-G21
+(430k) but its angle (36°) is too poor — so "minimal but wrong" loses to "big but right".
+
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
 resolution (G9→G13), capacity (44k→170k), data (512→1024 seeds) and epochs (→250) moved
