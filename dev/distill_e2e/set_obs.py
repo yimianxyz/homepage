@@ -30,8 +30,27 @@ def _torus_offset(boid_xy, pred_xy, half):
     return (d + half) % (2.0 * half) - half
 
 
-def set_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive):
-    """pred_* (B,2), boid_* (B,N,2), boid_alive (B,N) bool. -> feats,mask,pvel,d1."""
+def _local_density(bp, alive, radii):
+    """Per-boid local density = #alive neighbours within each radius (exact, torus).
+    bp (B,N,2), alive (B,N) bool, radii list -> (B,N,len(radii)) float, normalised /N.
+    This materialises the PAIRWISE quantity production weights patrol by — the thing a
+    softmax-attention pool averages away and a histogram only quantises. Given it as an
+    input feature, a plain DeepSets can form the density^pow-weighted centroid directly."""
+    B, N, _ = bp.shape
+    ddx = _torus_offset(bp[:, :, None, 0], bp[:, None, :, 0], HALF_W)   # (B,N,N)
+    ddy = _torus_offset(bp[:, :, None, 1], bp[:, None, :, 1], HALF_H)
+    pdist = torch.sqrt(ddx * ddx + ddy * ddy)                          # boid-boid torus dist
+    am = alive.to(bp.dtype)                                            # (B,N)
+    within = (pdist[..., None] < torch.tensor(radii, device=bp.device, dtype=bp.dtype)) \
+        .to(bp.dtype) * am[:, None, :, None]                           # (B,N,N,R), mask cols by alive
+    dens = within.sum(dim=2) / float(N)                                # (B,N,R) neighbour fraction
+    return dens * am[:, :, None]                                       # dead rows -> 0
+
+
+def set_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, density_radii=None):
+    """pred_* (B,2), boid_* (B,N,2), boid_alive (B,N) bool. -> feats,mask,pvel,d1.
+    If density_radii (list of raw-unit radii) is given, appends per-boid local density
+    columns to feats so FEAT_DIM = 5 + len(density_radii)."""
     f = torch.float32
     pv = pred_vel.to(f)
     bp = boid_pos.to(f)
@@ -46,9 +65,11 @@ def set_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive):
     rvx = bv[..., 0] - pv[:, None, 0]
     rvy = bv[..., 1] - pv[:, None, 1]
     m = alive.to(f)
-    feats = torch.stack([dx / HALF_W, dy / HALF_H,
-                         rvx / BOID_MAX, rvy / BOID_MAX,
-                         dist / HALF_W], dim=2) * m.unsqueeze(2)   # (B,N,5), dead->0
+    cols = [dx / HALF_W, dy / HALF_H, rvx / BOID_MAX, rvy / BOID_MAX, dist / HALF_W]
+    feats = torch.stack(cols, dim=2) * m.unsqueeze(2)            # (B,N,5), dead->0
+    if density_radii:
+        dens = _local_density(bp, alive, density_radii)          # (B,N,R)
+        feats = torch.cat([feats, dens], dim=2)                  # (B,N,5+R)
 
     inf = torch.full_like(dist, float('inf'))
     d1 = torch.where(alive, dist, inf).min(dim=1).values

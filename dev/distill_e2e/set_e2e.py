@@ -41,9 +41,10 @@ def _advance(sim, steering):
 
 
 class SetCaptureSim(Sim):
-    def __init__(self, *a, stride=5, **kw):
+    def __init__(self, *a, stride=5, density_radii=None, **kw):
         super().__init__(*a, **kw)
         self.stride = stride
+        self.density_radii = density_radii
         self.F, self.M, self.PV, self.FO, self.D1 = [], [], [], [], []
 
     def _step_predator(self):
@@ -52,7 +53,8 @@ class SetCaptureSim(Sim):
         if self.frame % self.stride == 0:
             with torch.no_grad():
                 feats, mask, pvel, d1 = set_obs(self.pred_pos, self.pred_vel,
-                                                self.boid_pos, self.boid_vel, self.boid_alive)
+                                                self.boid_pos, self.boid_vel, self.boid_alive,
+                                                density_radii=self.density_radii)
             self.F.append(feats.half().cpu()); self.M.append(mask.bool().cpu())
             self.PV.append(pvel.cpu()); self.FO.append(steering.float().cpu())
             self.D1.append(d1.cpu())
@@ -60,15 +62,17 @@ class SetCaptureSim(Sim):
 
 
 class SetHybridSim(Sim):
-    def __init__(self, *a, net=None, mode='full', **kw):
+    def __init__(self, *a, net=None, mode='full', density_radii=None, **kw):
         super().__init__(*a, **kw)
         self.net = net.eval() if net is not None else None
         self.mode = mode
+        self.density_radii = density_radii
 
     def _e2e(self):
         with torch.no_grad():
             feats, mask, pvel, _ = set_obs(self.pred_pos, self.pred_vel,
-                                           self.boid_pos, self.boid_vel, self.boid_alive)
+                                           self.boid_pos, self.boid_vel, self.boid_alive,
+                                           density_radii=self.density_radii)
             return self.net(feats, mask, pvel).double()
 
     def _step_predator(self):
@@ -93,16 +97,23 @@ class SetHybridSim(Sim):
 
 
 # ---------------- gen ----------------
+def _parse_radii(s):
+    return [float(x) for x in s.split(',')] if s else None
+
+
 def cmd_gen(a):
     seeds = list(range(a.seedStart, a.seedStart + a.seeds))
     weights = load_weights(a.weights, device=a.device)
+    radii = _parse_radii(a.density_radii)
     t0 = time.time()
     sim = SetCaptureSim(seeds=seeds, weights=weights, device=a.device,
-                        auto_target='evolved', auto_target_opts=dict(E3D), stride=a.stride)
+                        auto_target='evolved', auto_target_opts=dict(E3D), stride=a.stride,
+                        density_radii=radii)
     out = sim.run(a.frames)
     feats = torch.cat(sim.F, 0); mask = torch.cat(sim.M, 0)
     pvel = torch.cat(sim.PV, 0); force = torch.cat(sim.FO, 0); d1 = torch.cat(sim.D1, 0)
     meta = dict(seeds=len(seeds), seedStart=a.seedStart, frames=a.frames, stride=a.stride,
+                density_radii=radii,
                 n=int(feats.shape[0]), N=int(feats.shape[1]), mean_catches=out['mean_catches'],
                 gen_seconds=round(time.time() - t0, 1))
     path = f'setds_{a.tag}.pt'
@@ -124,8 +135,10 @@ def cmd_train(a):
     tr = torch.load(a.train, map_location='cpu'); va = torch.load(a.val, map_location='cpu')
     Ftr, Mtr, Ptr, Ytr, Dtr = tr['feats'].float(), tr['mask'].float(), tr['pvel'].float(), tr['force'].float(), tr['d1']
     Fva, Mva, Pva, Yva, Dva = va['feats'].float(), va['mask'].float(), va['pvel'].float(), va['force'].float(), va['d1']
+    in_dim = Ftr.shape[-1]                                   # FEAT_DIM (+ density cols if present)
+    density_radii = tr.get('meta', {}).get('density_radii')
     rho = tuple(int(x) for x in a.rho.split(',')) if a.rho else ()
-    net = SetNet(in_dim=FEAT_DIM, d=a.d, rho=rho, mode=a.mode, heads=a.heads, act=a.act,
+    net = SetNet(in_dim=in_dim, d=a.d, rho=rho, mode=a.mode, heads=a.heads, act=a.act,
                  nblocks=a.nblocks, pool=a.pool).to(dev)
     net.set_standardizer(Ftr, Mtr)                          # CPU stats -> buffers (no full set on GPU)
     opt = torch.optim.Adam(net.parameters(), lr=a.lr, weight_decay=a.wd)
@@ -165,8 +178,9 @@ def cmd_train(a):
         if not a.quiet or ep == a.epochs - 1 or ep % 50 == 0:
             print(f"ep{ep:3d} vmse={vmse:.5f} ang(pat/chs)={pa:.1f}/{ca:.1f} params={net.n_params()}")
     path = f'setnet_{a.tag}.pt'
-    torch.save(dict(state_dict=best_state, in_dim=FEAT_DIM, d=a.d, rho=rho, mode=a.mode,
+    torch.save(dict(state_dict=best_state, in_dim=in_dim, d=a.d, rho=rho, mode=a.mode,
                     heads=a.heads, act=a.act, nblocks=a.nblocks, pool=a.pool, best_vmse=best,
+                    density_radii=density_radii,
                     meta=dict(epochs=a.epochs, params=net.n_params())), path)
     print(f"# wrote {path}  best_vmse={best:.5f} params={net.n_params()}")
 
@@ -186,10 +200,11 @@ def cmd_decompose(a):
     seeds = list(range(a.seedStart, a.seedStart + a.seeds))
     weights = load_weights(a.weights, device=dev)
     net, ck = load_setnet(a.net, dev)
-    print(f"# net mode={ck['mode']} d={ck['d']} rho={ck['rho']} params={ck['meta']['params']}")
+    radii = ck.get('density_radii')
+    print(f"# net mode={ck['mode']} d={ck['d']} rho={ck['rho']} params={ck['meta']['params']} density_radii={radii}")
     for mode in ['prod', 'full', 'patrol_e2e', 'chase_e2e']:
         sim = SetHybridSim(seeds=seeds, weights=weights, device=dev, auto_target='evolved',
-                           auto_target_opts=dict(E3D), net=net, mode=mode)
+                           auto_target_opts=dict(E3D), net=net, mode=mode, density_radii=radii)
         mc = sim.run(a.frames)['mean_catches']
         print(f"{mode:>11}: {mc:.3f}")
 
@@ -201,6 +216,8 @@ def main():
     g.add_argument('--weights', default='predator_weights.json'); g.add_argument('--seeds', type=int, default=768)
     g.add_argument('--seedStart', type=int, default=50000); g.add_argument('--frames', type=int, default=1500)
     g.add_argument('--stride', type=int, default=5); g.add_argument('--tag', default='train')
+    g.add_argument('--density-radii', dest='density_radii', default=None,
+                   help='comma-sep raw-unit radii for per-boid local density features, e.g. 80,178')
     g.add_argument('--device', default='cuda')
     t = sub.add_parser('train')
     t.add_argument('--train', required=True); t.add_argument('--val', required=True)
