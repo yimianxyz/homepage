@@ -114,9 +114,10 @@ def main():
             print(f"ep{ep:3d} val_mse={ev['mse']:.3e} ang_med={ev['ang_med']:.2f} "
                   f"chase={ev['ang_chase']:.2f} patrol={ev['ang_patrol']:.2f}")
     ev = evaluate(net, Xva, Yva, Dva)
+    ds_meta = tr.get('meta', {}) if isinstance(tr, dict) else {}
     meta = dict(hidden=list(hidden), act=args.act, head=args.head, in_dim=in_dim,
                 n_params=net.n_params(), epochs=args.epochs, train_seconds=round(time.time() - t0, 1),
-                val=ev)
+                polar=ds_meta.get('polar'), G=ds_meta.get('G'), K=ds_meta.get('K'), val=ev)
     path = os.path.join(args.outdir, f'net_{args.tag}.pt')
     torch.save(dict(state_dict=net.state_dict(), in_dim=in_dim, hidden=list(hidden),
                     act=args.act, head=args.head, meta=meta), path)

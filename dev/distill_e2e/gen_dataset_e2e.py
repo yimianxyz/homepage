@@ -29,9 +29,9 @@ E3D = dict(cluster_r=178.09, dens_pow=2.373, reach_scale=1515.0, sharp=9.25,
 
 
 class CaptureSim(Sim):
-    def __init__(self, *a, G=9, K=8, stride=5, **kw):
+    def __init__(self, *a, G=9, K=8, stride=5, polar=None, **kw):
         super().__init__(*a, **kw)
-        self.G, self.K, self.stride = G, K, stride
+        self.G, self.K, self.stride, self.polar = G, K, stride, polar
         self._obs, self._force, self._d1 = [], [], []
         self._auto, self._ppos = [], []
 
@@ -51,7 +51,7 @@ class CaptureSim(Sim):
             with torch.no_grad():
                 obs, d1 = raw_obs(self.pred_pos, self.pred_vel,
                                   self.boid_pos, self.boid_vel, self.boid_alive,
-                                  G=self.G, K=self.K)
+                                  G=self.G, K=self.K, polar=self.polar)
             self._obs.append(obs.cpu())
             self._force.append(steering.float().cpu())
             self._d1.append(d1.cpu())
@@ -80,17 +80,19 @@ def main():
     ap.add_argument('--stride', type=int, default=5)
     ap.add_argument('--G', type=int, default=9)
     ap.add_argument('--K', type=int, default=8)
+    ap.add_argument('--polar', default=None, help='nr,nt -> log-polar grid instead of Cartesian')
     ap.add_argument('--device', default='cuda')
     ap.add_argument('--tag', default='train')
     ap.add_argument('--outdir', default=os.path.dirname(os.path.abspath(__file__)))
     args = ap.parse_args()
 
+    polar = tuple(int(x) for x in args.polar.split(',')) if args.polar else None
     seeds = list(range(args.seedStart, args.seedStart + args.seeds))
     weights = load_weights(args.weights, device=args.device)
     t0 = time.time()
     sim = CaptureSim(seeds=seeds, weights=weights, device=args.device,
                      auto_target='evolved', auto_target_opts=dict(E3D),
-                     G=args.G, K=args.K, stride=args.stride)
+                     G=args.G, K=args.K, stride=args.stride, polar=polar)
     out = sim.run(args.frames)
     obs = torch.cat(sim._obs, 0)
     force = torch.cat(sim._force, 0)
@@ -98,7 +100,8 @@ def main():
     dt = time.time() - t0
 
     meta = dict(seeds=len(seeds), seedStart=args.seedStart, frames=args.frames,
-                stride=args.stride, G=args.G, K=args.K, obs_dim=obs_dim(args.G, args.K),
+                stride=args.stride, G=args.G, K=args.K, polar=polar,
+                obs_dim=obs_dim(args.G, args.K, polar=polar),
                 n_samples=int(obs.shape[0]), mean_catches=out['mean_catches'],
                 in_range_frac=float((torch.isfinite(d1) & (d1 < 80.0)).float().mean()),
                 gen_seconds=round(dt, 1))

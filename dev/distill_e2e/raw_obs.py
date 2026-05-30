@@ -20,6 +20,7 @@ obs layout (default G=9, K=8, vel=True -> dim = 2 + 4*8 + 81 + 162 = 277):
   next 2*G*G       (vel only) bilinear MOMENTUM field Sum(w * boid_vel)/ (N*BOID_MAX)
                      -- carries cluster motion for the patrol travel-time LEAD term
 """
+import math
 import torch
 
 CANVAS_W = 1680.0
@@ -28,9 +29,15 @@ HALF_W = CANVAS_W / 2.0
 HALF_H = CANVAS_H / 2.0
 PREDATOR_MAX_SPEED = 2.5
 BOID_MAX = 6.0
+R_MAX = (HALF_W * HALF_W + HALF_H * HALF_H) ** 0.5     # corner distance
+R0 = 20.0                                              # inner log-radius floor
 
 
-def obs_dim(G=9, K=8, vel=True):
+def obs_dim(G=9, K=8, vel=True, polar=None):
+    if polar is not None:
+        nr, nt = polar
+        cells = nr * nt
+        return 2 + 4 * K + cells + (2 * cells if vel else 0)
     return 2 + 4 * K + G * G + (2 * G * G if vel else 0)
 
 
@@ -40,9 +47,12 @@ def _torus_offset(boid_xy, pred_xy, half):
     return (d + half) % (2.0 * half) - half
 
 
-def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=True):
+def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=True, polar=None):
     """All float32. Shapes: pred_* (B,2), boid_* (B,N,2), boid_alive (B,N) bool.
-    Returns (obs (B, obs_dim), d1 (B,) nearest-alive torus distance)."""
+    Returns (obs (B, obs_dim), d1 (B,) nearest-alive torus distance).
+    polar=(nr,nt): replace the Cartesian density/momentum grid with a predator-centric
+    LOG-POLAR histogram (nr log-radial x nt angular bins, angle wraps). Angular bins align
+    directly with the output direction, so 'densest angular sector' = patrol direction."""
     B, N, _ = boid_pos.shape
     dev = boid_pos.device
     f = torch.float32
@@ -76,6 +86,42 @@ def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=Tr
     out.append(knn.reshape(B, k * 4))
     if k < K:                                                     # pad if K>N (never for N=120)
         out.append(torch.zeros((B, (K - k) * 4), device=dev, dtype=f))
+
+    # ---- LOG-POLAR density/momentum grid (bilinear; radial clamp, angular wrap) ----
+    if polar is not None:
+        nr, nt = polar
+        aw = alive.to(f)
+        bvx, bvy = bv[..., 0], bv[..., 1]
+        r = torch.sqrt(dx * dx + dy * dy)                        # (B,N) torus distance
+        theta = torch.atan2(dy, dx)                              # (B,N) in [-pi, pi]
+        # log-radial cell coord in [-0.5, nr-0.5]
+        lr = (torch.log(torch.clamp(r, min=R0)) - math.log(R0)) / (math.log(R_MAX) - math.log(R0))
+        rb = lr * nr - 0.5
+        tb = (theta + math.pi) / (2.0 * math.pi) * nt - 0.5      # angular coord, wraps mod nt
+        r0i = torch.floor(rb); t0i = torch.floor(tb)
+        fr = rb - r0i; ft = tb - t0i
+        cells = nr * nt
+        grid = torch.zeros((B, cells), device=dev, dtype=f)
+        mvx = torch.zeros((B, cells), device=dev, dtype=f)
+        mvy = torch.zeros((B, cells), device=dev, dtype=f)
+        for cr, wr in ((r0i, 1 - fr), (r0i + 1, fr)):
+            ri = torch.clamp(cr.long(), 0, nr - 1)               # radial: clamp at edges
+            for ct, wt in ((t0i, 1 - ft), (t0i + 1, ft)):
+                ti = ct.long() % nt                              # angular: wrap (periodic)
+                flat = ri * nt + ti                              # (B,N)
+                w = (wr * wt * aw)
+                grid.scatter_add_(1, flat, w)
+                if vel:
+                    mvx.scatter_add_(1, flat, w * bvx)
+                    mvy.scatter_add_(1, flat, w * bvy)
+        out.append(grid / float(N))
+        if vel:
+            out.append(mvx / (N * BOID_MAX))
+            out.append(mvy / (N * BOID_MAX))
+        obs = torch.cat(out, dim=1)
+        d1 = torch.where(torch.isfinite(dk[:, 0]), dk[:, 0],
+                         torch.full((B,), float('inf'), device=dev, dtype=f))
+        return obs, d1
 
     # ---- coarse soft density grid (bilinear scatter), torus-centred ----
     # cell coords in [0, G-1]; cell width = 2*half / G

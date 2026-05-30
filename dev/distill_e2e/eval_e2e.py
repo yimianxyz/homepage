@@ -29,15 +29,16 @@ E3D = dict(cluster_r=178.09, dens_pow=2.373, reach_scale=1515.0, sharp=9.25,
 
 class E2ESim(Sim):
     """Predator steering comes entirely from the e2e net on raw_obs."""
-    def __init__(self, *a, net=None, G=9, K=8, **kw):
+    def __init__(self, *a, net=None, G=9, K=8, polar=None, **kw):
         super().__init__(*a, **kw)
         self.e2e = net.eval()
-        self.G, self.K = G, K
+        self.G, self.K, self.polar = G, K, polar
 
     def _step_predator(self):
         with torch.no_grad():
             obs, _ = raw_obs(self.pred_pos, self.pred_vel, self.boid_pos,
-                             self.boid_vel, self.boid_alive, G=self.G, K=self.K)
+                             self.boid_vel, self.boid_alive, G=self.G, K=self.K,
+                             polar=self.polar)
             steering = self.e2e(obs).double()
         new_vx = self.pred_vel[:, 0] + steering[:, 0]
         new_vy = self.pred_vel[:, 1] + steering[:, 1]
@@ -80,9 +81,10 @@ def main():
     t0 = time.time()
     prod = Sim(seeds=seeds, weights=weights, device=dev,
                auto_target='evolved', auto_target_opts=dict(E3D)).run(args.frames)
+    polar = meta.get('polar')
     e2e = E2ESim(seeds=seeds, weights=weights, device=dev,
                  auto_target='evolved', auto_target_opts=dict(E3D),
-                 net=net, G=args.G, K=args.K).run(args.frames)
+                 net=net, G=args.G, K=args.K, polar=polar).run(args.frames)
     dt = time.time() - t0
 
     pc = torch.tensor(prod['per_seed_catches']).float()
