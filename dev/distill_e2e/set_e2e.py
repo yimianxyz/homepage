@@ -174,7 +174,11 @@ def cmd_train(a):
         for i in range(0, n, bs):
             idx = perm[i:i + bs]
             f = Ftr[idx].to(dev); m = Mtr[idx].to(dev); p = Ptr[idx].to(dev); y = Ytr[idx].to(dev)
-            w = 1.0 + (a.patrolw - 1.0) * pat_tr[idx].to(dev)   # upweight patrol frames
+            pat_b = pat_tr[idx].to(dev)
+            if a.patrolonly:
+                w = pat_b                                       # train ONLY on patrol (chase is analytic seek-nearest)
+            else:
+                w = 1.0 + (a.patrolw - 1.0) * pat_b             # upweight patrol frames
             pred = net(f, m, p)
             mse = ((pred - y) ** 2).sum(1)
             pn = pred / (pred.norm(dim=1, keepdim=True) + 1e-9)
@@ -247,6 +251,7 @@ def main():
     t.add_argument('--bs', type=int, default=4096); t.add_argument('--lr', type=float, default=2e-3)
     t.add_argument('--wd', type=float, default=0.0); t.add_argument('--dirw', type=float, default=1.0)
     t.add_argument('--patrolw', type=float, default=1.0, help='loss multiplier on patrol frames')
+    t.add_argument('--patrolonly', action='store_true', help='train ONLY on patrol frames (chase handled analytically)')
     t.add_argument('--dironly', action='store_true', help='pure direction (cosine) loss, drop MSE')
     t.add_argument('--tauinit', type=float, default=None, help='gate log_tau init (e.g. -2.22 = 1/9.25)')
     t.add_argument('--tag', default='attn'); t.add_argument('--device', default='cuda')
