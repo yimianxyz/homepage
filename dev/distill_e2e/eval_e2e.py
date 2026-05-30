@@ -54,7 +54,8 @@ class E2ESim(Sim):
 
 def load_net(path, device):
     ck = torch.load(path, map_location=device)
-    net = E2ENet(ck['in_dim'], hidden=tuple(ck['hidden']), act=ck['act'])
+    net = E2ENet(ck['in_dim'], hidden=tuple(ck['hidden']), act=ck['act'],
+                 head=ck.get('head', 'force'))
     net.load_state_dict(ck['state_dict'])
     return net.to(device), ck.get('meta', {})
 

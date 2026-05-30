@@ -33,6 +33,7 @@ class CaptureSim(Sim):
         super().__init__(*a, **kw)
         self.G, self.K, self.stride = G, K, stride
         self._obs, self._force, self._d1 = [], [], []
+        self._auto, self._ppos = [], []
 
     def _step_predator(self):
         self._update_auto_target()
@@ -54,6 +55,8 @@ class CaptureSim(Sim):
             self._obs.append(obs.cpu())
             self._force.append(steering.float().cpu())
             self._d1.append(d1.cpu())
+            self._auto.append(self.pred_auto.float().cpu())
+            self._ppos.append(self.pred_pos.float().cpu())
 
         new_vx = self.pred_vel[:, 0] + steering[:, 0]
         new_vy = self.pred_vel[:, 1] + steering[:, 1]
@@ -100,7 +103,9 @@ def main():
                 in_range_frac=float((torch.isfinite(d1) & (d1 < 80.0)).float().mean()),
                 gen_seconds=round(dt, 1))
     path = os.path.join(args.outdir, f'dataset_{args.tag}.pt')
-    torch.save(dict(obs=obs, force=force, d1=d1, meta=meta), path)
+    auto = torch.cat(sim._auto, 0)
+    ppos = torch.cat(sim._ppos, 0)
+    torch.save(dict(obs=obs, force=force, d1=d1, auto=auto, ppos=ppos, meta=meta), path)
     print(json.dumps(meta, indent=2))
     print(f"# wrote {path}  obs={tuple(obs.shape)} force={tuple(force.shape)}")
 

@@ -12,12 +12,13 @@ The production policy blends seek-cluster (patrol) and seek-nearest (chase) via 
 in-range gate; these two views carry exactly the information each regime needs,
 with no hand-built features in between.
 
-obs layout (default G=9, K=8 -> dim = 2 + 4*8 + 81 = 115):
+obs layout (default G=9, K=8, vel=True -> dim = 2 + 4*8 + 81 + 162 = 277):
   [0:2]            predator velocity / PREDATOR_MAX_SPEED
   [2 : 2+4K]       K nearest alive boids, by torus distance:
                      rel_pos/HALF (2), rel_vel/BOID_MAX (2)  -- zeros if <K alive
-  [2+4K : ...]     G*G soft (bilinear) density of alive boids, torus-centred,
-                     normalised by N_BOIDS
+  next G*G         soft (bilinear) density of alive boids, torus-centred, /N_BOIDS
+  next 2*G*G       (vel only) bilinear MOMENTUM field Sum(w * boid_vel)/ (N*BOID_MAX)
+                     -- carries cluster motion for the patrol travel-time LEAD term
 """
 import torch
 
@@ -29,8 +30,8 @@ PREDATOR_MAX_SPEED = 2.5
 BOID_MAX = 6.0
 
 
-def obs_dim(G=9, K=8):
-    return 2 + 4 * K + G * G
+def obs_dim(G=9, K=8, vel=True):
+    return 2 + 4 * K + G * G + (2 * G * G if vel else 0)
 
 
 def _torus_offset(boid_xy, pred_xy, half):
@@ -39,7 +40,7 @@ def _torus_offset(boid_xy, pred_xy, half):
     return (d + half) % (2.0 * half) - half
 
 
-def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8):
+def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=True):
     """All float32. Shapes: pred_* (B,2), boid_* (B,N,2), boid_alive (B,N) bool.
     Returns (obs (B, obs_dim), d1 (B,) nearest-alive torus distance)."""
     B, N, _ = boid_pos.shape
@@ -83,7 +84,10 @@ def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8):
     x0 = torch.floor(gx); y0 = torch.floor(gy)
     fx = gx - x0; fy = gy - y0
     grid = torch.zeros((B, G * G), device=dev, dtype=f)
+    mvx = torch.zeros((B, G * G), device=dev, dtype=f)
+    mvy = torch.zeros((B, G * G), device=dev, dtype=f)
     aw = alive.to(f)
+    bvx, bvy = bv[..., 0], bv[..., 1]
     for cx, wx in ((x0, 1 - fx), (x0 + 1, fx)):
         for cy, wy in ((y0, 1 - fy), (y0 + 1, fy)):
             ci = (cx.long() % G)
@@ -91,7 +95,13 @@ def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8):
             flat = ci * G + cj                                   # (B,N) wrap grid edges (torus)
             w = (wx * wy * aw)
             grid.scatter_add_(1, flat, w)
+            if vel:
+                mvx.scatter_add_(1, flat, w * bvx)
+                mvy.scatter_add_(1, flat, w * bvy)
     out.append(grid / float(N))
+    if vel:
+        out.append(mvx / (N * BOID_MAX))
+        out.append(mvy / (N * BOID_MAX))
 
     obs = torch.cat(out, dim=1)
     d1 = torch.where(torch.isfinite(dk[:, 0]), dk[:, 0],

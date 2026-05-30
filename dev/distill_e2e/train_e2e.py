@@ -42,10 +42,12 @@ def main():
     ap.add_argument('--val', default='dataset_val.pt')
     ap.add_argument('--hidden', default='16', help='comma list, empty = linear')
     ap.add_argument('--act', default='relu')
+    ap.add_argument('--head', default='reynolds', choices=['force', 'reynolds'])
     ap.add_argument('--epochs', type=int, default=40)
     ap.add_argument('--bs', type=int, default=4096)
     ap.add_argument('--lr', type=float, default=2e-3)
     ap.add_argument('--wd', type=float, default=0.0)
+    ap.add_argument('--dirw', type=float, default=0.0, help='weight on (1-cos) direction loss')
     ap.add_argument('--device', default='cuda')
     ap.add_argument('--tag', default='h16')
     ap.add_argument('--outdir', default=os.path.dirname(os.path.abspath(__file__)))
@@ -60,7 +62,7 @@ def main():
     in_dim = Xtr.shape[1]
     hidden = tuple(int(h) for h in args.hidden.split(',') if h.strip() != '')
 
-    net = E2ENet(in_dim, hidden=hidden, act=args.act).to(dev)
+    net = E2ENet(in_dim, hidden=hidden, act=args.act, head=args.head).to(dev)
     net.set_standardizer(Xtr)
     opt = torch.optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.wd)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, args.epochs)
@@ -74,7 +76,11 @@ def main():
         for i in range(0, n, args.bs):
             idx = perm[i:i + args.bs]
             opt.zero_grad()
-            loss = F.mse_loss(net(Xtr[idx]), Ytr[idx])
+            pred = net(Xtr[idx])
+            loss = F.mse_loss(pred, Ytr[idx])
+            if args.dirw > 0:
+                cos = (F.normalize(pred, dim=1) * F.normalize(Ytr[idx], dim=1)).sum(1)
+                loss = loss + args.dirw * (1 - cos).mean()
             loss.backward(); opt.step()
         sched.step()
         if not args.quiet and (ep % 5 == 0 or ep == args.epochs - 1):
@@ -82,12 +88,12 @@ def main():
             print(f"ep{ep:3d} val_mse={ev['mse']:.3e} ang_med={ev['ang_med']:.2f} "
                   f"chase={ev['ang_chase']:.2f} patrol={ev['ang_patrol']:.2f}")
     ev = evaluate(net, Xva, Yva, Dva)
-    meta = dict(hidden=list(hidden), act=args.act, in_dim=in_dim,
+    meta = dict(hidden=list(hidden), act=args.act, head=args.head, in_dim=in_dim,
                 n_params=net.n_params(), epochs=args.epochs, train_seconds=round(time.time() - t0, 1),
                 val=ev)
     path = os.path.join(args.outdir, f'net_{args.tag}.pt')
     torch.save(dict(state_dict=net.state_dict(), in_dim=in_dim, hidden=list(hidden),
-                    act=args.act, meta=meta), path)
+                    act=args.act, head=args.head, meta=meta), path)
     print(json.dumps(meta, indent=2))
     print(f"# wrote {path}")
 
