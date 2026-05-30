@@ -313,6 +313,20 @@ underfits (6.82); wider/deeper/finer-grid buys nothing. Density not needed. Occa
 simplest reasonable net is also (within noise) the best -- strong evidence the ~7.2 plateau is
 a true ceiling, not a capacity shortfall.
 
+### Minimal net — high-precision 2048-seed verification (the deliverable's honest numbers)
+Ran the actual minimal net (G9 [256,128]) at 2048 seeds (seedStart 80000), both variance seeds:
+
+| seed | mean_prod | mean_e2e | dist_gap | per_seed_corr | mean_abs_diff |
+|---|---|---|---|---|---|
+| a | 8.423 | 6.869 | 1.556 | 0.075 | 4.53 |
+| b | 8.423 | 6.965 | 1.458 | 0.100 | 4.48 |
+
+So the minimal net holds ~82% of production catch-count at 2048 seeds, with per_seed_corr ~0.09
+— the chaos signature (M0), NOT a model defect. Its dist_gap (~1.5) is modestly worse than the
+larger G13 [512,256] candidate's 1.25, i.e. capacity buys a little distributional fidelity but
+NOT per-seed match (corr stays ~0.1 regardless). Confirms the ceiling is robust at the minimal
+corner: nothing recovers the per-seed identity the original goal asked for.
+
 ### Status / what remains
 - **100% match: proven impossible** (M0 chaos + per_seed_corr 0.10). Best e2e fidelity ~85-88%.
 - **Minimal net: found** (G9 + [256,128], ~115k params, ~7.26 catches).
