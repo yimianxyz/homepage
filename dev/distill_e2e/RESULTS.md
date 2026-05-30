@@ -131,6 +131,30 @@ reads off the densest cell → 10.8°. Set path closed for patrol; grid is the e
 Note minimality upside not realized: gate-pool at 8.6k params is 50× smaller than grid-G21
 (430k) but its angle (36°) is too poor — so "minimal but wrong" loses to "big but right".
 
+### CLEAN matched grid baseline (variance pairs) — corrects the bogus "10.8°"
+Earlier notes cited grid patrol angle "10.8°"; that was an unreproducible artifact (likely
+measured on train data or a different angle definition). A clean matched sweep — identical recipe
+(hidden 256,128, reynolds head, force target, NO dirw, 1280 seeds, 300 ep), TWO training seeds
+each, measured by measure_patrol_angle.py on held-out val — gives:
+
+| G | catches seed a | catches seed b | mean | patrol angle (val, reliable) |
+|---|---|---|---|---|
+| G17 | 6.79 | 7.05 | 6.92 | — |
+| G21 | 6.95 | 7.04 | **6.99** | **21.3 / 21.2** (both seeds!) |
+| G25 | 6.44 | 7.06 | 6.75 | — |
+
+Two decisive conclusions:
+1. **The grid plateaus at ~7.0 catches = 85% of prod 8.19, and resolution beyond G17 does NOT
+   help** (G17 6.92 ≈ G21 6.99 > G25 6.75; G25 even adds variance). The plateau is real and
+   resolution-saturated — NOT a quantization limit you can resolve away.
+2. **Reproducible patrol angle is ~21°**, not 10.8° — both G21 seeds land at 21.2–21.3°. So the
+   true grid patrol direction error is ~21°, and that 21° → ~7.0 catches. The whole residual gap
+   (7.0 vs 8.19) is patrol cluster-selection the histogram MLP cannot sharpen past ~21°.
+
+Catch-count variance across seeds is ~0.1–0.6 (G25 worst at 0.6) — modest, so the means above are
+defensible. NEXT: is 21° capacity-bound or representational? Test a much bigger/deeper head at
+fixed G21 (reuse data). If big head still ~21° → representational ceiling for raw-obs grid encoders.
+
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
 resolution (G9→G13), capacity (44k→170k), data (512→1024 seeds) and epochs (→250) moved
