@@ -69,6 +69,30 @@ class AttnPool(nn.Module):
         return self.proj(o)
 
 
+class GatePool(nn.Module):
+    """Self-weighted (density-gated) pool — the mechanism production actually uses.
+    Each boid emits a SCALAR score from its OWN features (its local density), softmax-
+    normalised with a LEARNABLE TEMPERATURE into weights w_i, then a weighted sum of
+    learned per-boid values. This is exactly production's density^p-weighted centroid
+    Σ(dens_i^p · v_i)/Σ dens_i^p — a small tau ≈ the sharp dens_pow=2.37 SELECTION.
+    Crucially the weighting does NOT depend on the predator (no query): production picks
+    the densest cluster independent of where the predator is."""
+    def __init__(self, d):
+        super().__init__()
+        self.score = nn.Linear(d, 1)
+        self.val = nn.Linear(d, d)
+        self.log_tau = nn.Parameter(torch.zeros(1))      # tau = exp(log_tau), learnable
+
+    def forward(self, x, mask):                          # x (B,N,d), mask (B,N)
+        s = self.score(x).squeeze(-1)                    # (B,N)
+        tau = self.log_tau.exp().clamp(min=1e-2, max=1e2)
+        s = s / tau
+        s = s.masked_fill(mask <= 0.5, float('-inf'))
+        w = torch.nan_to_num(torch.softmax(s, dim=-1))   # (B,N) sharp selection weights
+        v = self.val(x)                                  # (B,N,d)
+        return (w.unsqueeze(-1) * v).sum(1)              # (B,d)
+
+
 class SetNet(nn.Module):
     def __init__(self, in_dim=5, d=32, rho=(64,), mode='attn', heads=2, act='relu',
                  nblocks=1, pool='mean'):
@@ -84,6 +108,8 @@ class SetNet(nn.Module):
             self.norms = nn.ModuleList([nn.LayerNorm(d) for _ in range(nblocks)])
         if pool == 'attn':
             self.attnpool = AttnPool(d, heads)
+        if pool == 'gate':
+            self.gatepool = GatePool(d)
         layers, din = [], d + 2
         for h in rho:
             layers += [nn.Linear(din, h), A()]
@@ -107,6 +133,8 @@ class SetNet(nn.Module):
         h = h * mask.unsqueeze(2)
         if self.pool == 'attn':
             pooled = self.attnpool(h, mask, pvel)
+        elif self.pool == 'gate':
+            pooled = self.gatepool(h, mask)
         else:
             pooled = h.sum(1) / mask.sum(1, keepdim=True).clamp_min(1.0)   # masked mean
         out = self.rho(torch.cat([pooled, pvel], dim=1))

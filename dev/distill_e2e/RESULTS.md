@@ -84,7 +84,8 @@ RESULTS (512-seed decompose, 70000+):
 | density deepsets-MEAN, 3 radii | 6.2k | 5.715 | 7.94 | 5.35 | 40.5 |
 | density deepsets-MEAN, 4 radii | 6.2k | 5.711 | 8.01 | 5.04 | 40.7 |
 | density deepsets-MEAN, d64 rho128,64 | 21.7k | 5.912 | 7.89 | 5.57 | 34.1 |
-| **density + attn-POOL, 4 radii** | 13.4k | **7.123** | 8.305 | 6.906 | 32.6 |
+| density + attn-POOL, 4 radii (lucky draw) | 13.4k | 7.123 | 8.305 | 6.906 | 32.6 |
+| density + attn-POOL, 4 radii (repro ×4) | 13.4k | ~4.9 | 8.33 | ~4.9 | **36–38** |
 
 Two clean conclusions:
 1. **Density + mean-pool does NOT help** (5.7 ≈ 6.0 control). The earlier theory ("mean-pool =
@@ -94,16 +95,21 @@ Two clean conclusions:
    clusters. Same failure as the soft-argmax-centroid head (54°). Scaling capacity (21.7k) or
    radii (4 vs 3) barely moved it. So the bottleneck was never density materialization alone — it
    is SELECTION.
-2. **Density + attn-POOL = patrol 7.12 at 13.4k params** — matches the grid's 7.18 with **32×
-   fewer params** (grid needs 430k @ G21). And vs the NO-density attn-pool set-transformer (6.15),
-   adding the exact density feature lifted patrol **+0.97**. So BOTH ingredients are required:
-   exact per-boid density (input feature) AND attention selection (attn-pool, not mean-pool). The
-   cross-attention softmax IS the cluster selection; the density feature is what it selects on.
+2. **CORRECTION — the "7.12 winner" was chaotic-metric NOISE, not a real result.** The 7.123 came
+   from a single training draw that happened to land at 32.6° val patrol angle. Re-running the
+   EXACT same config (4-radii [60,120,240,480], d48, heads2, attn-pool) four independent times —
+   VM1 m4r_d48, VM2 iso3r_h2a/b, VM3 iso_h2a/b — gives patrol_e2e **4.76–5.14** at val angle
+   **36–38°**, NOT 7.12. The catch-count (`patrol_e2e`) is a CHAOTIC metric: a ~5° angle change
+   amplifies into a ~2-catch swing through the boid sim. **The reliable, deterministic signal is
+   the val patrol ANGLE.** By that metric the density+attn-pool set encoder sits at ~36–38°, far
+   worse than the grid's **10.8°**. Lesson recorded: never rank architectures by single-run
+   decompose catch-counts; rank by val angle, confirm with multi-seed.
 
-This is the elegant minimal patrol encoder: phi(boid+density) → cross-attn pool → rho → Reynolds,
-13k params ≈ grid's 7.18 patrol. NEXT (round 2): push past 7.18 toward prod 8.19 by sharpening
-selection — self-attn block(s) before the attn-pool (refine per-boid density), more heads, 3-radii
-on the same arch, and more data (2048 seeds). Chase is already solved (8.3, attn-pool 3.6°).
+**Set / attention path is RULED OUT for patrol** by the reliable angle metric (all set variants
+36–43° vs grid 10.8°). Mean-pool can't select; cross-attn pool selects but on a 36° error budget —
+the softmax over per-boid density is too soft to match the dens_pow=2.37 hard argmax that prod
+uses. Chase IS solved by the set path (attn-pool ~5° angle, 8.3 catches). The grid histogram
+remains the best patrol encoder found (10.8° @ G21, plateaus ~7.18 at 430k params).
 
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
