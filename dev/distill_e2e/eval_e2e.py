@@ -83,9 +83,11 @@ def main():
                auto_target='evolved', auto_target_opts=dict(E3D)).run(args.frames)
     polar = meta.get('polar')
     densr = meta.get('densr')
+    G = meta.get('G') or args.G          # match the encoder the net was trained on
+    K = meta.get('K') or args.K
     e2e = E2ESim(seeds=seeds, weights=weights, device=dev,
                  auto_target='evolved', auto_target_opts=dict(E3D),
-                 net=net, G=args.G, K=args.K, polar=polar, densr=densr).run(args.frames)
+                 net=net, G=G, K=K, polar=polar, densr=densr).run(args.frames)
     dt = time.time() - t0
 
     pc = torch.tensor(prod['per_seed_catches']).float()
