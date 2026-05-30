@@ -43,6 +43,8 @@ def main():
     ap.add_argument('--hidden', default='16', help='comma list, empty = linear')
     ap.add_argument('--act', default='relu')
     ap.add_argument('--head', default='reynolds', choices=['force', 'reynolds'])
+    ap.add_argument('--target', default='force', choices=['force', 'dir'],
+                    help="'dir' trains desired-velocity head on the target-direction label")
     ap.add_argument('--epochs', type=int, default=40)
     ap.add_argument('--bs', type=int, default=4096)
     ap.add_argument('--lr', type=float, default=2e-3)
@@ -60,8 +62,27 @@ def main():
     Xtr, Ytr, Dtr = tr['obs'].to(dev), tr['force'].to(dev), tr['d1'].to(dev)
     Xva, Yva, Dva = va['obs'].to(dev), va['force'].to(dev), va['d1'].to(dev)
     in_dim = Xtr.shape[1]
+
+    HALF = 840.0
+
+    def desired_dir(d, X, D):
+        # well-conditioned label: unit desired-velocity direction.
+        # chase (in range): toward nearest boid (obs KNN[0] rel pos = X[:,2:4]*HALF)
+        # patrol: toward production patrol target pred_auto
+        nearest = X[:, 2:4] * HALF
+        off = d['auto'].to(dev) - d['ppos'].to(dev)
+        off = (off + HALF) % (2 * HALF) - HALF
+        inr = (torch.isfinite(D) & (D < 80.0)).unsqueeze(1)
+        lab = torch.where(inr, nearest, off)
+        return F.normalize(lab, dim=1)
+
+    if args.target == 'dir':
+        Ldir_tr = desired_dir(tr, Xtr, Dtr)
+        Ldir_va = desired_dir(va, Xva, Dva)
     hidden = tuple(int(h) for h in args.hidden.split(',') if h.strip() != '')
 
+    if args.target == 'dir':
+        args.head = 'reynolds'   # dir label is a desired velocity -> reynolds head
     net = E2ENet(in_dim, hidden=hidden, act=args.act, head=args.head).to(dev)
     net.set_standardizer(Xtr)
     opt = torch.optim.Adam(net.parameters(), lr=args.lr, weight_decay=args.wd)
@@ -76,11 +97,16 @@ def main():
         for i in range(0, n, args.bs):
             idx = perm[i:i + args.bs]
             opt.zero_grad()
-            pred = net(Xtr[idx])
-            loss = F.mse_loss(pred, Ytr[idx])
-            if args.dirw > 0:
-                cos = (F.normalize(pred, dim=1) * F.normalize(Ytr[idx], dim=1)).sum(1)
-                loss = loss + args.dirw * (1 - cos).mean()
+            if args.target == 'dir':
+                dv = net.net((Xtr[idx] - net.mean) / net.std)   # raw desired-velocity
+                cos = (F.normalize(dv, dim=1) * Ldir_tr[idx]).sum(1)
+                loss = (1 - cos).mean()
+            else:
+                pred = net(Xtr[idx])
+                loss = F.mse_loss(pred, Ytr[idx])
+                if args.dirw > 0:
+                    cos = (F.normalize(pred, dim=1) * F.normalize(Ytr[idx], dim=1)).sum(1)
+                    loss = loss + args.dirw * (1 - cos).mean()
             loss.backward(); opt.step()
         sched.step()
         if not args.quiet and (ep % 5 == 0 or ep == args.epochs - 1):
