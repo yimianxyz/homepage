@@ -9,10 +9,16 @@ the density-weighted cluster centroid that drives PATROL directly from exact pos
 Returns, all float32:
   feats : (B, N, 5)  per-boid [rel_pos_x/HALF, rel_pos_y/HALF,
                                rel_vel_x/BOID_MAX, rel_vel_y/BOID_MAX, dist/HALF]
-                     torus min-image, predator-centric; zeros for dead boids
+                     NON-toroidal (raw position diff), predator-centric; zeros for dead boids
   mask  : (B, N) float  1.0 alive / 0.0 dead
   pvel  : (B, 2)  predator velocity / PREDATOR_MAX_SPEED
-  d1    : (B,)    nearest-alive torus distance (raw units; inf if none)
+  d1    : (B,)    nearest-alive distance (raw units; inf if none)
+
+CRITICAL: production buildPredatorFeatures (js/policy_features.js) and computeEvolvedTarget
+(js/predator.js) both use RAW non-toroidal position differences (boid.pos - pred.pos, no
+wrap). An earlier toroidal min-image encoding here corrupted ~13% of PATROL frames (those
+where the densest cluster sits across the world wrap), capping every net at patrol cos ~0.92.
+The offsets are therefore non-toroidal to match production exactly.
 """
 import torch
 
@@ -25,21 +31,21 @@ BOID_MAX = 6.0
 FEAT_DIM = 5
 
 
-def _torus_offset(boid_xy, pred_xy, half):
-    d = boid_xy - pred_xy
-    return (d + half) % (2.0 * half) - half
+def _raw_offset(boid_xy, pred_xy, half):
+    return boid_xy - pred_xy
 
 
 def _local_density(bp, alive, radii):
-    """Per-boid local density = #alive neighbours within each radius (exact, torus).
-    bp (B,N,2), alive (B,N) bool, radii list -> (B,N,len(radii)) float, normalised /N.
-    This materialises the PAIRWISE quantity production weights patrol by — the thing a
-    softmax-attention pool averages away and a histogram only quantises. Given it as an
-    input feature, a plain DeepSets can form the density^pow-weighted centroid directly."""
+    """Per-boid local density = #alive neighbours within each radius (exact, NON-toroidal,
+    matching computeEvolvedTarget's raw boid-boid diff). bp (B,N,2), alive (B,N) bool,
+    radii list -> (B,N,len(radii)) float, normalised /N. This materialises the PAIRWISE
+    quantity production weights patrol by — the thing a softmax-attention pool averages away
+    and a histogram only quantises. Given it as an input feature, a plain DeepSets can form
+    the density^pow-weighted centroid directly."""
     B, N, _ = bp.shape
-    ddx = _torus_offset(bp[:, :, None, 0], bp[:, None, :, 0], HALF_W)   # (B,N,N)
-    ddy = _torus_offset(bp[:, :, None, 1], bp[:, None, :, 1], HALF_H)
-    pdist = torch.sqrt(ddx * ddx + ddy * ddy)                          # boid-boid torus dist
+    ddx = bp[:, :, None, 0] - bp[:, None, :, 0]                        # (B,N,N) raw
+    ddy = bp[:, :, None, 1] - bp[:, None, :, 1]
+    pdist = torch.sqrt(ddx * ddx + ddy * ddy)                          # boid-boid raw dist
     am = alive.to(bp.dtype)                                            # (B,N)
     within = (pdist[..., None] < torch.tensor(radii, device=bp.device, dtype=bp.dtype)) \
         .to(bp.dtype) * am[:, None, :, None]                           # (B,N,N,R), mask cols by alive
@@ -58,8 +64,8 @@ def set_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, density_radii=No
     pp = pred_pos.to(f)
     alive = boid_alive
 
-    dx = _torus_offset(bp[..., 0], pp[:, None, 0], HALF_W)        # (B,N)
-    dy = _torus_offset(bp[..., 1], pp[:, None, 1], HALF_H)
+    dx = bp[..., 0] - pp[:, None, 0]                              # (B,N) raw, non-toroidal
+    dy = bp[..., 1] - pp[:, None, 1]
     dist = torch.sqrt(dx * dx + dy * dy)
 
     rvx = bv[..., 0] - pv[:, None, 0]
