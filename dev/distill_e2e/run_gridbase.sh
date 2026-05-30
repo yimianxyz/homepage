@@ -6,8 +6,9 @@
 cd ~/js_eval/e2e
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 W=predator_weights.json
-G=${1:-21}; K=8
+G=${1:-21}; HID=${2:-256,128}; K=8
 while pgrep -f 'set_e2e.py\|train_e2e\|gen_dataset_e2e\|eval_e2e' >/dev/null; do sleep 20; done
+HTAG=$(echo $HID | tr ',' '-')
 TR=dataset_gb${G}_train.pt; VA=dataset_gb${G}_val.pt
 if [ ! -f $TR ]; then
   echo "=== GEN G$G train (1280 seeds) ==="
@@ -18,9 +19,9 @@ if [ ! -f $TR ]; then
     --G $G --K $K --tag gb${G}_val --device cuda 2>&1 | tail -2
 fi
 for s in a b; do
-  tag=gb${G}_$s
-  echo "=== TRAIN $tag (G$G hidden256,128 reynolds force NO-dirw 300ep) ==="
-  python3 train_e2e.py --train $TR --val $VA --hidden 256,128 --head reynolds --target force \
+  tag=gb${G}h${HTAG}_$s
+  echo "=== TRAIN $tag (G$G hidden$HID reynolds force NO-dirw 300ep) ==="
+  python3 train_e2e.py --train $TR --val $VA --hidden $HID --head reynolds --target force \
     --epochs 300 --lr 1.5e-3 --bs 4096 --tag $tag --device cuda --quiet 2>&1 | tail -3
   echo "=== PATROL ANGLE $tag (reliable) ==="
   python3 measure_patrol_angle.py --net net_$tag.pt --data $VA --device cuda 2>&1 | tail -4
