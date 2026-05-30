@@ -46,6 +46,7 @@ class SetCaptureSim(Sim):
         self.stride = stride
         self.density_radii = density_radii
         self.F, self.M, self.PV, self.FO, self.D1 = [], [], [], [], []
+        self.AU, self.PP = [], []
 
     def _step_predator(self):
         self._update_auto_target()
@@ -58,6 +59,7 @@ class SetCaptureSim(Sim):
             self.F.append(feats.half().cpu()); self.M.append(mask.bool().cpu())
             self.PV.append(pvel.cpu()); self.FO.append(steering.float().cpu())
             self.D1.append(d1.cpu())
+            self.AU.append(self.pred_auto.float().cpu()); self.PP.append(self.pred_pos.float().cpu())
         _advance(self, steering)
 
 
@@ -112,12 +114,14 @@ def cmd_gen(a):
     out = sim.run(a.frames)
     feats = torch.cat(sim.F, 0); mask = torch.cat(sim.M, 0)
     pvel = torch.cat(sim.PV, 0); force = torch.cat(sim.FO, 0); d1 = torch.cat(sim.D1, 0)
+    auto = torch.cat(sim.AU, 0); ppos = torch.cat(sim.PP, 0)
     meta = dict(seeds=len(seeds), seedStart=a.seedStart, frames=a.frames, stride=a.stride,
                 density_radii=radii,
                 n=int(feats.shape[0]), N=int(feats.shape[1]), mean_catches=out['mean_catches'],
                 gen_seconds=round(time.time() - t0, 1))
     path = f'setds_{a.tag}.pt'
-    torch.save(dict(feats=feats, mask=mask, pvel=pvel, force=force, d1=d1, meta=meta), path)
+    torch.save(dict(feats=feats, mask=mask, pvel=pvel, force=force, d1=d1,
+                    auto=auto, ppos=ppos, meta=meta), path)
     print(json.dumps(meta, indent=2))
     print(f"# wrote {path} feats={tuple(feats.shape)} ({feats.dtype})")
 
@@ -143,7 +147,13 @@ def cmd_train(a):
     net.set_standardizer(Ftr, Mtr)                          # CPU stats -> buffers (no full set on GPU)
     opt = torch.optim.Adam(net.parameters(), lr=a.lr, weight_decay=a.wd)
     n = Ftr.shape[0]; bs = a.bs
+    pat_tr = ((Dtr > 80) | ~torch.isfinite(Dtr)).float()    # 1=patrol, 0=chase (train, on CPU)
     pat_va = (Dva > 80) | ~torch.isfinite(Dva); chs_va = ~pat_va
+    # E3D selection is softmax(9.25*log a): the gate needs a SHARP temperature. log_tau init
+    # = -log(9.25) ~ -2.22 puts tau in the right basin instead of the too-soft tau=1 default.
+    if a.pool == 'gate' and a.tauinit is not None:
+        with torch.no_grad():
+            net.gatepool.log_tau.fill_(a.tauinit)
 
     def eval_val():                                          # batched: attention is O(N^2) per row
         outs = []
@@ -152,37 +162,46 @@ def cmd_train(a):
             outs.append(pv.cpu())
         return torch.cat(outs, 0)
 
-    best = 1e9; best_state = None
+    def cosmed(pred, tgt, msk):
+        pn = pred / (pred.norm(dim=1, keepdim=True) + 1e-9)
+        tn = tgt / (tgt.norm(dim=1, keepdim=True) + 1e-9)
+        c = (pn * tn).sum(1).clamp(-1, 1)[msk]
+        return c.median().item(), (c > 0.99).float().mean().item() * 100
+
+    best = -1.0; best_state = None                          # select on PATROL cos_med (the hard regime)
     for ep in range(a.epochs):
         net.train(); perm = torch.randperm(n)
         for i in range(0, n, bs):
             idx = perm[i:i + bs]
             f = Ftr[idx].to(dev); m = Mtr[idx].to(dev); p = Ptr[idx].to(dev); y = Ytr[idx].to(dev)
+            w = 1.0 + (a.patrolw - 1.0) * pat_tr[idx].to(dev)   # upweight patrol frames
             pred = net(f, m, p)
-            loss = ((pred - y) ** 2).sum(1).mean()
-            if a.dirw > 0:                                  # direct cosine (no arccos: stable grad)
-                pn = pred / (pred.norm(dim=1, keepdim=True) + 1e-9)
-                tn = y / (y.norm(dim=1, keepdim=True) + 1e-9)
-                loss = loss + a.dirw * (1 - (pn * tn).sum(1)).mean()
+            mse = ((pred - y) ** 2).sum(1)
+            pn = pred / (pred.norm(dim=1, keepdim=True) + 1e-9)
+            tn = y / (y.norm(dim=1, keepdim=True) + 1e-9)
+            dircos = 1 - (pn * tn).sum(1)
+            per = (0.0 if a.dironly else mse) + a.dirw * dircos
+            loss = (w * per).sum() / w.sum()
             opt.zero_grad(); loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), 5.0)
             opt.step()
         net.eval()
         with torch.no_grad():
             pv = eval_val()
-            vmse = ((pv - Yva) ** 2).sum(1).mean().item()
-            ae = angerr(pv, Yva)
-            pa = ae[pat_va].median().item(); ca = ae[chs_va].median().item()
-        if vmse < best:
-            best = vmse; best_state = {k: v.detach().cpu().clone() for k, v in net.state_dict().items()}
-        if not a.quiet or ep == a.epochs - 1 or ep % 50 == 0:
-            print(f"ep{ep:3d} vmse={vmse:.5f} ang(pat/chs)={pa:.1f}/{ca:.1f} params={net.n_params()}")
+            pcm, pp99 = cosmed(pv, Yva, pat_va)
+            ccm, _ = cosmed(pv, Yva, chs_va)
+        if pcm > best:
+            best = pcm; best_state = {k: v.detach().cpu().clone() for k, v in net.state_dict().items()}
+        if not a.quiet or ep == a.epochs - 1 or ep % 25 == 0:
+            tau = (net.gatepool.log_tau.exp().item() if a.pool == 'gate' else 0.0)
+            print(f"ep{ep:3d} pat_cosM={pcm:.4f} pat%>99={pp99:5.1f} chs_cosM={ccm:.4f} "
+                  f"tau={tau:.3f} params={net.n_params()}")
     path = f'setnet_{a.tag}.pt'
     torch.save(dict(state_dict=best_state, in_dim=in_dim, d=a.d, rho=rho, mode=a.mode,
-                    heads=a.heads, act=a.act, nblocks=a.nblocks, pool=a.pool, best_vmse=best,
+                    heads=a.heads, act=a.act, nblocks=a.nblocks, pool=a.pool, best_pat_cosmed=best,
                     density_radii=density_radii,
                     meta=dict(epochs=a.epochs, params=net.n_params())), path)
-    print(f"# wrote {path}  best_vmse={best:.5f} params={net.n_params()}")
+    print(f"# wrote {path}  best_pat_cosM={best:.4f} params={net.n_params()}")
 
 
 def load_setnet(path, dev):
@@ -227,6 +246,9 @@ def main():
     t.add_argument('--act', default='relu'); t.add_argument('--epochs', type=int, default=250)
     t.add_argument('--bs', type=int, default=4096); t.add_argument('--lr', type=float, default=2e-3)
     t.add_argument('--wd', type=float, default=0.0); t.add_argument('--dirw', type=float, default=1.0)
+    t.add_argument('--patrolw', type=float, default=1.0, help='loss multiplier on patrol frames')
+    t.add_argument('--dironly', action='store_true', help='pure direction (cosine) loss, drop MSE')
+    t.add_argument('--tauinit', type=float, default=None, help='gate log_tau init (e.g. -2.22 = 1/9.25)')
     t.add_argument('--tag', default='attn'); t.add_argument('--device', default='cuda')
     t.add_argument('--quiet', action='store_true')
     d = sub.add_parser('decompose')
