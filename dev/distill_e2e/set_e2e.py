@@ -41,10 +41,11 @@ def _advance(sim, steering):
 
 
 class SetCaptureSim(Sim):
-    def __init__(self, *a, stride=5, density_radii=None, **kw):
+    def __init__(self, *a, stride=5, density_radii=None, fp32=False, **kw):
         super().__init__(*a, **kw)
         self.stride = stride
         self.density_radii = density_radii
+        self.fp32 = fp32
         self.F, self.M, self.PV, self.FO, self.D1 = [], [], [], [], []
         self.AU, self.PP = [], []
 
@@ -56,7 +57,7 @@ class SetCaptureSim(Sim):
                 feats, mask, pvel, d1 = set_obs(self.pred_pos, self.pred_vel,
                                                 self.boid_pos, self.boid_vel, self.boid_alive,
                                                 density_radii=self.density_radii)
-            self.F.append(feats.half().cpu()); self.M.append(mask.bool().cpu())
+            self.F.append((feats.float() if self.fp32 else feats.half()).cpu()); self.M.append(mask.bool().cpu())
             self.PV.append(pvel.cpu()); self.FO.append(steering.float().cpu())
             self.D1.append(d1.cpu())
             self.AU.append(self.pred_auto.float().cpu()); self.PP.append(self.pred_pos.float().cpu())
@@ -110,7 +111,7 @@ def cmd_gen(a):
     t0 = time.time()
     sim = SetCaptureSim(seeds=seeds, weights=weights, device=a.device,
                         auto_target='evolved', auto_target_opts=dict(E3D), stride=a.stride,
-                        density_radii=radii)
+                        density_radii=radii, fp32=a.fp32)
     out = sim.run(a.frames)
     feats = torch.cat(sim.F, 0); mask = torch.cat(sim.M, 0)
     pvel = torch.cat(sim.PV, 0); force = torch.cat(sim.FO, 0); d1 = torch.cat(sim.D1, 0)
@@ -154,6 +155,8 @@ def cmd_train(a):
     if a.pool == 'gate' and a.tauinit is not None:
         with torch.no_grad():
             net.gatepool.log_tau.fill_(a.tauinit)
+        if a.taufix:
+            net.gatepool.log_tau.requires_grad_(False)          # freeze sharp selection temperature
 
     def eval_val():                                          # batched: attention is O(N^2) per row
         outs = []
@@ -239,6 +242,7 @@ def main():
     g.add_argument('--weights', default='predator_weights.json'); g.add_argument('--seeds', type=int, default=768)
     g.add_argument('--seedStart', type=int, default=50000); g.add_argument('--frames', type=int, default=1500)
     g.add_argument('--stride', type=int, default=5); g.add_argument('--tag', default='train')
+    g.add_argument('--fp32', action='store_true', help='store feats as float32 (lossless; default fp16)')
     g.add_argument('--density-radii', dest='density_radii', default=None,
                    help='comma-sep raw-unit radii for per-boid local density features, e.g. 80,178')
     g.add_argument('--device', default='cuda')
@@ -254,6 +258,7 @@ def main():
     t.add_argument('--patrolonly', action='store_true', help='train ONLY on patrol frames (chase handled analytically)')
     t.add_argument('--dironly', action='store_true', help='pure direction (cosine) loss, drop MSE')
     t.add_argument('--tauinit', type=float, default=None, help='gate log_tau init (e.g. -2.22 = 1/9.25)')
+    t.add_argument('--taufix', action='store_true', help='freeze gate log_tau at tauinit (sharp selection)')
     t.add_argument('--tag', default='attn'); t.add_argument('--device', default='cuda')
     t.add_argument('--quiet', action='store_true')
     d = sub.add_parser('decompose')
