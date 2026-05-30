@@ -201,3 +201,32 @@ four levers drove the +0.53 patrol gain, and where does the grid curve plateau. 
 isolate by pushing grid resolution + data further (one decisive higher-res run), and in
 parallel test a set/attention encoder that sees exact boid positions (the architecture that
 can in principle compute the density-weighted centroid without histogram quantization).
+
+### DENSITY-AUGMENTED GRID — partly breaks the angle ceiling, NOT the catch ceiling
+The converged-ceiling section above predicted the wall was an INFORMATION limit: count
+histograms cannot recover production's per-boid local-density^2.37 cluster SELECTION. Test:
+add ONE extra grid channel where each boid deposits its Gaussian local-neighbour density
+(neutral single sigma, no dens_pow — stays in raw-obs spirit; raw_obs.py `--densr`). Matched
+recipe, 1280 seeds, 300ep, variance pairs. Patrol ANGLE (reliable) and catches:
+
+| config | grid | net | patrol angle (a/b) | catches (a/b) |
+|---|---|---|---|---|
+| no-density control | G13 | 256,128 | 20.7 / 20.2° | 7.11 / 6.73 |
+| dens r80  | G13 | 256,128 | 19.8 / 19.8° | — |
+| dens r120 | G13 | 256,128 | 19.7 / 19.5° | — |
+| dens r178 | G13 | 256,128 | 19.4 / 19.4° | — |
+| dens r120 | G13 | 1024,512,256 | 16.3 / 15.5° | 7.10 / 7.34 |
+| dens r178 | G13 | 1024,512,256 | 16.3 / 16.6° | 7.37 / 7.09 |
+| (no-density big-net G21, from polar table) | G21 | 1024,512,256 | 17.3° | ~7.0 |
+
+Density IS recoverable signal: at matched 256,128 it shaves ~0.7° (20.5→19.6°), and density
++ capacity reaches a NEW-BEST ~16° patrol angle (both seeds agree — not noise), beating the
+prior 17.3° count-grid floor. So the "pure information limit" claim is PARTLY REFUTED — local
+density is usable and lowers patrol DIRECTION error. Radius barely matters (r80→r178 within 0.5°).
+
+BUT the CATCH ceiling does NOT move: density+bignet = ~7.2 catches vs control ~6.9 vs prod 8.19
+(~88%). A 4.5° patrol-direction improvement bought only +0.3 catches — breaking the earlier
+"~5°≈2 catches" heuristic. The residual gap is therefore NOT mean patrol direction; it is
+lead/timing and/or seed-level trajectory chaos that better mean-direction can't fix. Decisive
+follow-up running: G21 + density + bignet (finer grid → lower angle). If angle drops further
+but catches stay ~7.2, the catch ceiling is timing/chaos-bound and ~88% is the e2e ceiling.
