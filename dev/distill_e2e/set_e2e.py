@@ -126,11 +126,18 @@ def cmd_train(a):
     Fva, Mva, Pva, Yva, Dva = va['feats'].float(), va['mask'].float(), va['pvel'].float(), va['force'].float(), va['d1']
     rho = tuple(int(x) for x in a.rho.split(',')) if a.rho else ()
     net = SetNet(in_dim=FEAT_DIM, d=a.d, rho=rho, mode=a.mode, heads=a.heads, act=a.act).to(dev)
-    net.set_standardizer(Ftr.to(dev), Mtr.to(dev))
+    net.set_standardizer(Ftr, Mtr)                          # CPU stats -> buffers (no full set on GPU)
     opt = torch.optim.Adam(net.parameters(), lr=a.lr, weight_decay=a.wd)
     n = Ftr.shape[0]; bs = a.bs
-    Fva_d, Mva_d, Pva_d, Yva_d = Fva.to(dev), Mva.to(dev), Pva.to(dev), Yva.to(dev)
     pat_va = (Dva > 80) | ~torch.isfinite(Dva); chs_va = ~pat_va
+
+    def eval_val():                                          # batched: attention is O(N^2) per row
+        outs = []
+        for j in range(0, Fva.shape[0], bs):
+            pv = net(Fva[j:j + bs].to(dev), Mva[j:j + bs].to(dev), Pva[j:j + bs].to(dev))
+            outs.append(pv.cpu())
+        return torch.cat(outs, 0)
+
     best = 1e9; best_state = None
     for ep in range(a.epochs):
         net.train(); perm = torch.randperm(n)
@@ -148,10 +155,10 @@ def cmd_train(a):
             opt.step()
         net.eval()
         with torch.no_grad():
-            pv = net(Fva_d, Mva_d, Pva_d)
-            vmse = ((pv - Yva_d) ** 2).sum(1).mean().item()
-            ae = angerr(pv, Yva_d)
-            pa = ae[pat_va.to(dev)].median().item(); ca = ae[chs_va.to(dev)].median().item()
+            pv = eval_val()
+            vmse = ((pv - Yva) ** 2).sum(1).mean().item()
+            ae = angerr(pv, Yva)
+            pa = ae[pat_va].median().item(); ca = ae[chs_va].median().item()
         if vmse < best:
             best = vmse; best_state = {k: v.detach().cpu().clone() for k, v in net.state_dict().items()}
         if not a.quiet or ep == a.epochs - 1 or ep % 50 == 0:
