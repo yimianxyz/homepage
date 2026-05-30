@@ -33,12 +33,12 @@ R_MAX = (HALF_W * HALF_W + HALF_H * HALF_H) ** 0.5     # corner distance
 R0 = 20.0                                              # inner log-radius floor
 
 
-def obs_dim(G=9, K=8, vel=True, polar=None):
+def obs_dim(G=9, K=8, vel=True, polar=None, densr=None):
     if polar is not None:
         nr, nt = polar
         cells = nr * nt
-        return 2 + 4 * K + cells + (2 * cells if vel else 0)
-    return 2 + 4 * K + G * G + (2 * G * G if vel else 0)
+        return 2 + 4 * K + cells + (2 * cells if vel else 0) + (cells if densr else 0)
+    return 2 + 4 * K + G * G + (2 * G * G if vel else 0) + (G * G if densr else 0)
 
 
 def _torus_offset(boid_xy, pred_xy, half):
@@ -47,7 +47,21 @@ def _torus_offset(boid_xy, pred_xy, half):
     return (d + half) % (2.0 * half) - half
 
 
-def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=True, polar=None):
+def _local_density(bp, alive, sigma):
+    """Per-boid soft neighbour count (excl self) within a generic Gaussian radius.
+    bp (B,N,2) float, alive (B,N) bool. Returns (B,N) >=0. Predator-INDEPENDENT and
+    NOT production-specific (single neutral sigma, no dens_pow) — it just exposes
+    cluster tightness, which a plain count histogram cannot recover."""
+    bx, by = bp[..., 0], bp[..., 1]
+    ddx = _torus_offset(bx[:, :, None], bx[:, None, :], HALF_W)   # (B,N,N)
+    ddy = _torus_offset(by[:, :, None], by[:, None, :], HALF_H)
+    d2 = ddx * ddx + ddy * ddy
+    w = torch.exp(-d2 / (2.0 * sigma * sigma)) * alive[:, None, :].to(bp.dtype)
+    dens = w.sum(2) - 1.0                                         # drop self (exp(0)=1)
+    return dens.clamp(min=0.0)
+
+
+def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=True, polar=None, densr=None):
     """All float32. Shapes: pred_* (B,2), boid_* (B,N,2), boid_alive (B,N) bool.
     Returns (obs (B, obs_dim), d1 (B,) nearest-alive torus distance).
     polar=(nr,nt): replace the Cartesian density/momentum grid with a predator-centric
@@ -132,8 +146,10 @@ def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=Tr
     grid = torch.zeros((B, G * G), device=dev, dtype=f)
     mvx = torch.zeros((B, G * G), device=dev, dtype=f)
     mvy = torch.zeros((B, G * G), device=dev, dtype=f)
+    gdn = torch.zeros((B, G * G), device=dev, dtype=f)
     aw = alive.to(f)
     bvx, bvy = bv[..., 0], bv[..., 1]
+    dens = _local_density(bp, alive, densr) if densr else None    # (B,N)
     for cx, wx in ((x0, 1 - fx), (x0 + 1, fx)):
         for cy, wy in ((y0, 1 - fy), (y0 + 1, fy)):
             ci = (cx.long() % G)
@@ -144,10 +160,14 @@ def raw_obs(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive, G=9, K=8, vel=Tr
             if vel:
                 mvx.scatter_add_(1, flat, w * bvx)
                 mvy.scatter_add_(1, flat, w * bvy)
+            if densr:
+                gdn.scatter_add_(1, flat, w * dens)
     out.append(grid / float(N))
     if vel:
         out.append(mvx / (N * BOID_MAX))
         out.append(mvy / (N * BOID_MAX))
+    if densr:
+        out.append(gdn / float(N))                               # standardizer rescales
 
     obs = torch.cat(out, dim=1)
     d1 = torch.where(torch.isfinite(dk[:, 0]), dk[:, 0],

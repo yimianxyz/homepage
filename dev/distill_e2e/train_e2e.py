@@ -117,7 +117,8 @@ def main():
     ds_meta = tr.get('meta', {}) if isinstance(tr, dict) else {}
     meta = dict(hidden=list(hidden), act=args.act, head=args.head, in_dim=in_dim,
                 n_params=net.n_params(), epochs=args.epochs, train_seconds=round(time.time() - t0, 1),
-                polar=ds_meta.get('polar'), G=ds_meta.get('G'), K=ds_meta.get('K'), val=ev)
+                polar=ds_meta.get('polar'), densr=ds_meta.get('densr'),
+                G=ds_meta.get('G'), K=ds_meta.get('K'), val=ev)
     path = os.path.join(args.outdir, f'net_{args.tag}.pt')
     torch.save(dict(state_dict=net.state_dict(), in_dim=in_dim, hidden=list(hidden),
                     act=args.act, head=args.head, meta=meta), path)
