@@ -155,6 +155,28 @@ Catch-count variance across seeds is ~0.1–0.6 (G25 worst at 0.6) — modest, s
 defensible. NEXT: is 21° capacity-bound or representational? Test a much bigger/deeper head at
 fixed G21 (reuse data). If big head still ~21° → representational ceiling for raw-obs grid encoders.
 
+### BREAKTHROUGH: LOG-POLAR encoder beats the Cartesian plateau
+The Cartesian grid is resolution+capacity saturated: bigger head (512,256,128 / 1024,512,256,
+400-500 ep) on G21 drops patrol angle 21°→17.3° but catches stay ~7.0 (cap_512 7.03, cap_1024
+6.92). So Cartesian tops out ~7.0 catches / 17° angle. A predator-centric LOG-POLAR histogram
+(nr log-radial × nt angular bins, angular bins WRAP and align with the output direction) breaks
+it — matched recipe (hidden 256,128, reynolds force, 1280 seeds, 300 ep), variance pairs:
+
+| encoder | params-class | catches a / b | mean | dist_gap |
+|---|---|---|---|---|
+| Cartesian G21 (256,128) | ~430k | 6.95 / 7.04 | 6.99 | 1.21 |
+| Cartesian G21 (1024,512,256) | ~2M | 6.92 / — | ~7.0 | 1.31 |
+| **polar 8×48** | ~370k | 7.115 / 7.121 | **7.12** | 1.09 |
+| **polar 8×64** | ~430k | 7.227 / 7.455 | **7.34** | **0.74–1.02** |
+
+Finer angular resolution keeps helping (48→64: +0.2 catches, dist_gap 1.09→0.74). The 8×64 seed-b
+reached **7.46 = 91% of prod 8.19** at dist_gap 0.74. The earlier "info-limit" worry (count
+histograms can't see cluster tightness) was empirically WRONG: aligning bins with the output
+DIRECTION matters more — "densest angular sector = patrol heading" is a far easier readout than
+reducing a Cartesian field to a direction. NEXT: push angular (8×96, 8×128) + radial (12×64) to
+find where polar saturates, and re-measure patrol angle (measure_patrol_angle.py was missing on
+the VMs, so polar angle numbers are still pending).
+
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
 resolution (G9→G13), capacity (44k→170k), data (512→1024 seeds) and epochs (→250) moved
