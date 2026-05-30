@@ -202,7 +202,7 @@ isolate by pushing grid resolution + data further (one decisive higher-res run),
 parallel test a set/attention encoder that sees exact boid positions (the architecture that
 can in principle compute the density-weighted centroid without histogram quantization).
 
-### DENSITY-AUGMENTED GRID — partly breaks the angle ceiling, NOT the catch ceiling
+### DENSITY-AUGMENTED GRID — capacity (not density) lowers patrol angle; catch ceiling holds at ~88%
 The converged-ceiling section above predicted the wall was an INFORMATION limit: count
 histograms cannot recover production's per-boid local-density^2.37 cluster SELECTION. Test:
 add ONE extra grid channel where each boid deposits its Gaussian local-neighbour density
@@ -219,14 +219,30 @@ recipe, 1280 seeds, 300ep, variance pairs. Patrol ANGLE (reliable) and catches:
 | dens r178 | G13 | 1024,512,256 | 16.3 / 16.6° | 7.37 / 7.09 |
 | (no-density big-net G21, from polar table) | G21 | 1024,512,256 | 17.3° | ~7.0 |
 
-Density IS recoverable signal: at matched 256,128 it shaves ~0.7° (20.5→19.6°), and density
-+ capacity reaches a NEW-BEST ~16° patrol angle (both seeds agree — not noise), beating the
-prior 17.3° count-grid floor. So the "pure information limit" claim is PARTLY REFUTED — local
-density is usable and lowers patrol DIRECTION error. Radius barely matters (r80→r178 within 0.5°).
+**RETRACTED (confounded).** The "density helps" read above compared density+BIGNET vs
+no-density+SMALLNET — two variables at once. The clean capacity-matched control settles it:
 
-BUT the CATCH ceiling does NOT move: density+bignet = ~7.2 catches vs control ~6.9 vs prod 8.19
-(~88%). A 4.5° patrol-direction improvement bought only +0.3 catches — breaking the earlier
-"~5°≈2 catches" heuristic. The residual gap is therefore NOT mean patrol direction; it is
-lead/timing and/or seed-level trajectory chaos that better mean-direction can't fix. Decisive
-follow-up running: G21 + density + bignet (finer grid → lower angle). If angle drops further
-but catches stay ~7.2, the catch ceiling is timing/chaos-bound and ~88% is the e2e ceiling.
+| config | grid | net | patrol angle (a/b) | catches (a/b) |
+|---|---|---|---|---|
+| no-density | G13 | 256,128       | 20.7 / 20.2° | 7.11 / 6.73 |
+| **no-density** | G13 | **1024,512,256** | **16.4 / 16.4°** | 7.01 / 7.35 |
+| density r120 | G13 | 1024,512,256 | 16.3 / 15.5° | 7.10 / 7.34 |
+| density r178 | G13 | 1024,512,256 | 16.3 / 16.6° | 7.37 / 7.09 |
+| density r178 | G21 | 1024,512,256 | 18.1 / 18.5° | 6.83 / 6.96 |
+| density r120 | G21 | 1024,512,256 | 18.7 / 18.5° | 6.95 / 7.08 |
+
+The no-density BIGNET hits 16.4° — IDENTICAL to density+bignet (16°). So the 20.5°→16° angle
+gain was **capacity, not density**; density adds ~0.4° (noise) at matched capacity. Finer grid
+(G21) makes it WORSE (18.5°). The "density partly breaks the ceiling" claim is **withdrawn** —
+4th time a cross-variable comparison nearly misled; only the clean control caught it.
+
+Two firm conclusions:
+1. **Capacity is the only patrol-ANGLE lever** (20.5→16.4° from 44k→2M params); resolution,
+   geometry (polar), and density are all saturated. Best e2e patrol angle ≈ 16°.
+2. **Catches are NOT angle-bound in the 16–21° regime**: 16.4° gives ~7.18 catches, 20.5° gives
+   ~6.92 — a 4° angle swing buys only +0.26 catches, and they all sit at the ~7.1–7.3 plateau.
+   So the CATCH ceiling (~7.2 = 88% of prod 8.19) is **independent of patrol direction accuracy**
+   — it is lead/timing + seed-level trajectory chaos, which no raw-obs encoder recovers. This
+   matches M0 (exact per-seed impossible) and the RL result (~8.05 ceiling). **~88% is the
+   end-to-end raw-obs behavioral ceiling.** Next: stop chasing catches; find the *minimal* net
+   that reaches this plateau (Occam deliverable) — density is NOT needed (no benefit).
