@@ -155,27 +155,37 @@ Catch-count variance across seeds is ~0.1–0.6 (G25 worst at 0.6) — modest, s
 defensible. NEXT: is 21° capacity-bound or representational? Test a much bigger/deeper head at
 fixed G21 (reuse data). If big head still ~21° → representational ceiling for raw-obs grid encoders.
 
-### BREAKTHROUGH: LOG-POLAR encoder beats the Cartesian plateau
+### LOG-POLAR ≈ Cartesian — NOT a breakthrough (the 8×64 "7.46" was noise, again)
 The Cartesian grid is resolution+capacity saturated: bigger head (512,256,128 / 1024,512,256,
 400-500 ep) on G21 drops patrol angle 21°→17.3° but catches stay ~7.0 (cap_512 7.03, cap_1024
-6.92). So Cartesian tops out ~7.0 catches / 17° angle. A predator-centric LOG-POLAR histogram
-(nr log-radial × nt angular bins, angular bins WRAP and align with the output direction) breaks
-it — matched recipe (hidden 256,128, reynolds force, 1280 seeds, 300 ep), variance pairs:
+6.92). A predator-centric LOG-POLAR histogram (nr log-radial × nt angular bins, angular bins WRAP,
+aligned with output direction) was tested as the last untried geometry. Matched recipe (hidden
+256,128, reynolds force, 1280 seeds, 300 ep), VARIANCE PAIRS + reliable patrol angle:
 
-| encoder | params-class | catches a / b | mean | dist_gap |
-|---|---|---|---|---|
-| Cartesian G21 (256,128) | ~430k | 6.95 / 7.04 | 6.99 | 1.21 |
-| Cartesian G21 (1024,512,256) | ~2M | 6.92 / — | ~7.0 | 1.31 |
-| **polar 8×48** | ~370k | 7.115 / 7.121 | **7.12** | 1.09 |
-| **polar 8×64** | ~430k | 7.227 / 7.455 | **7.34** | **0.74–1.02** |
+| encoder | catches a / b | mean | patrol angle |
+|---|---|---|---|
+| Cartesian G21 (1024,512,256) | 6.92 / — | ~7.0 | 17.3° |
+| polar 8×48 | 7.115 / 7.121 | 7.12 | — |
+| polar 8×64 | 7.227 / 7.455 | 7.34* | — |
+| polar 8×128 | 7.117 / 7.059 | 7.09 | 18.1° |
+| polar 12×64 | 7.176 / 7.041 | 7.11 | 17.8° |
 
-Finer angular resolution keeps helping (48→64: +0.2 catches, dist_gap 1.09→0.74). The 8×64 seed-b
-reached **7.46 = 91% of prod 8.19** at dist_gap 0.74. The earlier "info-limit" worry (count
-histograms can't see cluster tightness) was empirically WRONG: aligning bins with the output
-DIRECTION matters more — "densest angular sector = patrol heading" is a far easier readout than
-reducing a Cartesian field to a direction. NEXT: push angular (8×96, 8×128) + radial (12×64) to
-find where polar saturates, and re-measure patrol angle (measure_patrol_angle.py was missing on
-the VMs, so polar angle numbers are still pending).
+*The 8×64 "7.34" (seed-b 7.455) was a LUCKY-SEED catch-count outlier — the tight pairs (8×48 7.12,
+8×128 7.09, 12×64 7.11) and the reliable angle (~18° ≈ Cartesian 17.3°) show polar plateaus at the
+SAME ~7.1 catches / ~18° as Cartesian. Caught the noise via variance pairs (3rd time catch-count
+nearly misled — the metric discipline keeps paying off). Finer angular (48→128) and more radial
+(12) do NOT help; polar's direction-aligned bins buy at most +0.1 catches over Cartesian.
+
+### CONVERGED CEILING for end-to-end raw-obs encoders ≈ 7.1 catches (87% of prod 8.19)
+Across EVERY architecture family — set/attention pooling (all ~36° / ≤7), Cartesian grid (resolution
+G9→G25 + capacity to 2M params, ~17-21° / 7.0), log-polar (~18° / 7.1) — the patrol regime floors
+at ~17-18° direction error → ~7.0-7.1 catches. Capacity, resolution, and geometry are all saturated,
+so this is an INFORMATION limit (the original hypothesis, now well-supported): a COUNT-based spatial
+histogram cannot recover production's per-boid local-density^2.37 SELECTION (cluster tightness — 10
+tight vs 10 spread boids give the same cell counts but production weights the tight cluster far more).
+Chase is fully solved end-to-end (>prod). So pure-raw-obs distillation tops out at ~87%. Reaching
+100% needs the one feature production selects on — per-boid local density — exposed to a grid (which
+CAN argmax-select over cells). That is the next decisive test [[density-augmented grid]].
 
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
