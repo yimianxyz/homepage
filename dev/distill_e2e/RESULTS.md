@@ -29,11 +29,19 @@ Behavioural eval = `eval_e2e.py` (E2ESim plugs net in place of the whole pipelin
 | direct dir-label training | worse (crude chase label, no lead) | 4.2 |
 | grid G9 vs G13 (+2× data) | dir-to-target 23°→21° — resolution barely helps | — |
 | **regime decomposition** (hybrid_diag.py) | **chase_e2e 7.86 (96% of prod), patrol_e2e 6.24 (76%)** → CHASE is ~solved, PATROL is the whole gap | — |
+| **scale-up** G13 grid + 170k params (256,128) + 1024 seeds + 250 ep | full **6.48**, patrol_e2e **6.77**, chase_e2e **8.49** (>prod) | 6.48 |
 
-### Current read
-The KNN chase encoding reproduces production interception almost exactly. The gap is
-PATROL: the density-weighted, reach/nbhd cluster-SELECTION centroid floors at ~22°
-direction error for an MLP on a predator-centric grid — likely because production weights
-each boid by its OWN local (boid-boid) neighborhood density, a structure a predator-centric
-histogram only approximates. Open question (in progress): is this a data/capacity limit or
-a real raw-obs ceiling? (cf. memory: prior raw-obs PPO also capped ~6.0.)
+### Current read (post scale-up)
+The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
+resolution (G9→G13), capacity (44k→170k), data (512→1024 seeds) and epochs (→250) moved
+**both** regimes up: chase_e2e 7.86→8.49 (now exceeds prod — chase is saturated/solved),
+patrol_e2e 6.24→6.77. The full e2e net is 6.48 (errors in both regimes compound). The whole
+remaining gap is still PATROL (6.77 vs prod 8.19 = 83%), but it is responding to scale —
+so we are capacity/resolution/data-bound, not at a representational ceiling.
+
+The patrol computation is a density-weighted cluster-SELECTION centroid. A predator-centric
+density histogram approximates it and finer resolution helps (G13>G9). Open: which of the
+four levers drove the +0.53 patrol gain, and where does the grid curve plateau. Next:
+isolate by pushing grid resolution + data further (one decisive higher-res run), and in
+parallel test a set/attention encoder that sees exact boid positions (the architecture that
+can in principle compute the density-weighted centroid without histogram quantization).
