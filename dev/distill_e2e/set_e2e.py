@@ -139,9 +139,13 @@ def cmd_train(a):
             f = Ftr[idx].to(dev); m = Mtr[idx].to(dev); p = Ptr[idx].to(dev); y = Ytr[idx].to(dev)
             pred = net(f, m, p)
             loss = ((pred - y) ** 2).sum(1).mean()
-            if a.dirw > 0:
-                loss = loss + a.dirw * (1 - torch.cos(torch.deg2rad(angerr(pred, y)))).mean()
-            opt.zero_grad(); loss.backward(); opt.step()
+            if a.dirw > 0:                                  # direct cosine (no arccos: stable grad)
+                pn = pred / (pred.norm(dim=1, keepdim=True) + 1e-9)
+                tn = y / (y.norm(dim=1, keepdim=True) + 1e-9)
+                loss = loss + a.dirw * (1 - (pn * tn).sum(1)).mean()
+            opt.zero_grad(); loss.backward()
+            torch.nn.utils.clip_grad_norm_(net.parameters(), 5.0)
+            opt.step()
         net.eval()
         with torch.no_grad():
             pv = net(Fva_d, Mva_d, Pva_d)
