@@ -854,7 +854,15 @@ class Sim:
         else:
             raise NotImplementedError(f"autoTargetMode={mode}")
 
-        cond = (~any_in_range) & any_alive
+        # Instrumentation hook (default off → production behavior unchanged):
+        # when always_recompute_target is set, the patrol target is recomputed
+        # from the CURRENT state every frame instead of freezing during chase.
+        # Used by the e2e-distillation feasibility test to measure whether the
+        # frozen-target history actually affects the simulated outcome.
+        if getattr(self, 'always_recompute_target', False):
+            cond = any_alive
+        else:
+            cond = (~any_in_range) & any_alive
         self.pred_auto[:, 0] = torch.where(cond, cx, self.pred_auto[:, 0])
         self.pred_auto[:, 1] = torch.where(cond, cy, self.pred_auto[:, 1])
 
