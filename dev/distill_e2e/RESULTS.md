@@ -55,8 +55,27 @@ Key structural finding: **chase and patrol want opposite encodings.**
   directly as cell counts. So the grid's "lossy" binning is actually the right structure
   for density — the set net needs ≥2 attention layers (layer 1 computes per-boid density,
   a learned attn-POOL then forms the weighted centroid) to match production's algorithm.
-Next (running): 2-block self-attn + cross-attention pool set-transformer (set_net AttnPool),
-the architecture that can represent the production patrol exactly, at ~15k params.
+2-block self-attn + cross-attention pool set-transformer (set_net AttnPool, ~15k params)
+RESULT: full 6.10 / patrol_e2e **6.15** / chase_e2e 8.60 (val ang pat/chs = 36.8/4.1). Chase
+is superb (4.1°, exceeds prod); patrol 6.15 is still WORSE than the grid (7.18). **Set/attention
+path RULED OUT for patrol.** Root cause confirmed: a softmax-attention pool *normalises* the
+per-boid neighbour count into an average — it cannot COUNT density, which is exactly the
+quantity production weights by. The histogram counts (scatter-add) but quantises.
+
+### Density-feature DeepSets path (set_obs `--density-radii`) — RUNNING
+The decisive idea: stop asking the net to *infer* per-boid local density (a pairwise count
+that attention averages away and the grid quantises) and instead **materialise it exactly as
+an input feature**. `set_obs(..., density_radii=[r1,r2,...])` appends, per boid, the exact
+#alive-neighbours within each radius (torus, O(N²) in the encoder). Given density as input, a
+plain DeepSets `phi→masked-mean→rho` suffices: the masked mean is an *un-normalised* density-
+weighted sum Σφ/N, and since N is a per-frame scalar, that sum has the **same DIRECTION** as
+production's normalised centroid Σwₚ/Σw. So the minimal phi→mean→rho net can represent patrol
+direction with NO histogram quantization and NO attention-averaging. Three VMs in parallel:
+- VM1 CONTROL: identical pipeline, NO density (feats=5) — isolates the density-feature effect.
+- VM2 densA: radii [80,178,320] (range/cluster_r/2×), deepsets d32/48/64, mean pool.
+- VM3 densB: radii [60,120,240,480] (4-scale), deepsets-mean vs deepsets-attnpool vs 1×attn.
+Decision metric: patrol_e2e and val patrol angle vs grid 7.18 / 10.8°. If density-deepsets
+beats the grid at far fewer params, it is the elegant minimal answer.
 
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
