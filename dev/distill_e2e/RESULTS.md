@@ -32,9 +32,11 @@ Behavioural eval = `eval_e2e.py` (E2ESim plugs net in place of the whole pipelin
 | **scale-up** G13 grid + 170k params (256,128) + 1024 seeds + 250 ep | full **6.48**, patrol_e2e **6.77**, chase_e2e **8.49** (>prod) | 6.48 |
 | **scale-up** G17 grid + 256k params + 1280 seeds + 300 ep | full **6.99**, patrol_e2e **7.08**, chase_e2e **8.44** | 6.99 |
 
-Grid scaling curve on patrol_e2e: G9 6.24 → G13 6.77 → G17 7.08 (gains +0.53, +0.31,
-diminishing). Full: 5.9 → 6.48 → 6.99. The grid/raw_obs MLP keeps climbing but needs an
-ever-larger net (G17 obs is 901-dim, 256k params) — accurate but NOT minimal. Parallel
+Grid scaling curve on patrol_e2e: G9 6.24 → G13 6.77 → G17 7.08 → **G21 7.18** (gains
++0.53, +0.31, +0.10 — PLATEAUING). Full: 5.9 → 6.48 → 6.99 → **7.16**. The grid/raw_obs
+MLP saturates near ~7.2 and needs a 430k-param, 1357-dim net at G21 — accurate to 88% of
+prod but NOT minimal and NOT converging to equivalence. **Grid path ruled out as the final
+answer.** Parallel
 test: a set/attention encoder (see set_*.py) that aims for the same patrol with far fewer
 params by reading exact boid positions instead of a histogram.
 
