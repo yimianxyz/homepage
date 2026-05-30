@@ -45,17 +45,45 @@ class MaskedSelfAttn(nn.Module):
         return self.proj(o)
 
 
+class AttnPool(nn.Module):
+    """Cross-attention pool: a learned query (modulated by pred_vel) attends over boids ->
+    one weighted-sum vector. This IS the density-weighted centroid mechanism: the boid
+    embeddings (post self-attention) carry local density, the softmax turns it into the
+    weighting w_i, the weighted sum of values is the centroid production computes."""
+    def __init__(self, d, heads=2):
+        super().__init__()
+        self.h, self.dk = heads, d // heads
+        self.q = nn.Linear(2, d)                     # query from pred_vel
+        self.kv = nn.Linear(d, 2 * d)
+        self.proj = nn.Linear(d, d)
+
+    def forward(self, x, mask, pvel):                # x (B,N,d)
+        B, N, d = x.shape
+        q = self.q(pvel).reshape(B, self.h, 1, self.dk)
+        kv = self.kv(x).reshape(B, N, 2, self.h, self.dk).permute(2, 0, 3, 1, 4)
+        k, v = kv[0], kv[1]                          # (B,h,N,dk)
+        att = (q @ k.transpose(-2, -1)) / (self.dk ** 0.5)       # (B,h,1,N)
+        att = att.masked_fill(mask[:, None, None, :] <= 0.5, float('-inf'))
+        att = torch.nan_to_num(torch.softmax(att, dim=-1))
+        o = (att @ v).reshape(B, d)
+        return self.proj(o)
+
+
 class SetNet(nn.Module):
-    def __init__(self, in_dim=5, d=32, rho=(64,), mode='attn', heads=2, act='relu'):
+    def __init__(self, in_dim=5, d=32, rho=(64,), mode='attn', heads=2, act='relu',
+                 nblocks=1, pool='mean'):
         super().__init__()
         self.mode = mode
+        self.pool = pool
         self.register_buffer('fmean', torch.zeros(in_dim))
         self.register_buffer('fstd', torch.ones(in_dim))
         A = {'relu': nn.ReLU, 'tanh': nn.Tanh, 'gelu': nn.GELU}[act]
         self.phi = nn.Sequential(nn.Linear(in_dim, d), A(), nn.Linear(d, d))
         if mode == 'attn':
-            self.attn = MaskedSelfAttn(d, heads)
-            self.norm = nn.LayerNorm(d)
+            self.blocks = nn.ModuleList([MaskedSelfAttn(d, heads) for _ in range(nblocks)])
+            self.norms = nn.ModuleList([nn.LayerNorm(d) for _ in range(nblocks)])
+        if pool == 'attn':
+            self.attnpool = AttnPool(d, heads)
         layers, din = [], d + 2
         for h in rho:
             layers += [nn.Linear(din, h), A()]
@@ -74,9 +102,13 @@ class SetNet(nn.Module):
         x = x * mask.unsqueeze(2)
         h = self.phi(x)
         if self.mode == 'attn':
-            h = self.norm(h + self.attn(h, mask))
+            for blk, nrm in zip(self.blocks, self.norms):
+                h = nrm(h + blk(h, mask))
         h = h * mask.unsqueeze(2)
-        pooled = h.sum(1) / mask.sum(1, keepdim=True).clamp_min(1.0)   # masked mean
+        if self.pool == 'attn':
+            pooled = self.attnpool(h, mask, pvel)
+        else:
+            pooled = h.sum(1) / mask.sum(1, keepdim=True).clamp_min(1.0)   # masked mean
         out = self.rho(torch.cat([pooled, pvel], dim=1))
         desired = clip_mag(out, PREDATOR_MAX_SPEED)
         cur = pvel * PREDATOR_MAX_SPEED

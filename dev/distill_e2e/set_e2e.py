@@ -125,7 +125,8 @@ def cmd_train(a):
     Ftr, Mtr, Ptr, Ytr, Dtr = tr['feats'].float(), tr['mask'].float(), tr['pvel'].float(), tr['force'].float(), tr['d1']
     Fva, Mva, Pva, Yva, Dva = va['feats'].float(), va['mask'].float(), va['pvel'].float(), va['force'].float(), va['d1']
     rho = tuple(int(x) for x in a.rho.split(',')) if a.rho else ()
-    net = SetNet(in_dim=FEAT_DIM, d=a.d, rho=rho, mode=a.mode, heads=a.heads, act=a.act).to(dev)
+    net = SetNet(in_dim=FEAT_DIM, d=a.d, rho=rho, mode=a.mode, heads=a.heads, act=a.act,
+                 nblocks=a.nblocks, pool=a.pool).to(dev)
     net.set_standardizer(Ftr, Mtr)                          # CPU stats -> buffers (no full set on GPU)
     opt = torch.optim.Adam(net.parameters(), lr=a.lr, weight_decay=a.wd)
     n = Ftr.shape[0]; bs = a.bs
@@ -165,7 +166,7 @@ def cmd_train(a):
             print(f"ep{ep:3d} vmse={vmse:.5f} ang(pat/chs)={pa:.1f}/{ca:.1f} params={net.n_params()}")
     path = f'setnet_{a.tag}.pt'
     torch.save(dict(state_dict=best_state, in_dim=FEAT_DIM, d=a.d, rho=rho, mode=a.mode,
-                    heads=a.heads, act=a.act, best_vmse=best,
+                    heads=a.heads, act=a.act, nblocks=a.nblocks, pool=a.pool, best_vmse=best,
                     meta=dict(epochs=a.epochs, params=net.n_params())), path)
     print(f"# wrote {path}  best_vmse={best:.5f} params={net.n_params()}")
 
@@ -173,7 +174,8 @@ def cmd_train(a):
 def load_setnet(path, dev):
     ck = torch.load(path, map_location=dev)
     net = SetNet(in_dim=ck['in_dim'], d=ck['d'], rho=ck['rho'], mode=ck['mode'],
-                 heads=ck['heads'], act=ck['act']).to(dev)
+                 heads=ck['heads'], act=ck['act'],
+                 nblocks=ck.get('nblocks', 1), pool=ck.get('pool', 'mean')).to(dev)
     net.load_state_dict(ck['state_dict']); net.eval()
     return net, ck
 
@@ -204,6 +206,7 @@ def main():
     t.add_argument('--train', required=True); t.add_argument('--val', required=True)
     t.add_argument('--mode', default='attn'); t.add_argument('--d', type=int, default=32)
     t.add_argument('--rho', default='64'); t.add_argument('--heads', type=int, default=2)
+    t.add_argument('--nblocks', type=int, default=1); t.add_argument('--pool', default='mean')
     t.add_argument('--act', default='relu'); t.add_argument('--epochs', type=int, default=250)
     t.add_argument('--bs', type=int, default=4096); t.add_argument('--lr', type=float, default=2e-3)
     t.add_argument('--wd', type=float, default=0.0); t.add_argument('--dirw', type=float, default=1.0)

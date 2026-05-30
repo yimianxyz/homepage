@@ -38,6 +38,24 @@ ever-larger net (G17 obs is 901-dim, 256k params) — accurate but NOT minimal. 
 test: a set/attention encoder (see set_*.py) that aims for the same patrol with far fewer
 params by reading exact boid positions instead of a histogram.
 
+### Set-encoder path (set_obs/set_net/set_e2e) — boid SET vs histogram
+| net | params | full | patrol_e2e | chase_e2e | val ang pat/chs |
+|---|---|---|---|---|---|
+| DeepSets (phi→mean→rho) | 3.6k | 4.27 | 5.80 | 6.57 | 45/72 |
+| 1× self-attn → mean pool | 7.9k | 5.38 | 5.65 | **8.44** | 40/**11** |
+
+Key structural finding: **chase and patrol want opposite encodings.**
+- CHASE wants the single nearest boid. Self-attention nails it (11° angle, chase_e2e 8.44
+  = matches the KNN-grid, exceeds prod). DeepSets mean-pool dilutes it (chase 6.57).
+- PATROL wants a density-weighted centroid. A *single* attention layer is WORSE than the
+  histogram (40° vs grid ~21°): per-boid local density is a PAIRWISE quantity, and one
+  attn layer (per-boid keys) can't encode it, whereas a GxG histogram materializes density
+  directly as cell counts. So the grid's "lossy" binning is actually the right structure
+  for density — the set net needs ≥2 attention layers (layer 1 computes per-boid density,
+  a learned attn-POOL then forms the weighted centroid) to match production's algorithm.
+Next (running): 2-block self-attn + cross-attention pool set-transformer (set_net AttnPool),
+the architecture that can represent the production patrol exactly, at ~15k params.
+
 ### Current read (post scale-up)
 The "~6.0 raw-obs ceiling" from prior PPO is **NOT** a hard wall. Jointly raising grid
 resolution (G9→G13), capacity (44k→170k), data (512→1024 seeds) and epochs (→250) moved
