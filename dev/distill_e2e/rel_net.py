@@ -79,7 +79,7 @@ class RadialPool(nn.Module):
         super().__init__()
         self.K = K
         self.logR = nn.Parameter(torch.log(torch.linspace(80, 360, K)))   # learnable radii
-        self.logt = nn.Parameter(torch.full((K,), 2.0))                   # gate sharpness (t~7.4: ~20px boundary, near-integer counts)
+        self.logt = nn.Parameter(torch.zeros(K))                          # gate sharpness (learnable)
         # per-boid score from [soft_counts(K), own feats(in_feat), nbhd_off(2), nbhd_vel(2)]
         self.score = mlp([K + in_feat + 4, score_hidden, score_hidden, 1], act)
         self.log_tau = nn.Parameter(torch.tensor(-2.0))                   # sharp selection temp
@@ -168,9 +168,11 @@ class CountEncoder(nn.Module):
         self.K = K
         self.nbhd = nbhd
         self.logR = nn.Parameter(torch.log(torch.linspace(60, 420, K)))
-        self.logt = nn.Parameter(torch.full((K,), 2.0))                    # sharp gates -> near-integer counts
+        self.logt = nn.Parameter(torch.full((K,), 1.0))                    # mild gate sharpness (t~2.7)
         in_feat = 2 * K + (4 if nbhd else 0)
         self.emb = mlp([in_feat, hidden, d], act)
+        self.ln = nn.LayerNorm(d)
+        self.alpha = nn.Parameter(torch.zeros(1))   # ReZero gate: start as plain transformer, grow count use
 
     def forward(self, pos, mask, vel=None):
         d2 = ((pos[:, :, None, :] - pos[:, None, :, :]) ** 2).sum(-1)       # (B,N,N)
@@ -185,7 +187,7 @@ class CountEncoder(nn.Module):
             nbpos = (g0[..., None] * pos[:, None, :, :]).sum(2) / gsum      # (B,N,2) centroid
             nbvel = (g0[..., None] * vel[:, None, :, :]).sum(2) / gsum
             feats += [(nbpos - pos) / HALF, nbvel / BOID_MAX]
-        return self.emb(torch.cat(feats, -1)), d2
+        return self.alpha * self.ln(self.emb(torch.cat(feats, -1))), d2
 
 
 class SpatialBias(nn.Module):
