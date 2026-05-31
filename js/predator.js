@@ -112,32 +112,43 @@ function Predator(x, y, simulation) {
 
 Predator.prototype = {
 
-    // Autonomous movement. The steering policy is the trained neural
-    // network in window.__predatorModel; only patrol-target bookkeeping
-    // remains in plain JS. The simulation is gated on the weights being
-    // loaded, so window.__predatorModel is always present here.
-    //
-    // Patrol target = the evolved heuristic (see computeEvolvedTarget above):
-    // attractiveness-weighted centroid of the densest *reachable* cluster, led
-    // forward by the predator's travel time. Replaces the previous
-    // nearest_cluster patrol; ~+0.52 catches/eval (8.38 vs 7.86, GPU sim, 2048
-    // fresh seeds). The CHASE itself is still the trained NN below.
+    // Autonomous movement, split by regime exactly as the production teacher
+    // (dev/sim_torch.py) defines it:
+    //   CHASE  (a boid within POLICY_R): analytic seek toward the nearest boid
+    //          — fast-set the offset to MAX_SPEED, subtract velocity, fast-limit
+    //          to MAX_FORCE. This is closed-form and exact (cos 1.0).
+    //   PATROL (no boid in range): the 10,352-param radial net in
+    //          window.__predatorModel, straight from the raw boid set. It does
+    //          internally what the old computeEvolvedTarget (density-weighted
+    //          cluster select) + 35-feat seek-net did in two stages — patrol
+    //          cos_med 0.9878, matching the 129k-param transformer ceiling.
+    // The simulation is gated on the weights being loaded (see boids.js), so
+    // window.__predatorModel is always present here.
     getAutonomousForce: function(boids) {
-        var R = POLICY_R;
-        var anyInRange = false;
-        for (var i = 0; i < boids.length; i++) {
-            if (this.position.getDistance(boids[i].position) < R) {
-                anyInRange = true;
-                break;
-            }
-        }
-        if (!anyInRange && boids.length > 0) {
-            var t = computeEvolvedTarget(this.position, boids, EVOLVED_PATROL, this.autonomousTarget);
-            if (t) { this.autonomousTarget.x = t.x; this.autonomousTarget.y = t.y; }
+        var model = window.__predatorModel;
+        var n = boids.length;
+        if (n === 0) return new Vector(0, 0);
+
+        var px = this.position.x, py = this.position.y;
+        var bestD2 = Infinity, nx = 0, ny = 0;
+        for (var i = 0; i < n; i++) {
+            var dx = boids[i].position.x - px, dy = boids[i].position.y - py;
+            var d2 = dx * dx + dy * dy;
+            if (d2 < bestD2) { bestD2 = d2; nx = dx; ny = dy; }
         }
 
-        var features = buildPredatorFeatures(this.position, this.velocity, boids, this.autonomousTarget);
-        var out = window.__predatorModel.forward(features);
+        if (bestD2 < model.POLICY_R * model.POLICY_R) {
+            // CHASE: analytic seek-nearest (matches teacher fast_set_magnitude +
+            // fast_limit exactly).
+            var desired = new Vector(nx, ny);
+            desired.iFastSetMagnitude(PREDATOR_MAX_SPEED);
+            var steer = desired.subtract(this.velocity);
+            steer.iFastLimit(PREDATOR_MAX_FORCE);
+            return steer;
+        }
+
+        // PATROL: radial set-net maps raw boids -> steering force directly.
+        var out = model.forward(this.position, this.velocity, boids);
         return new Vector(out[0], out[1]);
     },
 
@@ -257,12 +268,12 @@ Predator.prototype = {
 // Guarded so the file can also be require()'d in node (parity tests) where
 // there is no window/fetch.
 if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-    window.__predatorReady = fetch('js/predator_weights.json', { cache: 'no-cache' })
+    window.__predatorReady = fetch('js/predator_radial_weights.json', { cache: 'no-cache' })
         .then(function (r) {
             if (!r.ok) throw new Error('predator weights fetch failed: ' + r.status);
             return r.json();
         })
         .then(function (json) {
-            window.__predatorModel = PredatorNN.loadModel(json);
+            window.__predatorModel = PredatorRadial.loadModel(json);
         });
 }
