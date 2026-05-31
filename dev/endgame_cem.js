@@ -207,6 +207,7 @@ if (!isMainThread && workerData && workerData.mode === 'baseline') {
         if (m[a]) A[m[a]] = +process.argv[++i];
         else if (a === '--out') A.out = process.argv[++i];
         else if (a === '--baseline') A.baseline = true;
+        else if (a === '--verify') A.verify = process.argv[++i];
     }
     const H = A.H, D = thetaLen(H);
     const battery = makeBattery(A.seeds, A.seedBase);
@@ -223,6 +224,35 @@ if (!isMainThread && workerData && workerData.mode === 'baseline') {
             const sum = all.reduce((a, b) => a + b.sum, 0), caught = all.reduce((a, b) => a + b.caught, 0), n = all.reduce((a, b) => a + b.n, 0);
             console.log(`[baseline radial] battery=${n} meanScore=${(sum / n).toFixed(1)} caught=${caught}/${n} (maxFrames=${A.maxFrames})`);
         }).catch(e => { console.error(e); process.exit(1); });
+        return;
+    }
+
+    if (A.verify) {
+        // JS-verify a CEM champion on FRESH seeds vs the radial baseline, per regime.
+        const ck = JSON.parse(fs.readFileSync(A.verify, 'utf8'));
+        const Hv = ck.H, theta = Float64Array.from(ck.bestTheta);
+        const mlp = makeMlp(theta, Hv);
+        const simCache = {};
+        const cells = {}; // key startN|pump -> {mTte,mCt,rTte,rCt,n}
+        for (const e of battery) {
+            const key = e.W + 'x' + e.H;
+            if (!simCache[key]) simCache[key] = loadSim(e.W, e.H);
+            const S = simCache[key];
+            const mt = runEpisode(S, mlp, e.W, e.H, e.seed, e.startN, e.pump, A.maxFrames, A.refreshMs);
+            const rt = runEpisodeRadial(S, e.W, e.H, e.seed, e.startN, e.pump, A.maxFrames, A.refreshMs);
+            const ck2 = e.startN + '|' + e.pump;
+            const c = cells[ck2] || (cells[ck2] = { mTte: 0, mCt: 0, rTte: 0, rCt: 0, n: 0 });
+            c.mTte += mt; c.mCt += (mt < A.maxFrames ? 1 : 0); c.rTte += rt; c.rCt += (rt < A.maxFrames ? 1 : 0); c.n++;
+        }
+        console.log(`[verify] ${A.verify}  H=${Hv} seeds=${A.seeds} seedBase=${A.seedBase} maxFrames=${A.maxFrames}`);
+        console.log(`  startN pump |  champ TTE  catch |  radial TTE  catch`);
+        let mAll = 0, rAll = 0, nAll = 0, mC = 0, rC = 0;
+        for (const k of Object.keys(cells).sort()) {
+            const c = cells[k], [sN, pm] = k.split('|');
+            console.log(`     N=${sN}  s=${pm} |  ${(c.mTte / c.n).toFixed(0).padStart(8)}  ${c.mCt}/${c.n} |  ${(c.rTte / c.n).toFixed(0).padStart(9)}  ${c.rCt}/${c.n}`);
+            mAll += c.mTte; rAll += c.rTte; nAll += c.n; mC += c.mCt; rC += c.rCt;
+        }
+        console.log(`  -------- OVERALL champ meanTTE=${(mAll / nAll).toFixed(0)} catch=${mC}/${nAll} | radial meanTTE=${(rAll / nAll).toFixed(0)} catch=${rC}/${nAll}`);
         return;
     }
     console.log(`[cem] D=${D} H=${H} pop=${A.pop} iters=${A.iters} battery=${battery.length} maxFrames=${A.maxFrames} island=${A.islandSeed}`);
