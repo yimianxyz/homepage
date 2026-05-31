@@ -75,11 +75,11 @@ class RadialPool(nn.Module):
     """E3D-structured, learnable. Soft counts at K learnable radii + gated neighbourhood
     centroid/velocity; per-boid MLP score -> sharp softmax selection -> weighted pool of
     [pos, vel, nbhd_pos, nbhd_vel]."""
-    def __init__(self, in_feat, K=4, score_hidden=32, act='relu'):
+    def __init__(self, in_feat, K=4, score_hidden=32, act='relu', logt_init=0.0):
         super().__init__()
         self.K = K
         self.logR = nn.Parameter(torch.log(torch.linspace(80, 360, K)))   # learnable radii
-        self.logt = nn.Parameter(torch.zeros(K))                          # gate sharpness (learnable)
+        self.logt = nn.Parameter(torch.full((K,), float(logt_init)))      # gate sharpness (learnable)
         # per-boid score from [soft_counts(K), own feats(in_feat), nbhd_off(2), nbhd_vel(2)]
         self.score = mlp([K + in_feat + 4, score_hidden, score_hidden, 1], act)
         self.log_tau = nn.Parameter(torch.tensor(-2.0))                   # sharp selection temp
@@ -163,12 +163,12 @@ class CountEncoder(nn.Module):
     With nbhd=True it additionally carries the SOFT-NEIGHBOURHOOD centroid offset and mean
     velocity (the E3D two-hop nbhd term) into the residual — so each token gets explicit
     'where/how-fast is my cluster' geometry, not just its scalar degree."""
-    def __init__(self, d, K=6, hidden=64, act='relu', nbhd=False):
+    def __init__(self, d, K=6, hidden=64, act='relu', nbhd=False, logt_init=1.0):
         super().__init__()
         self.K = K
         self.nbhd = nbhd
         self.logR = nn.Parameter(torch.log(torch.linspace(60, 420, K)))
-        self.logt = nn.Parameter(torch.full((K,), 1.0))                    # mild gate sharpness (t~2.7)
+        self.logt = nn.Parameter(torch.full((K,), float(logt_init)))      # gate sharpness (ReZero-protected)
         in_feat = 2 * K + (4 if nbhd else 0)
         self.emb = mlp([in_feat, hidden, d], act)
         self.ln = nn.LayerNorm(d)
@@ -256,7 +256,8 @@ class PMA(nn.Module):
 class RelNet(nn.Module):
     def __init__(self, in_dim=5, d=64, rho=(128, 64), mode='edge', heads=4,
                  nblocks=2, edge_hidden=64, K=4, act='relu', use_dens=False,
-                 ffn_mult=4, n_seeds=2, nrbf=16, reinject=True, count_nbhd=False):
+                 ffn_mult=4, n_seeds=2, nrbf=16, reinject=True, count_nbhd=False,
+                 logt_init=1.0):
         super().__init__()
         self.mode = mode
         self.use_dens = use_dens          # if False, slice feats to first 5 (raw set only)
@@ -266,17 +267,23 @@ class RelNet(nn.Module):
         self.register_buffer('fmean', torch.zeros(in_dim))
         self.register_buffer('fstd', torch.ones(in_dim))
         self.phi = mlp([in_dim, d, d], act)
-        if mode == 'countformer':
-            self.count_enc = CountEncoder(d, K=K, hidden=edge_hidden, act=act, nbhd=count_nbhd)
+        if mode in ('countformer', 'cfrad'):
+            self.count_enc = CountEncoder(d, K=K, hidden=edge_hidden, act=act,
+                                          nbhd=count_nbhd, logt_init=logt_init)
             self.spatial = SpatialBias(heads, nrbf=nrbf)
             self.blocks = nn.ModuleList([TBlock(d, heads, ffn_mult, act) for _ in range(nblocks)])
-            self.pma = PMA(d, heads, n_seeds=n_seeds)
-            pooled_dim = n_seeds * d
+            if mode == 'cfrad':
+                # E3D-style sharp selection head over transformer-encoded tokens
+                self.radhead = RadialPool(d, K=K, score_hidden=edge_hidden, act=act, logt_init=logt_init)
+                pooled_dim = 8
+            else:
+                self.pma = PMA(d, heads, n_seeds=n_seeds)
+                pooled_dim = n_seeds * d
         elif mode == 'edge':
             self.blocks = nn.ModuleList([EdgeBlock(d, edge_hidden, act) for _ in range(nblocks)])
             pooled_dim = d
         elif mode == 'radial':
-            self.radial = RadialPool(in_dim, K=K, score_hidden=edge_hidden, act=act)
+            self.radial = RadialPool(in_dim, K=K, score_hidden=edge_hidden, act=act, logt_init=logt_init)
             pooled_dim = 8
         elif mode == 'attn_denom':
             self.blocks = nn.ModuleList([AttnDenom(d, heads) for _ in range(nblocks)])
@@ -300,7 +307,7 @@ class RelNet(nn.Module):
         vel = feats[:, :, 2:4] * BOID_MAX + pvel[:, None, :] * PREDATOR_MAX_SPEED  # abs-ish vel
         xn = (feats - self.fmean) / self.fstd
         xn = xn * mask.unsqueeze(2)
-        if self.mode == 'countformer':
+        if self.mode in ('countformer', 'cfrad'):
             h = self.phi(xn)
             count_emb, d2 = self.count_enc(pos, mask, vel)  # degree/count (+nbhd) residual
             bias = self.spatial(d2)                        # spatial attention bias
@@ -310,7 +317,7 @@ class RelNet(nn.Module):
                 if self.reinject:
                     h = h + count_emb
                 h = h * mask.unsqueeze(2)
-            pooled = self.pma(h, mask)
+            pooled = self.radhead(h, pos, vel, mask) if self.mode == 'cfrad' else self.pma(h, mask)
         elif self.mode == 'radial':
             pooled = self.radial(xn, pos, vel, mask)
         else:

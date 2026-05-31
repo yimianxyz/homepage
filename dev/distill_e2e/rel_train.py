@@ -41,10 +41,14 @@ def main():
     ap.add_argument('--ffn_mult', type=int, default=4); ap.add_argument('--n_seeds', type=int, default=2)
     ap.add_argument('--nrbf', type=int, default=16); ap.add_argument('--no_reinject', action='store_true')
     ap.add_argument('--count_nbhd', action='store_true', help='count residual also carries nbhd centroid/vel')
+    ap.add_argument('--logt_init', type=float, default=1.0, help='count-gate sharpness init (ReZero-protected)')
     ap.add_argument('--act', default='relu'); ap.add_argument('--use_dens', action='store_true')
     ap.add_argument('--in_dim', type=int, default=5)
     ap.add_argument('--epochs', type=int, default=300); ap.add_argument('--bs', type=int, default=1024)
     ap.add_argument('--lr', type=float, default=2e-3); ap.add_argument('--wd', type=float, default=0.0)
+    ap.add_argument('--warmup', type=int, default=3, help='linear LR warmup epochs')
+    ap.add_argument('--sched', default='cosine', help='cosine | none')
+    ap.add_argument('--focal', action='store_true', help='weight cosine loss by (1-cos) to push hard cases')
     ap.add_argument('--patrolall', action='store_true', help='train on all frames (default patrol-only)')
     ap.add_argument('--tag', default='rel'); ap.add_argument('--device', default='cuda')
     a = ap.parse_args()
@@ -60,9 +64,18 @@ def main():
     net = RelNet(in_dim=a.in_dim, d=a.d, rho=rho, mode=a.mode, heads=a.heads,
                  nblocks=a.nblocks, edge_hidden=a.edge_hidden, K=a.K, act=a.act,
                  use_dens=a.use_dens, ffn_mult=a.ffn_mult, n_seeds=a.n_seeds,
-                 nrbf=a.nrbf, reinject=not a.no_reinject, count_nbhd=a.count_nbhd).to(dev)
+                 nrbf=a.nrbf, reinject=not a.no_reinject, count_nbhd=a.count_nbhd,
+                 logt_init=a.logt_init).to(dev)
     net.set_standardizer(Ft, Mt)
     opt = torch.optim.Adam(net.parameters(), lr=a.lr, weight_decay=a.wd)
+    import math
+    def lr_at(ep):
+        if ep < a.warmup:
+            return a.lr * (ep + 1) / max(1, a.warmup)
+        if a.sched == 'cosine':
+            p = (ep - a.warmup) / max(1, a.epochs - a.warmup)
+            return a.lr * 0.5 * (1 + math.cos(math.pi * min(1.0, p)))
+        return a.lr
     print(f"# mode={a.mode} d={a.d} nblocks={a.nblocks} params={net.n_params()} "
           f"in_dim={a.in_dim} train={tuple(Ft.shape)} dev={dev}", flush=True)
 
@@ -76,6 +89,8 @@ def main():
 
     n = Ft.shape[0]; best = -1; t0 = time.time()
     for ep in range(a.epochs):
+        for g in opt.param_groups:
+            g['lr'] = lr_at(ep)
         net.train(); perm = torch.randperm(n)
         for s in range(0, n, a.bs):
             idx = perm[s:s+a.bs]
@@ -83,7 +98,8 @@ def main():
             y = Yt[idx].to(dev)
             pn = pred / (pred.norm(dim=1, keepdim=True) + 1e-9)
             tn = y / (y.norm(dim=1, keepdim=True) + 1e-9)
-            loss = (1 - (pn * tn).sum(1)).mean()
+            d = 1 - (pn * tn).sum(1)
+            loss = (d * d).mean() if a.focal else d.mean()
             opt.zero_grad(); loss.backward()
             torch.nn.utils.clip_grad_norm_(net.parameters(), 5.0)
             opt.step()
