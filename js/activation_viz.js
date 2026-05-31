@@ -204,17 +204,19 @@
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
 
-        // "predator's brain" header — drawn INSIDE the widget at top-right,
-        // in the empty space above the 2-dot output column (whose color
-        // matches the predator triangle on canvas). Possessive matches the
-        // page's existing voice ("my master's degree from Cornell") and
-        // removes the "predator-or-brain" parsing ambiguity. Static
-        // metadata → dim alpha. Always visible because the empty top-right
-        // corner is structural: the short hidden/output columns are
-        // vertically centered at every viewport size, so there's always
-        // ~10px+ of clearance up there.
+        // "predator's brain" header — drawn just ABOVE the widget, right-
+        // aligned to its right edge, mirroring the "N left · M eaten" caption
+        // below it. It used to sit INSIDE the widget at top-right, but the
+        // input column's top dots and the edges fanning toward the output
+        // overlapped the text (the top-right corner only looks empty above the
+        // 2-dot output column — the wider label reaches back into the dense
+        // middle). Above the widget is clear canvas at every viewport: y0 is
+        // >= marginY (>=14px), so y0-12 keeps the text on-screen, and the top
+        // network dots start at >= y0, below the label's baseline. Possessive
+        // matches the page's voice ("my master's degree from Cornell"). Static
+        // metadata → dim alpha.
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText("predator's brain", x0 + W, y0 + 2);
+        ctx.fillText("predator's brain", x0 + W, y0 - 12);
 
         // Live numbers caption below the widget. Always shown except on
         // landscape phones (where the widget anchors to the top of the
