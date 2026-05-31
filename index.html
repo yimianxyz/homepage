@@ -91,5 +91,17 @@
             <p>Find me on <a href="mailto:i@yimian.xyz">Email</a> | <a href="https://github.com/yimianxyz" target="_blank" rel="noopener noreferrer">GitHub</a> | <a href="https://www.linkedin.com/in/yimianxyz" target="_blank" rel="noopener noreferrer">LinkedIn</a></p>
         </div>
     </main>
+
+    <!-- Opened from the "?" badge next to the neural-net viz (see boids.js). -->
+    <div id="viz-info-backdrop" hidden></div>
+    <aside id="viz-info-card" class="viz-info-card" role="dialog" aria-modal="true" aria-label="About this simulation" hidden>
+        <button type="button" class="viz-info-close" aria-label="Close">&times;</button>
+        <h2>what you're looking at</h2>
+        <ul>
+            <li><b>boids</b> &mdash; each dot steers by three local rules: separation, alignment, cohesion. no leader, yet a flock emerges.</li>
+            <li><b>predator</b> &mdash; the triangle hunts the nearest dot. its turns come from the small neural net above &mdash; its brain.</li>
+            <li><b>you</b> &mdash; click or tap anywhere to hatch a new boid.</li>
+        </ul>
+    </aside>
 </body>
 </html> 

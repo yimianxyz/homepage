@@ -201,27 +201,50 @@
 
         // --- Labels ------------------------------------------------------
         ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
-        ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
 
-        // "predator's brain" header — drawn just ABOVE the widget, centered on
-        // the graph's horizontal axis (x0 + W/2). The graph's columns span x0
-        // (inputs) to x0+W (output), so its visual center is the box midpoint;
-        // a title centered over its figure (with the live caption centered
-        // below it) is the standard, balanced layout. The label used to sit
-        // INSIDE the widget flush-right, tuned for the old narrower net; the
-        // wider net's top dots and fan-out edges then overlapped it and the
-        // flush-right anchor looked off-center. Above the widget is clear
-        // canvas at every viewport: y0 >= marginY (>=14px), so y0-12 keeps the
-        // text on-screen and the top dots (>= y0) sit below the baseline.
-        // Possessive matches the page's voice ("my master's degree from
-        // Cornell"). Static metadata → dim alpha.
+        // Header "predator's brain" plus a small "?" info badge to its right,
+        // the pair centered above the widget on the graph's axis (x0 + W/2).
+        // The columns span x0 (inputs) to x0+W (output), so the box midpoint
+        // is the graph's visual center; a title centered over its figure (with
+        // the live caption centered below) is the standard, balanced layout.
+        // Above the widget is clear canvas at every viewport (y0 >= marginY >=
+        // 10px, top dots start at >= y0). Possessive matches the page's voice
+        // ("my master's degree from Cornell"). Tapping the badge opens a DOM
+        // panel (wired in boids.js / index.html) that explains the boid +
+        // predator rules and the tap-to-hatch interaction; its hit-region is
+        // published on window.__vizInfo in canvas units, which equal CSS px
+        // here (canvas_init.js sizes the canvas to the visual viewport), so a
+        // pointer's clientX/clientY compares against it directly.
+        var title = "predator's brain";
+        ctx.textAlign = 'left';
+        var titleW = ctx.measureText(title).width;
+        var iconR = 6, iconGap = 6;
+        var groupLeft = x0 + W / 2 - (titleW + iconGap + iconR * 2) / 2;
+        var headerY = y0 - 12;
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText("predator's brain", x0 + W / 2, y0 - 12);
+        ctx.fillText(title, groupLeft, headerY);
+
+        // "?" badge — slightly more present than the title (it's interactive),
+        // brighter still on hover (window.__vizInfoHover, set on mousemove).
+        var iconX = groupLeft + titleW + iconGap + iconR;
+        var iconY = headerY + 4.5;
+        var hovered = !!window.__vizInfoHover;
+        ctx.strokeStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.55 : 0.30) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(iconX, iconY, iconR, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.72 : 0.46) + ')';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('?', iconX, iconY + 0.5);
+        window.__vizInfo = { cx: iconX, cy: iconY, r: 14 };
 
         // Live numbers caption below the widget, centered on the same axis as
         // the header. Always shown except on landscape phones (where the
         // widget anchors to the top of the viewport, no room below it).
+        ctx.textBaseline = 'top';
         if (!landscapePhone) {
             var alive = sim.boids ? sim.boids.length : 0;
             var eaten = sim.boidsEaten || 0;

@@ -314,6 +314,88 @@ a.inline-link:focus-visible {
     }
 }
 
+/* Simulation info card — opened from the "?" badge drawn by the NN viz.
+   A small centered modal: identical on every device, never colliding with
+   the (responsive) canvas widget, and readable at any width. Palette + font
+   match the page's gray-ladder voice. */
+#viz-info-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(20, 20, 20, 0.06);
+}
+#viz-info-backdrop[hidden] { display: none; }
+
+.viz-info-card {
+    position: fixed;
+    z-index: 60;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(340px, calc(100vw - 2.5rem));
+    background: #fff;
+    border: 1px solid rgba(85, 85, 85, 0.18);
+    border-radius: 10px;
+    box-shadow: 0 8px 30px rgba(20, 20, 20, 0.12);
+    padding: 1.1rem 1.25rem 1.2rem;
+    color: #666;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    letter-spacing: .2px;
+    /* This panel IS readable content — let users select it. */
+    -webkit-user-select: text;
+    user-select: text;
+}
+.viz-info-card[hidden] { display: none; }
+
+.viz-info-card h2 {
+    margin: 0 0 0.7rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.viz-info-card ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.viz-info-card li { margin: 0 0 0.55rem; }
+.viz-info-card li:last-child { margin-bottom: 0; }
+.viz-info-card b { font-weight: 600; color: #555; }
+
+.viz-info-close {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.5rem;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: rgba(85, 85, 85, 0.5);
+    font-family: inherit;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+}
+.viz-info-close:hover { color: #555; }
+.viz-info-close:focus-visible {
+    outline: 2px solid rgba(85, 85, 85, 0.35);
+    outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .viz-info-card:not([hidden]) { animation: viz-info-in 0.16s ease-out; }
+}
+@keyframes viz-info-in {
+    from { opacity: 0; transform: translate(-50%, -48%) scale(0.985); }
+    to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
     html {
