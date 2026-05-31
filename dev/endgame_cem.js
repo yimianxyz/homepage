@@ -93,6 +93,34 @@ function loadSim(W, H) {
     return S;
 }
 
+const CSCALE = PMF; // correction scale: net~O(1) -> full-cap force nudge
+
+// Install the endgame policy as a RESIDUAL on the deployed radial/chase force:
+//   f = limit( f_radial + 0.05*net(state), 0.05 )
+// zero weights => f == f_radial (exact radial, can't regress); large weights can
+// fully override the direction (escape the pumping basin). The net only learns the
+// anti-pump correction on top of an already-strong policy.
+function installResidual(sim, S, mlp) {
+    const orig = sim.predator.getAutonomousForce.bind(sim.predator);
+    const inp = new Float64Array(NIN);
+    sim.predator.getAutonomousForce = function (boids) {
+        if (boids.length === 0) return new S.Vector(0, 0);
+        const f0 = orig(boids);
+        const p = sim.predator;
+        const n = nearestRaw(p.position.x, p.position.y, boids);
+        const b = boids[n.idx];
+        inp[0] = n.dx / PSCALE; inp[1] = n.dy / PSCALE;
+        inp[2] = b.velocity.x / VSCALE; inp[3] = b.velocity.y / VSCALE;
+        inp[4] = p.velocity.x / VSCALE; inp[5] = p.velocity.y / VSCALE;
+        const net = mlp(inp);
+        // apply correction with the sim's OWN Vector math => bit-identical to how the
+        // deployed predator would compute it (zero net => exactly f0 => radial).
+        f0.iAdd(new S.Vector(CSCALE * net[0], CSCALE * net[1]));
+        f0.iFastLimit(PMF);
+        return f0;
+    };
+}
+
 // run one endgame episode with an MLP override; return TTE (frames) or maxFrames
 function runEpisode(S, mlp, W, H, seed, startN, pumpSpeed, maxFrames, refreshMs) {
     S.setSimSeed(seed, refreshMs);
@@ -108,22 +136,7 @@ function runEpisode(S, mlp, W, H, seed, startN, pumpSpeed, maxFrames, refreshMs)
             b.velocity.y = Math.sin(ang) * pumpSpeed;
         }
     }
-    const inp = new Float64Array(NIN);
-    sim.predator.getAutonomousForce = function (boids) {
-        if (boids.length === 0) return new S.Vector(0, 0);
-        const p = sim.predator;
-        const n = nearestRaw(p.position.x, p.position.y, boids);
-        const b = boids[n.idx];
-        inp[0] = n.dx / PSCALE; inp[1] = n.dy / PSCALE;
-        inp[2] = b.velocity.x / VSCALE; inp[3] = b.velocity.y / VSCALE;
-        inp[4] = p.velocity.x / VSCALE; inp[5] = p.velocity.y / VSCALE;
-        const net = mlp(inp);
-        // residual on pure pursuit: zero net => exact pursuit (28/32 lone-boid)
-        const base = setMag(n.dx, n.dy, 1);
-        const [dx, dy] = setMag(base[0] + net[0], base[1] + net[1], PMS);
-        const [fx, fy] = limit(dx - p.velocity.x, dy - p.velocity.y, PMF);
-        return new S.Vector(fx, fy);
-    };
+    installResidual(sim, S, mlp);
     for (let f = 0; f < maxFrames; f++) {
         S.simTick(); sim.render();
         if (sim.boids.length === 0) return f + 1;
@@ -145,7 +158,8 @@ function runFullGame(S, mlp, K, W, H, seed, startN, maxFrames, refreshMs) {
         const inp = new Float64Array(NIN);
         sim.predator.getAutonomousForce = function (boids) {
             if (boids.length === 0) return new S.Vector(0, 0);
-            if (boids.length > K) return orig(boids);
+            const f0 = orig(boids);
+            if (boids.length > K) return f0; // early game: pure radial
             const p = sim.predator;
             const n = nearestRaw(p.position.x, p.position.y, boids);
             const b = boids[n.idx];
@@ -153,10 +167,9 @@ function runFullGame(S, mlp, K, W, H, seed, startN, maxFrames, refreshMs) {
             inp[2] = b.velocity.x / VSCALE; inp[3] = b.velocity.y / VSCALE;
             inp[4] = p.velocity.x / VSCALE; inp[5] = p.velocity.y / VSCALE;
             const net = mlp(inp);
-            const base = setMag(n.dx, n.dy, 1);
-            const [dx, dy] = setMag(base[0] + net[0], base[1] + net[1], PMS);
-            const [fx, fy] = limit(dx - p.velocity.x, dy - p.velocity.y, PMF);
-            return new S.Vector(fx, fy);
+            f0.iAdd(new S.Vector(CSCALE * net[0], CSCALE * net[1]));
+            f0.iFastLimit(PMF);
+            return f0;
         };
     }
     for (let f = 0; f < maxFrames; f++) {
@@ -169,7 +182,7 @@ function runFullGame(S, mlp, K, W, H, seed, startN, maxFrames, refreshMs) {
 // battery of episodes (common random numbers): returns array of {seed,startN,pump,W,H}
 function makeBattery(seeds, seedBase) {
     const sizes = [[1440, 900], [1920, 1080]];
-    const startNs = [1, 2, 3];
+    const startNs = [1, 1, 2, 3]; // N=1 double-weighted (user's stated "last boid" case)
     const pumps = [0, 4];
     const battery = [];
     for (const [W, H] of sizes)
