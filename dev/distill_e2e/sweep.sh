@@ -3,7 +3,7 @@
 # Runs a slice of the config grid sequentially, appends best patrol cos to sweep_results.tsv.
 # Designed to run under nohup on a VM so it survives IAP flakiness; poll the tsv to read progress.
 cd ~/js_eval/e2e || exit 1
-TR=setds_densAnt_train.pt; VA=setds_densAnt_val.pt
+TR=${TR:-setds_densAnt_train.pt}; VA=${VA:-setds_densAnt_val.pt}
 EP=${EP:-90}
 run(){ local name="$1"; shift
   echo "[$(date -u +%H:%M:%S)] START $name :: $*" >> sweep.log
