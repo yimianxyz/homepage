@@ -79,7 +79,7 @@ class RadialPool(nn.Module):
         super().__init__()
         self.K = K
         self.logR = nn.Parameter(torch.log(torch.linspace(80, 360, K)))   # learnable radii
-        self.logt = nn.Parameter(torch.zeros(K))                          # gate sharpness
+        self.logt = nn.Parameter(torch.full((K,), 2.0))                   # gate sharpness (t~7.4: ~20px boundary, near-integer counts)
         # per-boid score from [soft_counts(K), own feats(in_feat), nbhd_off(2), nbhd_vel(2)]
         self.score = mlp([K + in_feat + 4, score_hidden, score_hidden, 1], act)
         self.log_tau = nn.Parameter(torch.tensor(-2.0))                   # sharp selection temp
@@ -168,7 +168,7 @@ class CountEncoder(nn.Module):
         self.K = K
         self.nbhd = nbhd
         self.logR = nn.Parameter(torch.log(torch.linspace(60, 420, K)))
-        self.logt = nn.Parameter(torch.zeros(K))
+        self.logt = nn.Parameter(torch.full((K,), 2.0))                    # sharp gates -> near-integer counts
         in_feat = 2 * K + (4 if nbhd else 0)
         self.emb = mlp([in_feat, hidden, d], act)
 
