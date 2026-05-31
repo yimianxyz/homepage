@@ -131,6 +131,41 @@ function runEpisode(S, mlp, W, H, seed, startN, pumpSpeed, maxFrames, refreshMs)
     return maxFrames;
 }
 
+// full closed-loop game (startN boids) to extinction. If mlp given, gate it in
+// when boids.length <= K (endgame); otherwise the deployed radial+chase drives.
+function runFullGame(S, mlp, K, W, H, seed, startN, maxFrames, refreshMs) {
+    S.setSimSeed(seed, refreshMs);
+    S.NUM_BOIDS = startN;
+    const sim = new S.Simulation('boids1');
+    sim.canvasWidth = W; sim.canvasHeight = H;
+    sim.initialize(false);
+    S.setFrameMs(refreshMs);
+    if (mlp) {
+        const orig = sim.predator.getAutonomousForce.bind(sim.predator);
+        const inp = new Float64Array(NIN);
+        sim.predator.getAutonomousForce = function (boids) {
+            if (boids.length === 0) return new S.Vector(0, 0);
+            if (boids.length > K) return orig(boids);
+            const p = sim.predator;
+            const n = nearestRaw(p.position.x, p.position.y, boids);
+            const b = boids[n.idx];
+            inp[0] = n.dx / PSCALE; inp[1] = n.dy / PSCALE;
+            inp[2] = b.velocity.x / VSCALE; inp[3] = b.velocity.y / VSCALE;
+            inp[4] = p.velocity.x / VSCALE; inp[5] = p.velocity.y / VSCALE;
+            const net = mlp(inp);
+            const base = setMag(n.dx, n.dy, 1);
+            const [dx, dy] = setMag(base[0] + net[0], base[1] + net[1], PMS);
+            const [fx, fy] = limit(dx - p.velocity.x, dy - p.velocity.y, PMF);
+            return new S.Vector(fx, fy);
+        };
+    }
+    for (let f = 0; f < maxFrames; f++) {
+        S.simTick(); sim.render();
+        if (sim.boids.length === 0) return f + 1;
+    }
+    return maxFrames;
+}
+
 // battery of episodes (common random numbers): returns array of {seed,startN,pump,W,H}
 function makeBattery(seeds, seedBase) {
     const sizes = [[1440, 900], [1920, 1080]];
@@ -208,6 +243,10 @@ if (!isMainThread && workerData && workerData.mode === 'baseline') {
         else if (a === '--out') A.out = process.argv[++i];
         else if (a === '--baseline') A.baseline = true;
         else if (a === '--verify') A.verify = process.argv[++i];
+        else if (a === '--gamefull') A.gamefull = process.argv[++i];
+        else if (a === '--K') A.K = +process.argv[++i];
+        else if (a === '--startN') A.startN = +process.argv[++i];
+        else if (a === '--size') A.size = process.argv[++i];
     }
     const H = A.H, D = thetaLen(H);
     const battery = makeBattery(A.seeds, A.seedBase);
@@ -224,6 +263,27 @@ if (!isMainThread && workerData && workerData.mode === 'baseline') {
             const sum = all.reduce((a, b) => a + b.sum, 0), caught = all.reduce((a, b) => a + b.caught, 0), n = all.reduce((a, b) => a + b.n, 0);
             console.log(`[baseline radial] battery=${n} meanScore=${(sum / n).toFixed(1)} caught=${caught}/${n} (maxFrames=${A.maxFrames})`);
         }).catch(e => { console.error(e); process.exit(1); });
+        return;
+    }
+
+    if (A.gamefull) {
+        // full closed-loop games (startN boids) to extinction: gated champion vs radial-only.
+        const ck = JSON.parse(fs.readFileSync(A.gamefull, 'utf8'));
+        const mlp = makeMlp(Float64Array.from(ck.bestTheta), ck.H);
+        const [W, H] = (A.size || '1920x1080').split('x').map(Number);
+        const startN = A.startN || 120, K = A.K || 3, mf = A.maxFrames;
+        const S = loadSim(W, H);
+        let gSum = 0, gC = 0, rSum = 0, rC = 0;
+        for (let i = 0; i < A.seeds; i++) {
+            const seed = A.seedBase + i;
+            const gt = runFullGame(S, mlp, K, W, H, seed, startN, mf, A.refreshMs);
+            const rt = runFullGame(S, null, K, W, H, seed, startN, mf, A.refreshMs);
+            gSum += gt; gC += (gt < mf ? 1 : 0); rSum += rt; rC += (rt < mf ? 1 : 0);
+            console.log(`  seed=${seed} gated=${gt}${gt < mf ? '' : '(maxF)'} radial=${rt}${rt < mf ? '' : '(maxF)'}`);
+        }
+        console.log(`[gamefull] startN=${startN} K=${K} ${W}x${H} seeds=${A.seeds} maxF=${mf}`);
+        console.log(`  GATED  meanTTE=${(gSum / A.seeds).toFixed(0)} extinct=${gC}/${A.seeds}`);
+        console.log(`  RADIAL meanTTE=${(rSum / A.seeds).toFixed(0)} extinct=${rC}/${A.seeds}`);
         return;
     }
 
