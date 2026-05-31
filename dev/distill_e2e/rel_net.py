@@ -266,7 +266,8 @@ class RelNet(nn.Module):
         self.count_nbhd = count_nbhd
         self.register_buffer('fmean', torch.zeros(in_dim))
         self.register_buffer('fstd', torch.ones(in_dim))
-        self.phi = mlp([in_dim, d, d], act)
+        if mode != 'radial':                  # radial head consumes raw xn; phi is dead weight there
+            self.phi = mlp([in_dim, d, d], act)
         if mode in ('countformer', 'cfrad'):
             self.count_enc = CountEncoder(d, K=K, hidden=edge_hidden, act=act,
                                           nbhd=count_nbhd, logt_init=logt_init)
