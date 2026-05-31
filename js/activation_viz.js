@@ -201,31 +201,32 @@
 
         // --- Labels ------------------------------------------------------
         ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
-        ctx.textAlign = 'right';
+        ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
 
-        // "predator's brain" header — drawn just ABOVE the widget, right-
-        // aligned to its right edge, mirroring the "N left · M eaten" caption
-        // below it. It used to sit INSIDE the widget at top-right, but the
-        // input column's top dots and the edges fanning toward the output
-        // overlapped the text (the top-right corner only looks empty above the
-        // 2-dot output column — the wider label reaches back into the dense
-        // middle). Above the widget is clear canvas at every viewport: y0 is
-        // >= marginY (>=14px), so y0-12 keeps the text on-screen, and the top
-        // network dots start at >= y0, below the label's baseline. Possessive
-        // matches the page's voice ("my master's degree from Cornell"). Static
-        // metadata → dim alpha.
+        // "predator's brain" header — drawn just ABOVE the widget, centered on
+        // the graph's horizontal axis (x0 + W/2). The graph's columns span x0
+        // (inputs) to x0+W (output), so its visual center is the box midpoint;
+        // a title centered over its figure (with the live caption centered
+        // below it) is the standard, balanced layout. The label used to sit
+        // INSIDE the widget flush-right, tuned for the old narrower net; the
+        // wider net's top dots and fan-out edges then overlapped it and the
+        // flush-right anchor looked off-center. Above the widget is clear
+        // canvas at every viewport: y0 >= marginY (>=14px), so y0-12 keeps the
+        // text on-screen and the top dots (>= y0) sit below the baseline.
+        // Possessive matches the page's voice ("my master's degree from
+        // Cornell"). Static metadata → dim alpha.
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText("predator's brain", x0 + W, y0 - 12);
+        ctx.fillText("predator's brain", x0 + W / 2, y0 - 12);
 
-        // Live numbers caption below the widget. Always shown except on
-        // landscape phones (where the widget anchors to the top of the
-        // viewport and there's no room below it before the content).
+        // Live numbers caption below the widget, centered on the same axis as
+        // the header. Always shown except on landscape phones (where the
+        // widget anchors to the top of the viewport, no room below it).
         if (!landscapePhone) {
             var alive = sim.boids ? sim.boids.length : 0;
             var eaten = sim.boidsEaten || 0;
             ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
-            ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W, y0 + H + 8);
+            ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W / 2, y0 + H + 8);
         }
 
         ctx.textAlign = 'left';
