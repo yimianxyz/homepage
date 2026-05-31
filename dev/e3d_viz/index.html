@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E3D predator brain — viz preview</title>
+<style>
+    html, body { margin: 0; padding: 0; background: #fff; color: #555;
+        font-family: "Source Code Pro", ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .wrap { display: flex; align-items: center; gap: 28px; padding: 36px 44px; }
+    .panel { display: flex; flex-direction: column; gap: 10px; }
+    .cap { font-size: 12px; color: #888; letter-spacing: .02em; }
+    canvas { background: #fff; }
+    /* sim runs at production world scale (1680) so cluster_r=178 is a real
+       LOCAL neighbourhood; displayed downscaled. */
+    #sim { border: 1px solid #ececec; width: 540px; height: 540px; }
+    h1 { font-size: 15px; font-weight: 600; color: #555; margin: 0 0 2px 0; }
+    .sub { font-size: 11px; color: #999; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="panel">
+        <div><h1>live flock</h1><div class="sub">real sim · boids + predator</div></div>
+        <canvas id="sim" width="1680" height="1680"></canvas>
+        <div class="cap" id="simcap">&nbsp;</div>
+    </div>
+    <div class="panel">
+        <div><h1>the predator's brain, drawn as the production NN viz is</h1>
+             <div class="sub">columns = computeEvolvedTarget pipeline stages, computed live each frame</div></div>
+        <canvas id="brain" width="760" height="560"></canvas>
+        <div class="cap">gray ladder = body · muted red = steer output · sparse top-K firing edges · per-stage EMA normalization</div>
+    </div>
+</div>
+
+<!-- production sim modules (predator policy only; boid policy untouched) -->
+<script>window.renderActivationViz = function () {};</script>
+<script src="../../js/vector.js"></script>
+<script src="../../js/rng.js"></script>
+<script src="../../js/policy_features.js"></script>
+<script src="../../js/predator_nn.js"></script>
+<script src="../../js/boid.js"></script>
+<script src="../../js/predator.js"></script>
+<script src="../../js/simulation.js"></script>
+<script src="./e3d_brain_viz.js"></script>
+<script>
+(function () {
+    'use strict';
+    // predator.js fetches js/predator_weights.json relative to the document,
+    // but the production code requests 'js/predator_weights.json'. From this
+    // page that path is ../../js/... — so re-issue the fetch ourselves and
+    // build the model, then run a self-contained sim (we do NOT load boids.js,
+    // whose DOMContentLoaded auto-boot targets the homepage canvas).
+    function start() {
+        if (typeof setSimSeed === 'function') setSimSeed(7);
+
+        var sim = new Simulation('sim');
+        sim.initialize(false);
+
+        // Warm up: evolve clusters and let the predator settle into patrol.
+        for (var i = 0; i < 520; i++) { if (typeof simTick === 'function') simTick(); sim.tick(); sim.render(); }
+
+        var simCtx = document.getElementById('sim').getContext('2d');
+        var brainCtx = document.getElementById('brain').getContext('2d');
+        var simcap = document.getElementById('simcap');
+
+        var layout = {
+            x: 70, y: 70, w: 620, h: 430,
+            dotR: 2.6, edgeW: 0.7, maxSpacing: 7,
+            labelFont: '12px', titleFont: '15px'
+        };
+
+        function frame() {
+            if (typeof simTick === 'function') simTick();
+            sim.tick();
+            sim.render();
+
+            // Mark the patrol target on the live flock so "aim" is grounded.
+            var t = computeEvolvedTarget(sim.predator.position, sim.boids, EVOLVED_PATROL,
+                sim.predator.autonomousTarget);
+            if (t) {
+                simCtx.beginPath();
+                simCtx.arc(t.x, t.y, 22, 0, Math.PI * 2);
+                simCtx.strokeStyle = 'rgba(140, 60, 60, 0.55)';
+                simCtx.lineWidth = 3;
+                simCtx.stroke();
+                simCtx.beginPath();
+                simCtx.moveTo(sim.predator.position.x, sim.predator.position.y);
+                simCtx.lineTo(t.x, t.y);
+                simCtx.strokeStyle = 'rgba(140, 60, 60, 0.22)';
+                simCtx.lineWidth = 2;
+                simCtx.stroke();
+            }
+
+            brainCtx.clearRect(0, 0, 760, 560);
+            renderE3DBrain(brainCtx, sim, layout);
+
+            simcap.textContent = sim.boids.length + ' boids · target ring = patrol aim';
+            window.__brainReady = true;
+            requestAnimationFrame(frame);
+        }
+        frame();
+    }
+
+    fetch('../../js/predator_weights.json', { cache: 'no-cache' })
+        .then(function (r) { return r.json(); })
+        .then(function (json) { window.__predatorModel = PredatorNN.loadModel(json); start(); })
+        .catch(function (e) { document.body.insertAdjacentHTML('beforeend',
+            '<pre style="color:#a33">' + e + '</pre>'); });
+})();
+</script>
+</body>
+</html>
