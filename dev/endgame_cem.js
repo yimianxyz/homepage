@@ -113,10 +113,14 @@ function installResidual(sim, S, mlp) {
         inp[2] = b.velocity.x / VSCALE; inp[3] = b.velocity.y / VSCALE;
         inp[4] = p.velocity.x / VSCALE; inp[5] = p.velocity.y / VSCALE;
         const net = mlp(inp);
-        // apply correction with the sim's OWN Vector math => bit-identical to how the
-        // deployed predator would compute it (zero net => exactly f0 => radial).
+        // Residual nudge with the sim's OWN Vector math. No final limit: the deployed
+        // predator only caps force in CHASE (steer.iFastLimit) and returns the PATROL
+        // net force RAW (predator.js:151-152). An unconditional iFastLimit(PMF) here
+        // would clip the patrol force the deployed policy leaves uncapped -> zero-net
+        // would NOT equal radial in the (endgame-dominant) patrol regime. Dropping it
+        // makes zero-net bit-identical to deployed; velocity is capped to MAX_SPEED in
+        // predator.update() regardless, so force stays physically bounded.
         f0.iAdd(new S.Vector(CSCALE * net[0], CSCALE * net[1]));
-        f0.iFastLimit(PMF);
         return f0;
     };
 }
@@ -168,7 +172,6 @@ function runFullGame(S, mlp, K, W, H, seed, startN, maxFrames, refreshMs) {
             inp[4] = p.velocity.x / VSCALE; inp[5] = p.velocity.y / VSCALE;
             const net = mlp(inp);
             f0.iAdd(new S.Vector(CSCALE * net[0], CSCALE * net[1]));
-            f0.iFastLimit(PMF);
             return f0;
         };
     }
