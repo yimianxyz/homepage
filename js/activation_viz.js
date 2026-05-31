@@ -18,24 +18,23 @@
         return v < min ? min : v > max ? max : v;
     }
 
-    // Input features cluster into contiguous "always-bright" and "always-dim"
-    // blocks (unit vectors at 15-22, distances at 23-26, padding zeros at
-    // 27-28, etc.), which makes the input column look stripey instead of a
-    // live firing constellation. We scramble the *visual y-position* of each
-    // input feature with a stride permutation; activation values and edge
-    // endpoints are untouched, so the rendering stays correct. Stride 8 on
-    // a length-35 column gives a permutation (gcd(8,35)=1), and 8's inverse
-    // mod 35 is 22 ≈ 35/φ, so adjacent original features land ~22 rows apart
-    // visually — the golden-ratio quasi-random spread.
-    var inputDisplayInverse = null;
-    function ensureInputPermutation(n) {
-        if (inputDisplayInverse && inputDisplayInverse.length === n) return;
-        inputDisplayInverse = new Array(n);
-        var stride = 8;
-        for (var visualPos = 0; visualPos < n; visualPos++) {
-            var featureIdx = (visualPos * stride) % n;
-            inputDisplayInverse[featureIdx] = visualPos;
+    // Wide layers (the rho head is 128- and 64-neuron) would pack into a solid
+    // bar at this widget size, so each column draws at most MAX_DOTS neurons,
+    // evenly subsampled across the layer. Purely cosmetic: the subset's
+    // activations are still their true values, and edges are drawn only between
+    // displayed neurons.
+    var MAX_DOTS = 22;
+    function displayIndices(n) {
+        if (n <= MAX_DOTS) {
+            var all = new Array(n);
+            for (var i = 0; i < n; i++) all[i] = i;
+            return all;
         }
+        var idx = new Array(MAX_DOTS);
+        for (var m = 0; m < MAX_DOTS; m++) {
+            idx[m] = Math.round(m * (n - 1) / (MAX_DOTS - 1));
+        }
+        return idx;
     }
 
     // Per-layer EMA of the max activation magnitude, for stable normalization.
@@ -112,42 +111,44 @@
             activations.push(model.layers[i].lastA);
         }
 
-        // Per-column dot positions, vertically centered within H.
-        var positions = [];
+        // Per-column displayed-neuron indices + their screen positions, vertically
+        // centered within H. posMap[l] is sparse (length = layer size); entries
+        // exist only for displayed neurons, so edges to undrawn neurons are skipped.
+        var disp = [];
+        var posMap = [];
         var colSpacing = W / (nLayers - 1);
         for (var l = 0; l < nLayers; l++) {
-            var n = layerSizes[l];
+            var idxs = displayIndices(layerSizes[l]);
             var colX = x0 + l * colSpacing;
-            var spacing = Math.min(4.4, (H - 6) / (n - 1));
-            var totalH = (n - 1) * spacing;
+            var spacing = Math.min(4.4, (H - 6) / Math.max(1, idxs.length - 1));
+            var totalH = (idxs.length - 1) * spacing;
             var startY = y0 + (H - totalH) / 2;
-            var col = new Array(n);
-            // For the input column only, place feature k at the permuted
-            // y-row; hidden/output columns keep natural order.
-            if (l === 0 && n > 4) {
-                ensureInputPermutation(n);
-                for (var k = 0; k < n; k++) {
-                    col[k] = { x: colX, y: startY + inputDisplayInverse[k] * spacing };
-                }
-            } else {
-                for (var k = 0; k < n; k++) col[k] = { x: colX, y: startY + k * spacing };
+            var pm = new Array(layerSizes[l]);
+            for (var k = 0; k < idxs.length; k++) {
+                pm[idxs[k]] = { x: colX, y: startY + k * spacing };
             }
-            positions.push(col);
+            disp.push(idxs);
+            posMap.push(pm);
         }
 
         // --- Edges -------------------------------------------------------
         // Draw only the top |signal| edges per layer to keep it visually
         // sparse; signal = |weight * prev_activation|. This is a "wired
-        // synapse firing" effect that's responsive to current state.
+        // synapse firing" effect that's responsive to current state. Only
+        // edges between two displayed neurons are eligible.
         if (!prefersReducedMotion) {
             for (var L_idx = 0; L_idx < model.layers.length; L_idx++) {
                 var Lr = model.layers[L_idx];
                 var prev = activations[L_idx];
-                var posPrev = positions[L_idx];
-                var posNext = positions[L_idx + 1];
+                var posPrev = posMap[L_idx];
+                var posNext = posMap[L_idx + 1];
+                var dispPrev = disp[L_idx];
+                var dispNext = disp[L_idx + 1];
                 var edges = [];
-                for (var j = 0; j < Lr.outDim; j++) {
-                    for (var iI = 0; iI < Lr.inDim; iI++) {
+                for (var dj = 0; dj < dispNext.length; dj++) {
+                    var j = dispNext[dj];
+                    for (var di = 0; di < dispPrev.length; di++) {
+                        var iI = dispPrev[di];
                         var sig = Math.abs(Lr.W[iI * Lr.outDim + j] * prev[iI]);
                         if (sig > 0.02) edges.push([iI, j, sig]);
                     }
@@ -170,28 +171,30 @@
 
         // --- Dots --------------------------------------------------------
         for (var li = 0; li < nLayers; li++) {
-            var nn = layerSizes[li];
-            var pos = positions[li];
+            var pos = posMap[li];
+            var dispCol = disp[li];
             var act = activations[li];
             var isOutput = (li === nLayers - 1);
 
-            // Per-layer EMA normalization so the visual is stable.
+            // Per-layer EMA normalization (over displayed neurons) so the
+            // visual is stable.
             var localMax = 0;
-            for (var kk = 0; kk < nn; kk++) {
-                var a2 = Math.abs(act[kk]);
+            for (var kk = 0; kk < dispCol.length; kk++) {
+                var a2 = Math.abs(act[dispCol[kk]]);
                 if (a2 > localMax) localMax = a2;
             }
             var norm = emaUpdate(li, localMax);
 
-            for (var k2 = 0; k2 < nn; k2++) {
-                var v = Math.abs(act[k2]) / norm;
+            for (var k2 = 0; k2 < dispCol.length; k2++) {
+                var ni = dispCol[k2];
+                var v = Math.abs(act[ni]) / norm;
                 if (v > 1) v = 1;
                 var baseAlpha = dotBaseAlpha;
                 var alpha = baseAlpha + (1 - baseAlpha) * v * 0.78;
                 var rgb = isOutput ? '140, 60, 60' : '85, 85, 85';
                 ctx.fillStyle = 'rgba(' + rgb + ', ' + alpha.toFixed(3) + ')';
                 ctx.beginPath();
-                ctx.arc(pos[k2].x, pos[k2].y, dotR, 0, Math.PI * 2);
+                ctx.arc(pos[ni].x, pos[ni].y, dotR, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
@@ -201,17 +204,19 @@
         ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
 
-        // "predator's brain" header — drawn INSIDE the widget at top-right,
-        // in the empty space above the 2-dot output column (whose color
-        // matches the predator triangle on canvas). Possessive matches the
-        // page's existing voice ("my master's degree from Cornell") and
-        // removes the "predator-or-brain" parsing ambiguity. Static
-        // metadata → dim alpha. Always visible because the empty top-right
-        // corner is structural: the short hidden/output columns are
-        // vertically centered at every viewport size, so there's always
-        // ~10px+ of clearance up there.
+        // "predator's brain" header — drawn just ABOVE the widget, right-
+        // aligned to its right edge, mirroring the "N left · M eaten" caption
+        // below it. It used to sit INSIDE the widget at top-right, but the
+        // input column's top dots and the edges fanning toward the output
+        // overlapped the text (the top-right corner only looks empty above the
+        // 2-dot output column — the wider label reaches back into the dense
+        // middle). Above the widget is clear canvas at every viewport: y0 is
+        // >= marginY (>=14px), so y0-12 keeps the text on-screen, and the top
+        // network dots start at >= y0, below the label's baseline. Possessive
+        // matches the page's voice ("my master's degree from Cornell"). Static
+        // metadata → dim alpha.
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText("predator's brain", x0 + W, y0 + 2);
+        ctx.fillText("predator's brain", x0 + W, y0 - 12);
 
         // Live numbers caption below the widget. Always shown except on
         // landscape phones (where the widget anchors to the top of the
