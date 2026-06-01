@@ -322,7 +322,9 @@ a.inline-link:focus-visible {
     position: fixed;
     inset: 0;
     z-index: 55;
-    background: rgba(20, 20, 20, 0.06);
+    /* Scrim tinted with the page's brand dark (#343a40) rather than pure
+       black, so it reads as part of the same gray-ladder palette. */
+    background: rgba(52, 58, 64, 0.10);
 }
 #viz-info-backdrop[hidden] { display: none; }
 
@@ -334,15 +336,18 @@ a.inline-link:focus-visible {
     transform: translate(-50%, -50%);
     width: min(340px, calc(100vw - 2.5rem));
     background: #fff;
-    border: 1px solid rgba(85, 85, 85, 0.18);
-    border-radius: 10px;
-    box-shadow: 0 8px 30px rgba(20, 20, 20, 0.12);
-    padding: 1.1rem 1.25rem 1.2rem;
+    border: 1px solid rgba(85, 85, 85, 0.16);
+    /* Restrained radius — the page is near-square (only 1px focus rings), so a
+       big radius would read foreign. 6px softens the float without rounding. */
+    border-radius: 6px;
+    box-shadow: 0 6px 24px rgba(52, 58, 64, 0.12);
+    padding: 1.2rem 1.3rem 1.25rem;
+    /* color, font, line-height and letter-spacing all match .homepage-content
+       (#666 body on the gray ladder, 1.6 leading, inherited .33px tracking). */
     color: #666;
     font-family: 'Source Code Pro', monospace;
     font-size: 0.82rem;
-    line-height: 1.65;
-    letter-spacing: .2px;
+    line-height: 1.6;
     /* This panel IS readable content — let users select it. */
     -webkit-user-select: text;
     user-select: text;
@@ -350,9 +355,10 @@ a.inline-link:focus-visible {
 .viz-info-card[hidden] { display: none; }
 
 .viz-info-card h2 {
-    margin: 0 0 0.7rem;
+    margin: 0 0 0.75rem;
+    padding-right: 1.5rem;          /* keep the title clear of the × button */
     font-size: 0.92rem;
-    font-weight: 500;
+    font-weight: 500;               /* matches the h1 — the page's heaviest */
     color: #555;
 }
 
@@ -362,9 +368,10 @@ a.inline-link:focus-visible {
     list-style: none;
 }
 
-.viz-info-card li { margin: 0 0 0.55rem; }
+.viz-info-card li { margin: 0 0 0.6rem; }
 .viz-info-card li:last-child { margin-bottom: 0; }
-.viz-info-card b { font-weight: 600; color: #555; }
+/* The page has no semibold; emphasis is weight 500 + the #555 heading gray. */
+.viz-info-card b { font-weight: 500; color: #555; }
 
 .viz-info-close {
     position: absolute;
@@ -375,25 +382,31 @@ a.inline-link:focus-visible {
     padding: 0;
     border: 0;
     background: transparent;
-    color: rgba(85, 85, 85, 0.5);
+    color: rgba(85, 85, 85, 0.45);
     font-family: inherit;
     font-size: 1.15rem;
     line-height: 1;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 5px;
+    transition: color 0.2s ease;    /* same easing as the page's links */
 }
 .viz-info-close:hover { color: #555; }
 .viz-info-close:focus-visible {
     outline: 2px solid rgba(85, 85, 85, 0.35);
-    outline-offset: 1px;
+    outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: no-preference) {
-    .viz-info-card:not([hidden]) { animation: viz-info-in 0.16s ease-out; }
+    .viz-info-card:not([hidden]) { animation: viz-info-in 0.18s ease-out; }
+    #viz-info-backdrop:not([hidden]) { animation: viz-info-fade 0.18s ease-out; }
 }
 @keyframes viz-info-in {
     from { opacity: 0; transform: translate(-50%, -48%) scale(0.985); }
     to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes viz-info-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
 /* Reduced motion preferences */
