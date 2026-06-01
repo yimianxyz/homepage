@@ -783,6 +783,23 @@ class Sim:
             # reach_scale is the NEW axis: the predator is slow, so a closer but
             # slightly-less-dense cluster can beat a distant denser one.
             o = self.auto_target_opts
+            # Phase-conditional params (backward-compatible; off unless set):
+            # select a per-env param row by the current live-boid count, so the
+            # patrol heuristic can use different constants in different game
+            # phases (120-boid herding ... small-N ... 1-boid endgame). This is
+            # a strict superset of a single global param set.
+            _pp = o.get('_phase_params', None)
+            if _pp is not None:
+                alive_ct = self.boid_alive.sum(dim=1)            # (B,) int
+                phase = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                for _e in o['_phase_edges']:
+                    phase = phase + (alive_ct > _e).long()
+                _sel = torch.gather(
+                    _pp, 1,
+                    phase.view(self.B, 1, 1).expand(self.B, 1, _pp.shape[2])
+                ).squeeze(1)                                     # (B,K)
+                for _j, _nm in enumerate(o['_phase_names']):
+                    o[_nm] = _sel[:, _j]
 
             def _pv(name, default, nd):
                 # param as scalar float or per-env (B,) tensor reshaped with `nd`
