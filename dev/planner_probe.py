@@ -240,6 +240,49 @@ def run_planner_log(seeds, frames, device, K, H, D, M):
     return obs, tgt, sim.catches.cpu().numpy()
 
 
+def run_planner_log_cand(seeds, frames, device, K, H, D, M):
+    """Run the planner, logging PER DECISION: (obs, candidate offsets, gains).
+
+    For the pointer-net distillation: the net scores the SAME K candidates the
+    planner ranks and picks argmax, so we log candidate offsets (predator-rel)
+    and the rollout gain per candidate (the value to regress / argmax over)."""
+    sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
+              auto_target='evolved', auto_target_opts=dict(E3D))
+    B = sim.B
+    roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device,
+               auto_target='evolved', auto_target_opts=dict(E3D))
+    held = None
+    rows = torch.arange(B, device=device)
+    obs_log, cand_log, gain_log = [], [], []
+    f = 0
+    while f < frames:
+        if f % D == 0:
+            cand = _candidate_targets(sim, K)                  # (B,K,2) absolute
+            e3d_rel = cand[:, 0] - sim.pred_pos                 # E3D target rel
+            ob = planner_obs(sim, M, e3d_rel)                  # (B,F)
+            cand_rel = cand - sim.pred_pos[:, None, :]          # (B,K,2)
+            base = _save_state(sim)
+            tiled = _tile_state(base, K)
+            _load_state(roll, tiled)
+            roll_tgt = cand.reshape(B * K, 2).contiguous()
+            h = min(H, frames - f)
+            c0 = roll.catches.clone()
+            for _ in range(h):
+                _step_with_target(roll, roll_tgt)
+            gain = (roll.catches - c0).reshape(B, K).float()    # (B,K)
+            best = gain.argmax(dim=1)
+            held = cand[rows, best]
+            obs_log.append(ob.float().cpu())
+            cand_log.append(cand_rel.float().cpu())
+            gain_log.append(gain.cpu())
+        _step_with_target(sim, held)
+        f += 1
+    obs = torch.cat(obs_log, dim=0).numpy()
+    cand = torch.cat(cand_log, dim=0).numpy()
+    gain = torch.cat(gain_log, dim=0).numpy()
+    return obs, cand, gain, sim.catches.cpu().numpy()
+
+
 def run_e3d(seeds, frames, device):
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
               auto_target='evolved', auto_target_opts=dict(E3D))
