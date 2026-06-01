@@ -153,7 +153,57 @@ Target for distillation: **>99% × 21.4 ≈ 21.2 catches** (K16 teacher).
 
 ## 5. Results (distill_v4)
 
-_pending — runs land here._
+### Round 1 — encoder ablation (loss=both, full 120-boid input, K16/H120/D8 teacher)
+
+| enc | iter-0 closed-loop mean | vs baseline 8.3447 | pick0 | decisive TRAIN acc |
+|---|---|---|---|---|
+| crossattn   | 8.119 ± 0.183 | −2.70% | 0.214 | 0.222 |
+| transformer | 8.713 ± 0.191 | +4.41% | 0.387 | 0.253 |
+| deepsets    | 8.814 ± 0.182 | +5.63% | 0.381 | 0.252 |
+
+Dataset diagnostic (shared): `tie_frac=0.535`, `decisive_frac=0.465`,
+`label_is_E3D=0.667`, `E3D_best_among_decisive=0.283`.
+
+**This partially refutes §2's Bug-A framing.** Two claims held, one broke:
+
+- **Bug B (loss collapse) is fixed.** `pick0` fell from v3's 0.92 to 0.21–0.39 —
+  the net no longer degenerates to "always E3D". Value regression passes a real,
+  diverse signal. ✓
+- **But removing input truncation did NOT lift decisive accuracy.** I predicted
+  full-set input would push decisive TRAIN acc *above* v3's 44.7%. Instead it
+  *fell* to ~0.22–0.25 — and `E3D_best_among_decisive=0.283` means **a constant
+  "always E3D" predictor scores 0.283 on decisive frames, beating all three
+  trained nets.** On the frames that carry the planner's entire +156% edge, the
+  nets learned nothing useful. Closed-loop ≈ baseline follows directly.
+- The net **cannot fit its own training set** (TRAIN acc, not val). So this is
+  *not* distribution shift — DAgger cannot help — and it is *not* (only) input
+  truncation, since the full set is now present. The label is not being fit.
+
+**Revised root cause (two candidates, under test):**
+
+1. **A still-missing state variable.** `gain(s,c)` depends on `pred_size` (it sets
+   `catch_radius = pred_size·0.7`, sim_torch.py:922) — and `full_obs` omitted it.
+   Fixed in this commit (`pred_state` 4→5 dims). *Caveat:* `pred_size` scales all
+   K candidates' gains together, so it should move value *magnitude* more than the
+   *argmax* — unlikely to fully explain a 25% decisive ceiling, but a real bug.
+2. **The H=120 gain argmax is a high-Lipschitz / chaotic label.** Decisive frames
+   often hinge on whether one boid drifts within an ~8px radius ~100 frames later,
+   inside a chaotic flock. §1's "deterministic ⇒ universally approximable" is true
+   in the limit but says nothing about the *precision* (capacity + data) required:
+   a function with enormous Lipschitz constant is approximable only at impractical
+   cost. The planner wins precisely because it holds the *exact* state and rolls
+   *exact* dynamics; a smooth reactive net cannot reconstruct the deciding boid's
+   100-frame future from a normalised, pooled view. This is a **soft** boundary —
+   not a theorem of non-distillability, but a practical wall.
+
+**Decisive experiment (running):** an *overfit* test — train crossattn on 24 seeds
+for 1500 epochs and read decisive TRAIN acc. If it climbs to >80%, the label *is*
+learnable and we have a capacity/data problem (scale up). If it stays ~25% even
+when the net is free to memorise, the label is effectively not a function of the
+observation → hypothesis (2), the chaotic-lookahead wall. Run with and without
+`pred_size` to also isolate hypothesis (1). In parallel, a teacher horizon sweep
+(H=20/40/60/80) checks whether a shorter, *smoother* planner keeps most of the
+edge — a more distillable target if (2) holds.
 
 Sources / inspiration:
 - Lee et al., *Set Transformer*, ICML 2019 (arXiv:1810.00825) — ISAB/PMA, permutation invariance.

@@ -51,7 +51,7 @@ def full_obs(sim):
     """Full permutation-invariant observation.
       boid_feat (B,N,5): [dx/PS, dy/PS, vx/VS, vy/VS, alive]   predator-relative
       mask      (B,N)  : alive bool
-      pred_state(B,4)  : [pred_vx/VS, pred_vy/VS, frac_alive, cooldown_frac]
+      pred_state(B,5)  : [pred_vx/VS, pred_vy/VS, frac_alive, cooldown_frac, size_frac]
     """
     dx = (sim.boid_pos[..., 0] - sim.pred_pos[:, None, 0]) / PS
     dy = (sim.boid_pos[..., 1] - sim.pred_pos[:, None, 1]) / PS
@@ -63,7 +63,11 @@ def full_obs(sim):
     # feed cooldown: ms since last feed, normalised by the cooldown window
     cd = ((sim._frame_ms - sim.pred_last_feed_ms) / st.PREDATOR_FEED_COOLDOWN_MS)
     cd = cd.clamp(0, 1).to(dx.dtype).unsqueeze(1)
-    pred_state = torch.cat([sim.pred_vel / VS, frac_alive, cd], dim=1)
+    # predator size sets the catch radius (catch_radius = pred_size*0.7); it is a
+    # dynamic state variable gain(s,c) depends on, so the net must see it.
+    sz = ((sim.pred_size - st.PREDATOR_BASE_SIZE) /
+          (st.PREDATOR_MAX_SIZE - st.PREDATOR_BASE_SIZE)).clamp(0, 1).to(dx.dtype).unsqueeze(1)
+    pred_state = torch.cat([sim.pred_vel / VS, frac_alive, cd, sz], dim=1)
     return boid_feat, sim.boid_alive, pred_state
 
 
@@ -129,7 +133,7 @@ class SetScorer(nn.Module):
         super().__init__()
         self.enc = enc; self.d = d
         self.boid_embed = nn.Sequential(nn.Linear(5, d), nn.GELU(), nn.Linear(d, d))
-        self.pred_embed = nn.Linear(4, d)
+        self.pred_embed = nn.Linear(5, d)
         if enc in ('transformer', 'crossattn'):
             self.isabs = nn.ModuleList([ISAB(d, 16, heads) for _ in range(layers)])
         if enc == 'crossattn':
