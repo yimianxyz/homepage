@@ -119,3 +119,44 @@ candidate 0 is E3D's target and rollout is on the true dynamics, the planner is
 Baselines on the same held-out block: `--controller e3d` (analytic E3D, no
 planning) isolates the NN-vs-analytic gap; `--controller planner` measures the
 ceiling. Results recorded below as they land.
+
+### Results (held-out seedStart=200000, n=512)
+
+| controller | K | H | D | seedStart | mean | SE | vs 8.34 |
+|---|---|---|---|---|---|---|---|
+| e3d (analytic, no planning) | – | – | – | 200000 | 8.139 | 0.177 | — |
+| planner | **1** | 60 | 15 | 200000 | **8.176** | 0.179 | +0% (control) |
+| planner | 2 | 60 | 15 | 200000 | 10.656 | 0.184 | +28% |
+| planner | 8 | 60 | 15 | 200000 | **13.998** | 0.194 | **+68%** |
+| planner | 8 | 60 | 15 | 300000 | 14.303 | 0.200 | +71% (fresh block) |
+| planner | 10 | 90 | 10 | 200000 | 18.258 | 0.203 | +119% |
+| planner | 16 | 120 | 8 | 200000 | **21.871** | 0.212 | **+162%** |
+
+**POSITIVE — and large.** The planner, controlling ONLY the patrol-target choice
+via true-dynamics rollout, beats the +50% target (≥12.52) at every K≥8 and scales
+monotonically with candidate count and lookahead. Two decisive controls:
+
+1. **K=1 (only E3D's target as candidate) = 8.18 ≈ the 8.14 e3d baseline** — the
+   planning machinery with no real choice reproduces baseline exactly, so the gain
+   is entirely from *better target selection*, not a counting/leakage bug. (The
+   rollout runs on a separate B·K-env sim; the real env advances one true frame
+   per step; catches ≤ ~180/run by the feed cooldown — 14–22 is well within bounds.)
+2. **Fresh seed block reproduces 14.0 → 14.3** — not seed-specific.
+
+**This overturns the prior `predator-rl-ceiling` conclusion.** That conclusion
+("instantaneous target choice is saturated; +50% via a reactive net is infeasible")
+was an artifact of only ever searching E3D's *7-parameter family* (the patrol-evolve
+islands AND the phase probe above). A richer target-selection *function* is
+dramatically better. Crucially, the planner's chosen target is a deterministic
+function of the CURRENT state (the future it rolls out is itself determined by the
+present), so this is **distillable into a reactive, memoryless net**: keep
+production's architecture (net → target point → analytic seek + in-range chase),
+just replace E3D's hand-derived target function with one learned from the planner.
+
+## Experiment 3 — distill the planner's target function into a reactive net
+
+Plan: (1) generate (state → planner target) pairs across many seeds; (2) train a
+reactive net mapping production-style features → 2D target; (3) closed-loop eval
+with net-target + analytic seek/chase; (4) DAgger to fix distribution shift. The
+open question is how much of the 14–22 planner ceiling survives reactive
+distillation. Even partial recovery clears the ≥12.52 target. Results below.
