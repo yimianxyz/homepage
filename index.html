@@ -98,8 +98,8 @@
         <button type="button" class="viz-info-close" aria-label="Close">&times;</button>
         <h2>what you're looking at</h2>
         <ul>
-            <li><b>boids</b> &mdash; each dot steers by three local rules: separation, alignment, cohesion. no leader, yet a flock emerges.</li>
-            <li><b>predator</b> &mdash; the triangle hunts the nearest dot. its turns come from the small neural net above &mdash; its brain.</li>
+            <li><b>boids</b> &mdash; each dot follows three fixed rules: separation, alignment, cohesion. no leader, no learning &mdash; yet a flock emerges.</li>
+            <li><b>predator</b> &mdash; the triangle isn't following rules. the small neural net above is its brain, trained to hunt: it weighs the whole flock and goes for the dot it can catch &mdash; not always the nearest.</li>
             <li><b>you</b> &mdash; click or tap anywhere to hatch a new boid.</li>
         </ul>
     </aside>
