@@ -222,12 +222,18 @@ Two things this proves:
 
 | H | planner mean catches | vs baseline 8.3447 |
 |---|---|---|
+| 10  | 8.113 ± 0.300 | −2.8% (≈ baseline) |
 | 20  | 8.544 ± 0.320 | +2.4% (≈ baseline) |
-| 40  | _pending_ | |
-| 60  | _pending_ | |
+| 40  | 12.369 ± 0.334 | +48% |
+| 60  | 17.031 ± 0.381 | +104% |
 | 80  | _pending_ | |
 | 100 | _pending_ | |
 | 120 | 21.40 (n=512) | +156% |
+
+The climb is smooth and monotone: catches ≈ a roughly linear function of lookahead
+depth from H≈20 up. H=60 already **doubles** the baseline (+104%) — a strong
+candidate for a browser budget if the per-decision cost (K·H flock-steps every D
+frames) fits a frame. The cost/benefit knob is now explicit.
 
 The H=20 planner — same candidate set, same chase, only a *short* lookahead —
 scores **8.54, indistinguishable from the reactive baseline**. The entire +156%
