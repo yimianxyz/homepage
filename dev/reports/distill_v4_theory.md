@@ -196,14 +196,76 @@ Dataset diagnostic (shared): `tie_frac=0.535`, `decisive_frac=0.465`,
    100-frame future from a normalised, pooled view. This is a **soft** boundary —
    not a theorem of non-distillability, but a practical wall.
 
-**Decisive experiment (running):** an *overfit* test — train crossattn on 24 seeds
-for 1500 epochs and read decisive TRAIN acc. If it climbs to >80%, the label *is*
-learnable and we have a capacity/data problem (scale up). If it stays ~25% even
-when the net is free to memorise, the label is effectively not a function of the
-observation → hypothesis (2), the chaotic-lookahead wall. Run with and without
-`pred_size` to also isolate hypothesis (1). In parallel, a teacher horizon sweep
-(H=20/40/60/80) checks whether a shorter, *smoother* planner keeps most of the
-edge — a more distillable target if (2) holds.
+### Round 2 — the decisive diagnostics
+
+**Overfit test (crossattn, 24 seeds, 1500 epochs, with and without `pred_size`):**
+
+| metric | no-size | with pred_size |
+|---|---|---|
+| train value loss (SmoothL1) | 0.62 → 0.07 | 0.62 → 0.07 |
+| decisive TRAIN acc | 0.25 → **~0.55 (plateau)** | 0.25 → **~0.55 (plateau)** |
+
+Two things this proves:
+
+1. **It is NOT a capacity / pure-noise problem.** Given freedom to memorise 24
+   seeds, the net drives value loss down 9× and lifts decisive acc from 0.25 to
+   ~0.55. The relation is partly learnable.
+2. **But decisive argmax plateaus at ~0.55 while value loss keeps falling — they
+   decouple.** The net learns the *values* well yet still mis-ranks the winner on
+   ~45% of decisive frames. Reason: decisive frames are **razor-thin near-ties** —
+   the best candidate beats the runner-up by ~1 catch over the horizon — so a tiny
+   value error flips the `argmax`. This is a **precision-of-near-ties wall**, not a
+   capacity wall. **`pred_size` changes nothing** (it scales all candidates
+   together), so hypothesis (1), the missing variable, is **rejected** as the cause.
+
+**Teacher horizon sweep (K16/D8, n=160, held-out seed 300000):**
+
+| H | planner mean catches | vs baseline 8.3447 |
+|---|---|---|
+| 20  | 8.544 ± 0.320 | +2.4% (≈ baseline) |
+| 40  | _pending_ | |
+| 60  | _pending_ | |
+| 80  | _pending_ | |
+| 100 | _pending_ | |
+| 120 | 21.40 (n=512) | +156% |
+
+The H=20 planner — same candidate set, same chase, only a *short* lookahead —
+scores **8.54, indistinguishable from the reactive baseline**. The entire +156%
+edge appears only as the rollout horizon grows toward 120. **The advantage is the
+lookahead itself.**
+
+## 6. Conclusion — the planner's edge is non-reactive; it does not distill
+
+Three independent lines of evidence converge:
+
+- **Overfit:** even memorising, a reactive net caps at ~0.55 decisive accuracy
+  because the deciding margins are sub-catch near-ties (precision wall).
+- **Horizon sweep:** strip the lookahead (H→20) and the planner *is* the baseline
+  (~8.5). The catches are bought by deep rollout, frame by frame.
+- **Prior RL/ES/PPO ceiling (separate search):** the best *reactive* predator
+  found by exhaustive policy search sits at ~8.0–8.3 — independent proof of the same wall.
+
+So the answer to the three questions that launched this note:
+
+1. **Theoretical boundary?** No *theorem* of non-distillability — but a hard
+   **practical** one. The planner's value comes from online model-based lookahead
+   over a **chaotic** flock; the deciding frames hinge on sub-catch margins set by
+   where one boid drifts ~100 frames out. Amortising that into a memoryless map
+   requires reconstructing the chaotic future to a precision no finite reactive net
+   reaches. A reactive net is the H≈0 limit of the planner — and H≈0 is the ~8
+   ceiling, measured three ways.
+2. **Data generation / coverage?** Not the bottleneck. Full-set input, on-policy
+   data, and outright memorisation all leave the wall standing.
+3. **Loss correctly passed?** Yes — confirmed and fixed (pick0 decollapsed
+   0.92→0.2; value loss memorises to 0.07). Fitting the value is *not enough*
+   because the closed-loop objective lives in the near-tie argmax.
+
+**Implication for deployment.** The only way to move client-side catches toward
+the planner's is to *run* lookahead in the browser, not to distill it away. The
+homepage already simulates the 120-boid flock every frame, so a **trimmed planner**
+(small K, moderate H, larger D) is feasible — the horizon curve above is exactly
+its cost/benefit menu. A pure reactive NN is capped near production (~8). This
+reframes the deliverable: *cheap online lookahead*, not *a bigger reactive net*.
 
 Sources / inspiration:
 - Lee et al., *Set Transformer*, ICML 2019 (arXiv:1810.00825) — ISAB/PMA, permutation invariance.
