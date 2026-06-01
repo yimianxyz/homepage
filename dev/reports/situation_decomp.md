@@ -39,3 +39,20 @@ reproduces global E3D exactly (parity match, CPU).
 
 3 islands (different phase granularities), one per VM, CMA-ES over P×7 params.
 Results recorded below as they land.
+
+### Launch (2026-06-01)
+
+All 3 islands running, pop=24 × 160 seeds × 1500 frames, 60 gens,
+sigma0=0.15. Eager (phase hook is not CUDA-graph-safe) → ~271 s/gen,
+~4.5 h/island.
+
+| island | VM | live-count edges | P | dim | seedStart | seed |
+|---|---|---|---|---|---|---|
+| ph1 | ml-forecast-1 | 2,8,25,70 | 5 | 35 | 30000 | 1 |
+| ph2 | ml-forecast-2 | 1,4,12,40,90 | 6 | 42 | 50000 | 2 |
+| ph3 | ml-forecast-3 | 8,40 | 3 | 21 | 70000 | 3 |
+
+ph1 gen-0 best 8.41 (≈E3D, since x0 starts every phase at E3D — the
+search is a strict superset, so gen-0 ≈ baseline confirms wiring). Each
+island writes `~/situ/ckpt/phX/best.json` + `log.jsonl`; held-out
+re-scoring of any winner on a fresh seed block (n≥2048) before any claim.
