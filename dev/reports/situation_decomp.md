@@ -160,3 +160,36 @@ reactive net mapping production-style features → 2D target; (3) closed-loop ev
 with net-target + analytic seek/chase; (4) DAgger to fix distribution shift. The
 open question is how much of the 14–22 planner ceiling survives reactive
 distillation. Even partial recovery clears the ≥12.52 target. Results below.
+
+### Distillation results — the planner edge does NOT survive reactive distillation
+
+| approach | what it learns | closed-loop mean | vs baseline |
+|---|---|---|---|
+| v1 `distill_planner.py` | MSE regress planner's 2D target | 7.5–7.8 | below (multimodal averaging) |
+| v2 `distill_planner2.py` | pointer-net, CE on argmax(gain), pick argmax | 8.24–8.44 | ≈ baseline |
+| v3 `distill_planner3.py` all | v2 repro | 8.24 (pick0=0.92) | −1.3% |
+| v3 decisive (train only decisive frames) | — | 7.77 (pick0=0.44) | −6.9% |
+| v3 margin-weighted CE | — | 7.21 (pick0=0.22) | −13.6% |
+
+**Root cause (decisive, K8/H60/D15, n=38400 decisions):** the per-candidate gain is
+"catches in the next H=60 frames", and with ~8 catches/1500 frames it is **86.2%
+all-tie** (every candidate gives equal gain over the horizon) → `argmax` defaults to
+index 0 = the E3D candidate → **91.7% of labels are "pick E3D"**. CE is minimised by
+always picking E3D, which IS baseline (v3-all pick0=0.92, mean 8.24). Only **13.8%**
+of frames are decisive, and E3D is still best in 40% of those.
+
+**The killer: decisive-frame TRAIN accuracy is only 44.7%.** On the training set,
+restricted to frames where the choice matters, the net barely beats "always pick the
+majority class." So the planner's decisive pick is **not a learnable function of the
+M=16-nearest observation** — it depends on the full 120-boid future the planner rolls
+out, information absent from the local obs. Forcing the net to deviate from E3D
+(decisive/weighted modes drop pick0 to 0.44/0.22) makes catches **worse** (7.77/7.21):
+its deviations are mostly wrong guesses.
+
+**Implication:** this is an INSUFFICIENT-OBSERVATION failure, not distribution shift,
+so **DAgger cannot fix it** (DAgger relabels visited states, but the labels still
+aren't a function of the obs). The fix must be richer information at decision time.
+Two routes: (a) per-candidate cheap-lookahead FEATURES, or (b) skip the net entirely
+and replace the planner's expensive true-dynamics rollout with a CHEAP O(N) rollout
+the browser can run every frame, keeping the argmax-over-candidates structure
+(`cheap_planner.py`). Route (b) is the more promising deployable answer. Results next.
