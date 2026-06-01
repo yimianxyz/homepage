@@ -56,3 +56,66 @@ ph1 gen-0 best 8.41 (≈E3D, since x0 starts every phase at E3D — the
 search is a strict superset, so gen-0 ≈ baseline confirms wiring). Each
 island writes `~/situ/ckpt/phX/best.json` + `log.jsonl`; held-out
 re-scoring of any winner on a fresh seed block (n≥2048) before any claim.
+
+### Result — NEGATIVE (held-out, 2026-06-01)
+
+All 3 islands finished 60 gens. Their on-search 160-seed bests
+(9.24 / 9.25 / 9.36) looked promising, but those are the **max over
+pop×gens on a single 160-seed block — selection-bias-inflated**. The
+honest test is `phase_rescore.py`: the winning phase params vs global
+E3D on the SAME fresh held-out block (seedStart 200000, n=2048, paired).
+
+| island | P | search 160-seed | held-out phase | held-out E3D | paired gain | gain σ |
+|---|---|---|---|---|---|---|
+| ph1 | 5 | 9.24 | 8.489 ± .094 | 8.350 ± .093 | **+0.139** | 1.15 |
+| ph2 | 6 | 9.25 | 8.401 ± .093 | 8.350 ± .093 | **+0.052** | 0.45 |
+| ph3 | 3 | 9.36 | 8.267 ± .089 | 8.350 ± .093 | **−0.083** | −0.71 |
+
+All three paired gains are **statistically insignificant (<2σ)**, and ph3 is
+actually negative — its 9.36 on-search best collapsed to 8.27 held-out, below
+E3D. Held-out E3D re-measures at 8.3496 ≈ the 8.3447 north-star baseline
+(sanity OK). The 160-seed→2048-seed collapse (9.2–9.4 → 8.27–8.49) is dramatic
+and identical to the prior `predator-rl-ceiling` small-block overfit signature.
+
+**Conclusion:** phase-conditional reactive-parameter specialization (the
+cheapest situation decomposition) buys ~0–1.7%, within noise — it does
+NOT break the ~8.4 reactive ceiling. This independently reconfirms
+`predator-rl-ceiling`: reactive/parametric tweaks are saturated. The
+160→held-out collapse is the key lesson — never trust a CMA-ES winner's
+own-block mean; always paired-re-score on fresh seeds.
+
+**Implication for the deliverable.** The remaining lever is the planner
++ distill pipeline (non-reactive multi-step anticipation). But the
+binding constraint is that the deliverable must stay a *reactive*,
+memoryless browser net. A lookahead planner can score higher in closed
+loop, yet distilling it back to a reactive function should regress toward
+the same reactive ceiling — a reactive net only ever sees the current
+state, which is exactly what E3D already optimizes. So the planner's
+edge that *survives distillation* is limited to finding better
+*instantaneous* target choices than the E3D heuristic; the phase result
+suggests that heuristic is already near-optimal for reactive play. The
++50% (≥12.52) target via a reactive net is therefore likely infeasible;
+the planner phase will quantify how much (if any) instantaneous-choice
+headroom remains.
+
+## Experiment 2 — planner ceiling probe (`planner_probe.py`)
+
+The decisive test of feasibility. If a non-reactive, multi-step-anticipating
+**expert** that controls only the distillable lever (the patrol-target choice)
+cannot reach ≥12.52, then a *reactive* net distilled from it certainly cannot,
+and the user's ≥50% goal is infeasible for the required deliverable.
+
+Design: greedy receding-horizon **target-commitment** planner. Steering is
+production's exact analytic decomposition (M5): `force = nearest-in-POLICY_R ?
+seek(nearest) : seek(target)` — NN-free, so any gain is purely from better
+*instantaneous target choice* (the part that survives distillation). Every `D`
+frames the planner branches over `K` candidate targets (E3D's own target as
+candidate 0, plus the K−1 nearest live boids lead-adjusted), rolls the TRUE
+dynamics forward `H` frames committed to each candidate, picks the candidate
+with the most catches over the horizon, holds it `D` frames, re-plans. Because
+candidate 0 is E3D's target and rollout is on the true dynamics, the planner is
+≥ analytic-E3D by construction (up to rollout-horizon truncation).
+
+Baselines on the same held-out block: `--controller e3d` (analytic E3D, no
+planning) isolates the NN-vs-analytic gap; `--controller planner` measures the
+ceiling. Results recorded below as they land.
