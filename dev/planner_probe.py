@@ -160,6 +160,86 @@ def _candidate_targets(sim, K):
     return cand
 
 
+def planner_obs(sim, M, e3d_rel):
+    """Target-free, predator-relative observation for the distill net (B,F).
+
+    NON-toroidal rel coords (matches js/policy_features.js). Layout:
+      [pred_vx, pred_vy,                       # 2
+       e3d_target_rel_x, e3d_target_rel_y,     # 2  (production already computes this)
+       (rel_x, rel_y, rel_vx, rel_vy) * M,     # 4M nearest live boids (dead -> 0)
+       frac_alive,                             # 1
+       cent_rel_x, cent_rel_y]                 # 2  alive centroid rel
+    Positions scaled by 1/200, velocities by 1/6 (MAX_SPEED)."""
+    B = sim.B
+    PS, VS = 200.0, 6.0
+    dx = sim.boid_pos[..., 0] - sim.pred_pos[:, None, 0]
+    dy = sim.boid_pos[..., 1] - sim.pred_pos[:, None, 1]
+    d2 = dx * dx + dy * dy
+    d2m = torch.where(sim.boid_alive, d2, torch.full_like(d2, float('inf')))
+    _, order = torch.sort(d2m, dim=1)
+    idx = order[:, :M]
+    rx = dx.gather(1, idx); ry = dy.gather(1, idx)
+    rvx = sim.boid_vel[..., 0].gather(1, idx)
+    rvy = sim.boid_vel[..., 1].gather(1, idx)
+    al = sim.boid_alive.gather(1, idx).double()
+    rx = rx * al; ry = ry * al; rvx = rvx * al; rvy = rvy * al
+    alive_f = sim.boid_alive.double()
+    n_alive = alive_f.sum(dim=1, keepdim=True)
+    n_safe = torch.where(n_alive > 0, n_alive, torch.ones_like(n_alive))
+    cx = (sim.boid_pos[..., 0] * alive_f).sum(dim=1, keepdim=True) / n_safe
+    cy = (sim.boid_pos[..., 1] * alive_f).sum(dim=1, keepdim=True) / n_safe
+    cent_rx = (cx[:, 0] - sim.pred_pos[:, 0]).unsqueeze(1)
+    cent_ry = (cy[:, 0] - sim.pred_pos[:, 1]).unsqueeze(1)
+    boid_block = torch.stack([rx / PS, ry / PS, rvx / VS, rvy / VS], dim=2).reshape(B, 4 * M)
+    feat = torch.cat([
+        sim.pred_vel / VS,
+        e3d_rel / PS,
+        boid_block,
+        (n_alive / sim.N),
+        cent_rx / PS, cent_ry / PS,
+    ], dim=1)
+    return feat
+
+
+def run_planner_log(seeds, frames, device, K, H, D, M):
+    """Run the planner and log (obs, target_rel) every frame for distillation."""
+    sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
+              auto_target='evolved', auto_target_opts=dict(E3D))
+    B = sim.B
+    roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device,
+               auto_target='evolved', auto_target_opts=dict(E3D))
+    held = None
+    rows = torch.arange(B, device=device)
+    obs_log = []
+    tgt_log = []
+    f = 0
+    while f < frames:
+        if f % D == 0:
+            cand = _candidate_targets(sim, K)
+            base = _save_state(sim)
+            tiled = _tile_state(base, K)
+            _load_state(roll, tiled)
+            roll_tgt = cand.reshape(B * K, 2).contiguous()
+            h = min(H, frames - f)
+            c0 = roll.catches.clone()
+            for _ in range(h):
+                _step_with_target(roll, roll_tgt)
+            gain = (roll.catches - c0).reshape(B, K)
+            best = gain.float().argmax(dim=1)
+            held = cand[rows, best]
+        # log obs (e3d target as feature) + chosen target (predator-relative)
+        e3d_rel = _e3d_target(sim) - sim.pred_pos
+        ob = planner_obs(sim, M, e3d_rel)
+        tgt_rel = held - sim.pred_pos
+        obs_log.append(ob.float().cpu())
+        tgt_log.append(tgt_rel.float().cpu())
+        _step_with_target(sim, held)
+        f += 1
+    obs = torch.cat(obs_log, dim=0).numpy()
+    tgt = torch.cat(tgt_log, dim=0).numpy()
+    return obs, tgt, sim.catches.cpu().numpy()
+
+
 def run_e3d(seeds, frames, device):
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
               auto_target='evolved', auto_target_opts=dict(E3D))
