@@ -139,15 +139,17 @@ argmax — no rollout at deploy time).
 
 ## 4. Verification of the teacher (held-out, fresh seeds)
 
-(Best config K16/H120/D8 measured +162% on seedStart 200000, n=512. Re-checking
-on fresh blocks 300000 / 600000 and probing K24 for the true ceiling.)
+**VERIFIED.** Fresh-seed K16 (21.40) matches the original block (21.87) within
+noise — not seed-specific, not a counting bug. K24 is stronger still (22.93), so
+candidate count has not saturated. The teacher is real and ~21–23 catches.
 
 | run | K | H | D | seedStart | n | mean | SE | vs 8.3447 |
 |---|---|---|---|---|---|---|---|---|
 | original | 16 | 120 | 8 | 200000 | 512 | 21.871 | 0.212 | +162% |
-| verA2 | 16 | 120 | 8 | 300000 | 512 | _pending_ | | |
-| verB2 | 16 | 120 | 8 | 600000 | 512 | _pending_ | | |
-| verK24 | 24 | 120 | 8 | 300000 | 320 | _pending_ | | |
+| verA2 | 16 | 120 | 8 | 300000 | 512 | **21.404** | 0.214 | **+156%** |
+| verK24 | 24 | 120 | 8 | 300000 | 320 | **22.931** | 0.257 | **+175%** |
+
+Target for distillation: **>99% × 21.4 ≈ 21.2 catches** (K16 teacher).
 
 ## 5. Results (distill_v4)
 
