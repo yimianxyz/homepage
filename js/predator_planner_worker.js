@@ -61,28 +61,86 @@ function ensureCap(n) {
     _alive = new Uint8Array(n); _cap = n;
 }
 
+// Uniform spatial hash so flock neighbor queries are O(local) not O(n). Cell
+// size == NEIGHBOR_DISTANCE (the largest interaction radius), so EVERY boid
+// within 60px is guaranteed to lie in the queried 3x3 cell block — the neighbor
+// SET is byte-identical to brute force (verified: verify_planner_parity == 0).
+// Distances are raw euclidean (boid.js does NOT wrap distance), so the grid
+// likewise does NOT wrap — edge boids don't see across the toroidal seam, same
+// as the live sim. Doubly-linked buckets give O(1) move when a boid changes
+// cell during the sequential render phase. One grid is shared (single-threaded
+// worker, one rollout/episode at a time).
+var GCELL = NEIGHBOR_DISTANCE;            // 60
+var GOFF = 120;                            // > boid border (10) so indices >= 0
+var g_ncx = 0, g_ncy = 0, g_ncells = 0;
+var g_head, g_next, g_prev, g_cellOf, g_ccap = 0, g_gcap = 0;
+function gridConfig() {
+    g_ncx = ((cfg.W + 2 * GOFF) / GCELL | 0) + 2;
+    g_ncy = ((cfg.Hc + 2 * GOFF) / GCELL | 0) + 2;
+    g_ncells = g_ncx * g_ncy;
+    if (g_ncells > g_ccap) { g_head = new Int32Array(g_ncells); g_ccap = g_ncells; }
+}
+function gridEnsure(n) {
+    if (n > g_gcap) { g_next = new Int32Array(n); g_prev = new Int32Array(n); g_cellOf = new Int32Array(n); g_gcap = n; }
+}
+function cellIdx(x, y) {
+    var cx = (x + GOFF) / GCELL | 0; if (cx < 0) cx = 0; else if (cx >= g_ncx) cx = g_ncx - 1;
+    var cy = (y + GOFF) / GCELL | 0; if (cy < 0) cy = 0; else if (cy >= g_ncy) cy = g_ncy - 1;
+    return cy * g_ncx + cx;
+}
+function gridReset() { g_head.fill(-1, 0, g_ncells); }
+function gridInsert(i, x, y) {
+    var c = cellIdx(x, y); g_cellOf[i] = c; g_prev[i] = -1;
+    var h = g_head[c]; g_next[i] = h; if (h >= 0) g_prev[h] = i; g_head[c] = i;
+}
+function gridRemove(i) {
+    var c = g_cellOf[i]; if (c < 0) return;
+    var pr = g_prev[i], nx = g_next[i];
+    if (pr >= 0) g_next[pr] = nx; else g_head[c] = nx;
+    if (nx >= 0) g_prev[nx] = pr;
+    g_cellOf[i] = -1;
+}
+function gridMove(i, x, y) {
+    var nc = cellIdx(x, y); if (nc === g_cellOf[i]) return;
+    gridRemove(i);
+    g_cellOf[i] = nc; g_prev[i] = -1;
+    var h = g_head[nc]; g_next[i] = h; if (h >= 0) g_prev[h] = i; g_head[nc] = i;
+}
+function gridBuild(px, py, alive, n) {
+    gridConfig(); gridEnsure(n); gridReset();
+    for (var i = 0; i < n; i++) if (alive[i]) gridInsert(i, px[i], py[i]);
+}
+
 // Accumulate one flock() contribution onto (ax[i], ay[i]), reading current
-// positions of all live boids. Mirrors Boid.flock add-order exactly. Arrays are
-// passed in so the same verified code drives both rollouts (scratch buffers) and
-// the closed-loop episode eval (separate buffers).
+// positions of live neighbors via the spatial grid. Mirrors Boid.flock add-order
+// exactly. Arrays are passed in so the same verified code drives both rollouts
+// (scratch buffers) and the closed-loop episode eval (separate buffers).
 function accumulateFlock(px, py, vx, vy, ax, ay, alive, i, n, predX, predY) {
     var pix = px[i], piy = py[i];
     var cx = 0, cy = 0, cn = 0;        // cohesion: sum neighbor positions
     var sx = 0, sy = 0, sn = 0;        // separation: sum normalized/dist deltas
     var alx = 0, aly = 0, an = 0;      // alignment: sum neighbor velocities
-    for (var j = 0; j < n; j++) {
-        if (j === i || !alive[j]) continue;
-        var rx = px[j] - pix, ry = py[j] - piy;
-        var dist = Math.sqrt(rx * rx + ry * ry) + EPSILON;
-        if (dist <= NEIGHBOR_DISTANCE) { cx += px[j]; cy += py[j]; cn++; }
-        if (dist > 0 && dist < DESIRED_SEPARATION) {
-            var ddx = -rx, ddy = -ry;                 // pos - boid.pos
-            var m = Math.sqrt(ddx * ddx + ddy * ddy); // iNormalize (TRUE mag)
-            if (m > 0) { ddx /= m; ddy /= m; }
-            ddx /= dist; ddy /= dist;                 // iDivideBy(distance)
-            sx += ddx; sy += ddy; sn++;
+    var ci = g_cellOf[i], cyi = (ci / g_ncx) | 0, cxi = ci - cyi * g_ncx;
+    var gylo = cyi > 0 ? cyi - 1 : 0, gyhi = cyi < g_ncy - 1 ? cyi + 1 : g_ncy - 1;
+    var gxlo = cxi > 0 ? cxi - 1 : 0, gxhi = cxi < g_ncx - 1 ? cxi + 1 : g_ncx - 1;
+    for (var gy = gylo; gy <= gyhi; gy++) {
+        var rowbase = gy * g_ncx;
+        for (var gx = gxlo; gx <= gxhi; gx++) {
+            for (var j = g_head[rowbase + gx]; j >= 0; j = g_next[j]) {
+                if (j === i) continue;
+                var rx = px[j] - pix, ry = py[j] - piy;
+                var dist = Math.sqrt(rx * rx + ry * ry) + EPSILON;
+                if (dist <= NEIGHBOR_DISTANCE) { cx += px[j]; cy += py[j]; cn++; }
+                if (dist > 0 && dist < DESIRED_SEPARATION) {
+                    var ddx = -rx, ddy = -ry;                 // pos - boid.pos
+                    var m = Math.sqrt(ddx * ddx + ddy * ddy); // iNormalize (TRUE mag)
+                    if (m > 0) { ddx /= m; ddy /= m; }
+                    ddx /= dist; ddy /= dist;                 // iDivideBy(distance)
+                    sx += ddx; sy += ddy; sn++;
+                }
+                if (dist > 0 && dist < NEIGHBOR_DISTANCE) { alx += vx[j]; aly += vy[j]; an++; }
+            }
         }
-        if (dist > 0 && dist < NEIGHBOR_DISTANCE) { alx += vx[j]; aly += vy[j]; an++; }
     }
     var vxi = vx[i], vyi = vy[i], fm, s;
     // cohesion = seek(avgPos)
@@ -181,13 +239,14 @@ function rolloutFlat(s, tx, ty, H) {
         _vx[i] = s.bvx[i]; _vy[i] = s.bvy[i];
         _ax[i] = 0; _ay[i] = 0; _alive[i] = 1;
     }
+    gridBuild(_px, _py, _alive, n);
     var p = { x: s.px, y: s.py, vx: s.pvx, vy: s.pvy };
     var size = s.psize, lastFeed = s.lastFeed, now = s.nowMs, catches = 0;
     for (var f = 0; f < H; f++) {
         // tick(): flock all live boids (no move)
         for (i = 0; i < n; i++) if (_alive[i]) accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y);
         // render(): per live boid in order, flock again then move immediately
-        for (i = 0; i < n; i++) if (_alive[i]) { accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y); updateBoid(_px, _py, _vx, _vy, _ax, _ay, i); }
+        for (i = 0; i < n; i++) if (_alive[i]) { accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y); updateBoid(_px, _py, _vx, _vy, _ax, _ay, i); gridMove(i, _px[i], _py[i]); }
         predatorStepFlat(_px, _py, _alive, n, p, tx, ty);
         // catch check (gated by feed cooldown), TRUE distance
         if (now - lastFeed >= FEED_COOLDOWN) {
@@ -197,7 +256,7 @@ function rolloutFlat(s, tx, ty, H) {
                 var ex = p.x - _px[i], ey = p.y - _py[i];
                 if (Math.sqrt(ex * ex + ey * ey) < cr) {
                     size = Math.min(size + GROWTH, MAX_SIZE);
-                    lastFeed = now; _alive[i] = 0; catches++; break;
+                    lastFeed = now; _alive[i] = 0; gridRemove(i); catches++; break;
                 }
             }
         }
@@ -253,8 +312,11 @@ function evalClosedLoop(s, frames, D, controller) {
                 tx = e.x; ty = e.y;
             }
         }
+        // Rebuild from current episode state: plan() above reuses the shared grid
+        // for its scratch rollouts, so it must be reset here regardless.
+        gridBuild(e_px, e_py, e_alive, n);
         for (i = 0; i < n; i++) if (e_alive[i]) accumulateFlock(e_px, e_py, e_vx, e_vy, e_ax, e_ay, e_alive, i, n, p.x, p.y);
-        for (i = 0; i < n; i++) if (e_alive[i]) { accumulateFlock(e_px, e_py, e_vx, e_vy, e_ax, e_ay, e_alive, i, n, p.x, p.y); updateBoid(e_px, e_py, e_vx, e_vy, e_ax, e_ay, i); }
+        for (i = 0; i < n; i++) if (e_alive[i]) { accumulateFlock(e_px, e_py, e_vx, e_vy, e_ax, e_ay, e_alive, i, n, p.x, p.y); updateBoid(e_px, e_py, e_vx, e_vy, e_ax, e_ay, i); gridMove(i, e_px[i], e_py[i]); }
         predatorStepFlat(e_px, e_py, e_alive, n, p, tx, ty);
         if (now - lastFeed >= FEED_COOLDOWN) {
             var cr = size * CATCH_FACTOR;
@@ -262,7 +324,7 @@ function evalClosedLoop(s, frames, D, controller) {
                 if (!e_alive[i]) continue;
                 var ex = p.x - e_px[i], ey = p.y - e_py[i];
                 if (Math.sqrt(ex * ex + ey * ey) < cr) {
-                    size = Math.min(size + GROWTH, MAX_SIZE); lastFeed = now; e_alive[i] = 0; catches++; break;
+                    size = Math.min(size + GROWTH, MAX_SIZE); lastFeed = now; e_alive[i] = 0; gridRemove(i); catches++; break;
                 }
             }
         }
