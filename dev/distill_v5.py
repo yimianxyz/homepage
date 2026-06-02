@@ -139,6 +139,8 @@ def class_weights(GN, K, device):
 
 def train(tr, va, enc, device, epochs, modes, tau, margin_w, d, layers, hid,
           heads, lr, bs, out_json=None):
+    if device.startswith('cuda'):
+        torch.cuda.empty_cache()
     BF, MK, PSt, CF, GN = [t.to(device) for t in tr]
     K = CF.shape[1]
     cw = class_weights(GN, K, device) if 'cls' in modes else None
@@ -235,6 +237,8 @@ def main():
         if args.save_data:
             torch.save({'data': list(data), 'gmean': gmean}, args.save_data)
             print(f"  saved dataset -> {args.save_data}", flush=True)
+    if device.startswith('cuda'):
+        torch.cuda.empty_cache()
     print(f"  planner_mean={gmean:.2f} rows={data[0].shape[0]} {time.time()-t0:.0f}s", flush=True)
     bufs = [data]
     history = []
