@@ -107,7 +107,7 @@ def main():
     res['net_mean_ci95'] = [nlo, nhi]
 
     if not args.skip_planner:
-        plan_c = pp.run_planner(seeds, args.frames, device, args.K, args.H, args.D).astype(np.float64)
+        plan_c = pp.run_planner(seeds, args.frames, device, args.K, args.H, args.D)[0].astype(np.float64)
         print(f"[eval_net] planner done {time.time()-t0:.0f}s", flush=True)
         res['planner_catches'] = stat(plan_c)
         delta = net_c - plan_c

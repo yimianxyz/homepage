@@ -105,7 +105,7 @@ def main():
         results.append(r)
         print(json.dumps(r), flush=True)
 
-    planner_catches = pp.run_planner(seeds, args.frames, device, args.K, args.H, args.D)
+    planner_catches, _ = pp.run_planner(seeds, args.frames, device, args.K, args.H, args.D)
     results.append(summarize('planner', planner_catches))
     print(json.dumps(results[-1]), flush=True)
 

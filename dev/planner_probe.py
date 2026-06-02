@@ -329,7 +329,16 @@ def run_e3d(seeds, frames, device):
     return sim.catches.cpu().numpy()
 
 
-def run_planner(seeds, frames, device, K, H, D):
+def run_planner(seeds, frames, device, K, H, D, randtie=False):
+    """Returns (per_seed_catches, stats).
+
+    randtie: when two or more candidates tie for the max rollout gain, break
+    the tie UNIFORMLY AT RANDOM instead of defaulting to argmax's first index
+    (candidate 0 = E3D). This is the selection-on-chaos null: if the real
+    planner's edge over E3D vanishes under random tie-breaking, the "edge" was
+    an artifact of how near-tied (mostly sub-catch) rollouts get resolved, not
+    genuine lookahead. stats also reports the fraction of decisions whose
+    committed target was NOT E3D (candidate 0)."""
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
               auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     B = sim.B
@@ -338,6 +347,8 @@ def run_planner(seeds, frames, device, K, H, D):
                auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     held = None        # (B,2) currently committed target
     rows = torch.arange(B, device=device)
+    n_dec = 0
+    n_non_e3d = 0
     f = 0
     while f < frames:
         if f % D == 0:
@@ -351,11 +362,23 @@ def run_planner(seeds, frames, device, K, H, D):
             for _ in range(h):
                 _step_with_target(roll, roll_tgt)
             gain = rollout_gain(roll, c0, B, K)      # (B,K) catches (+dense bonus)
-            best = gain.argmax(dim=1)                     # (B,)
+            if randtie:
+                mx = gain.max(dim=1, keepdim=True).values
+                is_max = gain >= (mx - 1e-9)
+                # argmax of (uniform noise masked to the tied-max set) = random
+                # pick among the maximizers.
+                pick = torch.rand_like(gain) * is_max.float() - (~is_max).float()
+                best = pick.argmax(dim=1)
+            else:
+                best = gain.argmax(dim=1)                 # (B,)
+            n_dec += B
+            n_non_e3d += int((best != 0).sum().item())
             held = cand[rows, best]                       # (B,2)
         _step_with_target(sim, held)
         f += 1
-    return sim.catches.cpu().numpy()
+    stats = dict(n_dec=n_dec, n_non_e3d=n_non_e3d,
+                 frac_non_e3d=round(n_non_e3d / max(n_dec, 1), 4))
+    return sim.catches.cpu().numpy(), stats
 
 
 def main():
@@ -373,6 +396,9 @@ def main():
                     help='DENSE_LAMBDA proximity tie-breaker on gain (0=pure integer)')
     ap.add_argument('--twopass', action='store_true',
                     help='use the live browser two-flock-pass dynamics')
+    ap.add_argument('--randtie', action='store_true',
+                    help='planner: break tied-max-gain candidates at random '
+                         '(selection-on-chaos null arm)')
     ap.add_argument('--out', default=None)
     args = ap.parse_args()
 
@@ -386,18 +412,22 @@ def main():
 
     seeds = list(range(args.seedStart, args.seedStart + args.n))
     t0 = time.time()
+    stats = None
     if args.controller == 'e3d':
         catches = run_e3d(seeds, args.frames, device)
     else:
-        catches = run_planner(seeds, args.frames, device, args.K, args.H, args.D)
+        catches, stats = run_planner(seeds, args.frames, device, args.K, args.H,
+                                     args.D, randtie=args.randtie)
     elapsed = time.time() - t0
 
     mean = float(catches.mean())
     se = float(catches.std(ddof=1) / np.sqrt(len(catches)))
     res = dict(controller=args.controller, n=args.n, seedStart=args.seedStart,
                frames=args.frames, K=args.K, H=args.H, D=args.D,
-               two_pass=TWO_PASS, mean=mean, se=se, elapsed=elapsed, device=device)
-    print(json.dumps(res))
+               two_pass=TWO_PASS, randtie=args.randtie, stats=stats,
+               mean=mean, se=se, elapsed=elapsed, device=device,
+               per_seed=catches.astype(float).round(0).tolist())
+    print(json.dumps({k: v for k, v in res.items() if k != 'per_seed'}))
     if args.out:
         with open(args.out, 'w') as fh:
             json.dump(res, fh)
