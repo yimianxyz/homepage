@@ -1,3 +1,6 @@
 node_modules/
 package.json
 package-lock.json
+# large binaries: planner datasets + net checkpoints (reproducible, kept on fs not git)
+dev/datasets/
+*.pt
