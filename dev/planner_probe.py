@@ -56,6 +56,11 @@ E3D = dict(cluster_r=178.09, dens_pow=2.373, reach_scale=1515.0, sharp=9.25,
 # the teacher distillable and (b) may RAISE the ceiling, since tied frames now
 # pick a forward-positioned target instead of defaulting to baseline E3D.
 DENSE_LAMBDA = 0.0
+# TWO_PASS: when True, every Sim built here (closed-loop + rollout) runs the
+# live browser's two-flock-pass dynamics (see Sim._step_boids_twopass). The
+# planner thus plans AND acts under the same two-pass world. Default False =
+# single-pass (matches Oracle + ds1024_dense08.pt teacher data).
+TWO_PASS = False
 _PS = 200.0
 
 
@@ -236,10 +241,10 @@ def planner_obs(sim, M, e3d_rel):
 def run_planner_log(seeds, frames, device, K, H, D, M):
     """Run the planner and log (obs, target_rel) every frame for distillation."""
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
-              auto_target='evolved', auto_target_opts=dict(E3D))
+              auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     B = sim.B
     roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device,
-               auto_target='evolved', auto_target_opts=dict(E3D))
+               auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     held = None
     rows = torch.arange(B, device=device)
     obs_log = []
@@ -279,10 +284,10 @@ def run_planner_log_cand(seeds, frames, device, K, H, D, M):
     planner ranks and picks argmax, so we log candidate offsets (predator-rel)
     and the rollout gain per candidate (the value to regress / argmax over)."""
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
-              auto_target='evolved', auto_target_opts=dict(E3D))
+              auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     B = sim.B
     roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device,
-               auto_target='evolved', auto_target_opts=dict(E3D))
+               auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     held = None
     rows = torch.arange(B, device=device)
     obs_log, cand_log, gain_log = [], [], []
@@ -317,7 +322,7 @@ def run_planner_log_cand(seeds, frames, device, K, H, D, M):
 
 def run_e3d(seeds, frames, device):
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
-              auto_target='evolved', auto_target_opts=dict(E3D))
+              auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     for _ in range(frames):
         tgt = _e3d_target(sim)
         _step_with_target(sim, tgt)
@@ -326,11 +331,11 @@ def run_e3d(seeds, frames, device):
 
 def run_planner(seeds, frames, device, K, H, D):
     sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
-              auto_target='evolved', auto_target_opts=dict(E3D))
+              auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     B = sim.B
     # rollout sim with B*K envs, state injected each decision point
     roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device,
-               auto_target='evolved', auto_target_opts=dict(E3D))
+               auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     held = None        # (B,2) currently committed target
     rows = torch.arange(B, device=device)
     f = 0
@@ -366,11 +371,14 @@ def main():
     ap.add_argument('--weights', default='js/predator_weights.json')
     ap.add_argument('--dense', type=float, default=0.0,
                     help='DENSE_LAMBDA proximity tie-breaker on gain (0=pure integer)')
+    ap.add_argument('--twopass', action='store_true',
+                    help='use the live browser two-flock-pass dynamics')
     ap.add_argument('--out', default=None)
     args = ap.parse_args()
 
-    global WEIGHTS, DENSE_LAMBDA
+    global WEIGHTS, DENSE_LAMBDA, TWO_PASS
     DENSE_LAMBDA = args.dense
+    TWO_PASS = args.twopass
     device = args.device
     if device.startswith('cuda') and not torch.cuda.is_available():
         device = 'cpu'
@@ -388,7 +396,7 @@ def main():
     se = float(catches.std(ddof=1) / np.sqrt(len(catches)))
     res = dict(controller=args.controller, n=args.n, seedStart=args.seedStart,
                frames=args.frames, K=args.K, H=args.H, D=args.D,
-               mean=mean, se=se, elapsed=elapsed, device=device)
+               two_pass=TWO_PASS, mean=mean, se=se, elapsed=elapsed, device=device)
     print(json.dumps(res))
     if args.out:
         with open(args.out, 'w') as fh:

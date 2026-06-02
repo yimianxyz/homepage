@@ -280,7 +280,7 @@ def build_features(pred_pos, pred_vel, boid_pos, boid_vel, boid_alive,
 class Sim:
     def __init__(self, seeds, weights, num_boids=N_BOIDS,
                  auto_target='flock_centroid', device='cpu', sequential=False,
-                 auto_target_opts=None):
+                 auto_target_opts=None, two_pass=False):
         self.seeds = list(seeds)
         self.B = len(self.seeds)
         self.N = num_boids
@@ -289,6 +289,12 @@ class Sim:
         self.auto_target_opts = auto_target_opts or {}
         self.device = device
         self.sequential = sequential
+        # two_pass: replicate the LIVE browser's two flock() passes per frame
+        # (js/simulation.js run(): tick() then render()). Pass 1 = vectorized
+        # flock from frame-start positions (no movement); pass 2 = sequential
+        # flock + immediate per-boid update, ADDED to the pass-1 accel. Default
+        # False = single parallel pass (matches Oracle + all teacher data).
+        self.two_pass = two_pass
         self._initialize()
 
     def _initialize(self):
@@ -334,10 +340,10 @@ class Sim:
         self._wrap_neg_b = torch.tensor(-BORDER_OFFSET, dtype=dt, device=d)
         self._inf_t = torch.tensor(float('inf'), dtype=dt, device=d)
 
-        if self.sequential:
-            # Acceleration accumulator — matches JS Oracle which calls
-            # sim.render() only (skipping the live-page's sim.tick()), so each
-            # boid gets exactly ONE flock pass per frame inside boid.run().
+        if self.sequential or self.two_pass:
+            # Acceleration accumulator. Sequential (Oracle) uses one flock pass;
+            # two_pass (live browser) accumulates a vectorized pass-1 plus a
+            # sequential pass-2 into this buffer before each per-boid update.
             self.boid_accel = torch.zeros((self.B, self.N, 2), dtype=dt, device=d)
 
     def _compute_boid_acceleration(self):
@@ -431,6 +437,8 @@ class Sim:
         return acc_x, acc_y
 
     def _step_boids(self):
+        if self.two_pass:
+            return self._step_boids_twopass()
         ax, ay = self._compute_boid_acceleration()
         new_vx = self.boid_vel[..., 0] + ax
         new_vy = self.boid_vel[..., 1] + ay
@@ -448,6 +456,53 @@ class Sim:
         self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] < neg_b, pos_mw, self.boid_pos[..., 0])
         self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] > pos_mh, neg_b, self.boid_pos[..., 1])
         self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] < neg_b, pos_mh, self.boid_pos[..., 1])
+
+    def _step_boids_twopass(self):
+        """Replicate the LIVE browser's TWO flock passes per frame.
+
+        js/simulation.js run() per frame: self.tick() then self.render().
+          - tick()  : every boid flock() from frame-start positions, accumulate
+                       acceleration, NO movement                     (pass 1)
+          - render(): every boid run() = flock() (forces now include in-frame
+                       updates from boids 0..i-1) + update() (vel+=accel; limit;
+                       pos+=vel; wrap; accel=0)                       (pass 2)
+        The predator updates only at the END of render(), so pred_pos is the
+        frame-start position during BOTH passes (predator-avoidance is summed
+        twice). pred_pos is advanced after _step_boids() by the caller, so it is
+        already frame-start here -> matches the browser.
+
+        boid_accel is 0 at frame start (pass 2 zeroes each boid after updating).
+        """
+        # Pass 1 — vectorized flock from frame-start positions; accumulate.
+        ax, ay = self._compute_boid_acceleration()
+        self.boid_accel[..., 0] += ax
+        self.boid_accel[..., 1] += ay
+        # Pass 2 — sequential flock + immediate update, added to pass-1 accel.
+        neg_b = self._wrap_neg_b
+        pos_mw = self._wrap_b_w_max
+        pos_mh = self._wrap_b_h_max
+        for i in range(self.N):
+            ax_i, ay_i = self._compute_single_boid_acceleration(i)
+            self.boid_accel[:, i, 0] += ax_i
+            self.boid_accel[:, i, 1] += ay_i
+
+            new_vx = self.boid_vel[:, i, 0] + self.boid_accel[:, i, 0]
+            new_vy = self.boid_vel[:, i, 1] + self.boid_accel[:, i, 1]
+            new_vx, new_vy = fast_limit(new_vx, new_vy, MAX_SPEED)
+            self.boid_vel[:, i, 0] = new_vx
+            self.boid_vel[:, i, 1] = new_vy
+
+            new_px = self.boid_pos[:, i, 0] + new_vx
+            new_py = self.boid_pos[:, i, 1] + new_vy
+            new_px = torch.where(new_px > pos_mw, neg_b, new_px)
+            new_px = torch.where(new_px < neg_b, pos_mw, new_px)
+            new_py = torch.where(new_py > pos_mh, neg_b, new_py)
+            new_py = torch.where(new_py < neg_b, pos_mh, new_py)
+            self.boid_pos[:, i, 0] = new_px
+            self.boid_pos[:, i, 1] = new_py
+
+            self.boid_accel[:, i, 0] = 0
+            self.boid_accel[:, i, 1] = 0
 
     def _compute_single_boid_acceleration(self, i):
         """Compute (ax, ay) for boid i across all B batches, using CURRENT
