@@ -105,6 +105,9 @@ function buildContext(opt, weightsJson) {
     // Configure exactly as predator_planner.js's config message would.
     sandbox.cfg.K = opt.K; sandbox.cfg.H = opt.H; sandbox.cfg.POLICY_R = opt.POLICY_R;
     sandbox.cfg.W = opt.width; sandbox.cfg.Hc = opt.height;
+    // Set PREDATOR_RANGE explicitly (desktop=80) rather than relying on the
+    // boid.js getBoidPredatorRange() default resolving correctly by load order.
+    sandbox.PREDATOR_RANGE = 80;
     return { sandbox, win };
 }
 
