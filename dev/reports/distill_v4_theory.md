@@ -227,7 +227,7 @@ Two things this proves:
 | 40  | 12.369 ± 0.334 | +48% |
 | 60  | 17.031 ± 0.381 | +104% |
 | 80  | _pending_ | |
-| 100 | _pending_ | |
+| 100 | 20.556 ± 0.385 | +146% |
 | 120 | 21.40 (n=512) | +156% |
 
 The climb is smooth and monotone: catches ≈ a roughly linear function of lookahead
