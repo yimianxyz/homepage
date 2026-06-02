@@ -41,6 +41,22 @@ def boot_paired(a, b, iters=100000, seed=0):
     return float(d.mean()), float(lo), float(hi), float((means > 0).mean())
 
 
+def mde(a, b):
+    """Minimum detectable effect (paired, 80% power, two-sided 0.05) and the
+    n needed to detect a +0.5/episode edge. Addresses the red-team's power
+    worry: a 'n.s.' CI is only informative if the test COULD have seen a real
+    sub-catch edge. sd_delta is the paired per-seed Δ SD (scene difficulty
+    cancels), which drives power far more than the raw catch SD."""
+    d = a - b
+    n = len(d)
+    sd = float(d.std(ddof=1))
+    # 80% power two-sided 0.05: MDE = (z_a/2 + z_b) * sd/sqrt(n) = 2.80 * SE
+    se = sd / np.sqrt(n)
+    mde80 = 2.80 * se
+    n_for_half = (2.80 * sd / 0.5) ** 2 if sd > 0 else 0.0
+    return sd, se, mde80, n_for_half
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--label', action='append', nargs=2, metavar=('NAME', 'PATH'),
@@ -87,9 +103,15 @@ def main():
             print(f"  [{tag}] length mismatch {len(a)} vs {len(b)}")
             return
         m, lo, hi, pgt = boot_paired(a, b)
+        sd, se, mde80, n_half = mde(a, b)
         sig = "SIGNIFICANT" if (lo > 0 or hi < 0) else "n.s. (CI spans 0)"
         print(f"  [{tag}] Δ(mean per-seed) = {m:+.3f}  95%CI [{lo:+.3f}, {hi:+.3f}]  "
               f"P(Δ>0)={pgt:.3f}  {sig}")
+        print(f"        paired SD(Δ)={sd:.3f}  SE={se:.3f}  MDE@80%pow={mde80:.3f}/episode"
+              f"  n_for_0.5edge≈{n_half:.0f}")
+        if not (lo > 0 or hi < 0):
+            print(f"        ^ n.s. is only conclusive if MDE < the edge you'd act on; "
+                  f"a real edge < {mde80:.2f}/episode would be invisible at this n.")
 
     print('\n=== paired bootstrap (shared seeds) ===')
     paired(args.planner_key, args.e3d_key, f"{args.planner_key} - {args.e3d_key}")
