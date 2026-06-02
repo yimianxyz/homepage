@@ -125,6 +125,12 @@ Predator.prototype = {
     // The simulation is gated on the weights being loaded (see boids.js), so
     // window.__predatorModel is always present here.
     getAutonomousForce: function(boids) {
+        // TEMPORARY, URL-flag-gated planner override (?policy=planner). When
+        // inactive (default prod) this is a no-op and the radial net below runs
+        // byte-identically. See js/predator_planner.js. One-commit reversible.
+        if (window.__planner && window.__planner.active) {
+            return window.__planner.force(this, boids);
+        }
         var model = window.__predatorModel;
         var n = boids.length;
         if (n === 0) return new Vector(0, 0);
