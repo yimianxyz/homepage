@@ -208,6 +208,8 @@ def main():
     ap.add_argument('--weights', default='predator_weights.json')
     ap.add_argument('--device', default='cuda')
     ap.add_argument('--out', default=None)
+    ap.add_argument('--save_data', default=None, help='cache iter-0 planner dataset to this .pt')
+    ap.add_argument('--load_data', default=None, help='load cached iter-0 dataset, skip gen')
     args = ap.parse_args()
 
     device = args.device
@@ -222,9 +224,17 @@ def main():
           f"loss={args.loss} margin_w={args.margin_w} K={args.K} H={args.H} D={args.D} "
           f"gen_seeds={args.gen_seeds}", flush=True)
 
-    print("[v5] iter 0: planner data gen (chunked)", flush=True)
-    data, gmean = gen_chunked(None, gen_seeds, args.gen_frames, device,
-                              args.K, args.H, args.D, args.gen_chunk)
+    if args.load_data:
+        print(f"[v5] iter 0: load cached dataset {args.load_data}", flush=True)
+        blob = torch.load(args.load_data, map_location='cpu')
+        data, gmean = tuple(blob['data']), blob['gmean']
+    else:
+        print("[v5] iter 0: planner data gen (chunked)", flush=True)
+        data, gmean = gen_chunked(None, gen_seeds, args.gen_frames, device,
+                                  args.K, args.H, args.D, args.gen_chunk)
+        if args.save_data:
+            torch.save({'data': list(data), 'gmean': gmean}, args.save_data)
+            print(f"  saved dataset -> {args.save_data}", flush=True)
     print(f"  planner_mean={gmean:.2f} rows={data[0].shape[0]} {time.time()-t0:.0f}s", flush=True)
     bufs = [data]
     history = []
