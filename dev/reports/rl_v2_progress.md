@@ -97,3 +97,39 @@ point.
   common than current data shows.
 - **JS-aware ES**: use JS as the selection signal directly (slow but
   exact); `rl_train_jsaware.py` is the framework.
+
+## 2026-06-02 — cval+cls distillation is a dead end; ES sweep relaunched
+
+**Distillation of the planner's per-frame centered gain (task #94) failed
+across three architectures.** distill_v5 cval+cls trained to convergence
+(80 epochs) on `ds1024_dense08.pt`, then closed-loop-evaluated:
+
+| Encoder      | params | closed-loop mean | % of planner | vs shipped base |
+|--------------|-------:|-----------------:|-------------:|----------------:|
+| deepsets     | big    | 7.107 ± 0.17     | 33.2%        | −14.8%          |
+| transformer  | 6L/192 | 6.068 ± 0.18     | 28.4%        | −27.3%          |
+| crossattn    | 6L/192 | 5.875 ± 0.17     | 27.5%        | −29.6%          |
+
+All three converge to the same wall (val decisive-choice acc ~0.18–0.24,
+vs E3D-const 0.138) and all land *below* the shipped baseline in closed
+loop. **Supervised distillation of the teacher's choices does not
+transfer to closed-loop catches** — the per-frame argmax target is too
+noisy/ill-posed (consistent with the earlier 0.55 classification wall,
+tasks #86/#89). Conclusion: stop pursuing choice/value distillation.
+
+**Pivot: direct closed-loop ES is the only line that has ever produced a
+JS-positive direction (the gen-10 +0.6 above).** Relaunched a 3-VM ES
+sweep (rl_train_v2, P=154 radial, frames=5000, rotate_seeds):
+
+| VM | sigma | K  | lr  | top_k | seed | out |
+|----|-------|----|-----|-------|------|-----|
+| 1  | 0.02  | 64 | 0.5 | 8     | 1234 | es_stage2_shipped |
+| 2  | 0.04  | 64 | 0.5 | 8     | 7777 | es_vm2_sig04 |
+| 3  | 0.02  | 96 | 0.8 | 12    | 4242 | es_vm3_K96 |
+
+**CRITICAL — do not trust sim_torch best_so_far** (e.g. VM1's 25.15): the
+ρ=0.55 tail-misleading result above still holds. The reliable signal is
+JS-verifying the *central theta* per gen (ckpt_every=1 saves all). Next:
+JS-verify the central-theta peaks of these three runs; if none beats
+shipped 24.25, the small radial net is capacity-bound and the real move
+is a **deeper net** (user's explicit ask) with JS-aware selection.
