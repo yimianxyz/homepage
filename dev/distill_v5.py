@@ -79,6 +79,16 @@ def compute_loss(s, gain, modes, tau, margin_w, class_w):
     lab = gain.argmax(1)
     if 'value' in modes:
         loss = loss + F.smooth_l1_loss(s, gain)
+    if 'cval' in modes:
+        # per-frame CENTERED value regression. Raw gain is ~88% scene-difficulty
+        # variance (nuisance) and only ~12% candidate-to-candidate signal; the
+        # uncentered SmoothL1 spends its capacity fitting the scene mean and the
+        # scores collapse to ~flat. Centering removes the scene mean so the net
+        # only learns the within-frame ranking (the thing argmax actually uses).
+        sc = s - s.mean(1, keepdim=True)
+        gc = gain - gain.mean(1, keepdim=True)
+        w = (1.0 + margin_w * (gmax - gmin)).unsqueeze(1)
+        loss = loss + (F.smooth_l1_loss(sc, gc, reduction='none') * w).mean()
     if 'margin' in modes:
         # value regression weighted per-frame by the decision margin
         w = (1.0 + margin_w * (gmax - gmin)).unsqueeze(1)        # (B,1)
@@ -103,7 +113,7 @@ def compute_loss(s, gain, modes, tau, margin_w, class_w):
     return loss
 
 
-def decisive_acc(net, data, device, bs=8192):
+def decisive_acc(net, data, device, bs=2048):
     BF, MK, PSt, CF, GN = data
     n = BF.shape[0]
     lab = GN.argmax(1)
