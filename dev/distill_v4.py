@@ -210,7 +210,7 @@ def gen_rollout(net, enc_dev, seeds, frames, device, K, H, D):
             c0 = roll.catches.clone()
             for _ in range(h):
                 pp._step_with_target(roll, roll_tgt)
-            gain = (roll.catches - c0).reshape(B, K).float()
+            gain = pp.rollout_gain(roll, c0, B, K)
             BF.append(bf.float().cpu()); MK.append(mk.cpu()); PSt.append(ps.float().cpu())
             CF.append(cf.float().cpu()); GN.append(gain.cpu())
             if net is None:

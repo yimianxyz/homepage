@@ -212,12 +212,15 @@ def main():
     ap.add_argument('--out', default=None)
     ap.add_argument('--save_data', default=None, help='cache iter-0 planner dataset to this .pt')
     ap.add_argument('--load_data', default=None, help='load cached iter-0 dataset, skip gen')
+    ap.add_argument('--dense', type=float, default=0.0,
+                    help='DENSE_LAMBDA proximity tie-breaker on teacher gain (0=pure integer)')
     args = ap.parse_args()
 
     device = args.device
     if device.startswith('cuda') and not torch.cuda.is_available():
         device = 'cpu'
     pp.WEIGHTS = st.load_weights(args.weights, device=device)
+    pp.DENSE_LAMBDA = args.dense
     modes = set(args.loss.split('+'))
     gen_seeds = list(range(args.gen_seedStart, args.gen_seedStart + args.gen_seeds))
     eval_seeds = list(range(args.eval_seedStart, args.eval_seedStart + args.eval_n))

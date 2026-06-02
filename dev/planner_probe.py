@@ -45,6 +45,38 @@ from sim_torch import (
 E3D = dict(cluster_r=178.09, dens_pow=2.373, reach_scale=1515.0, sharp=9.25,
            lead_scale=0.454, lead_max=230.6, nbhd=0.461)
 
+# Dense-gain tie-breaker. The integer catch-count over the horizon is ~86%
+# all-tie (most candidates yield the same #catches over H), so argmax defaults
+# to index-0 (E3D) on those frames and the supervised target is a chaotic
+# arbitrary pick that no reactive net can fit. Adding a small continuation
+# bonus in [0, DENSE_LAMBDA] (predator->nearest-live-boid proximity at horizon
+# end) makes the per-candidate value strictly tie-free and smoothly rankable:
+# a real 1-catch advantage (=1.0) always dominates the bonus (<1), while among
+# integer-tied candidates the better-positioned one wins. This both (a) makes
+# the teacher distillable and (b) may RAISE the ceiling, since tied frames now
+# pick a forward-positioned target instead of defaulting to baseline E3D.
+DENSE_LAMBDA = 0.0
+_PS = 200.0
+
+
+def continuation_bonus(roll):
+    """(B*K,) in [0,1]: 1 when predator is touching a live boid, ->0 at >= _PS px."""
+    dx = roll.boid_pos[..., 0] - roll.pred_pos[:, None, 0]
+    dy = roll.boid_pos[..., 1] - roll.pred_pos[:, None, 1]
+    d = torch.sqrt(dx * dx + dy * dy)
+    d = torch.where(roll.boid_alive, d, torch.full_like(d, float('inf')))
+    mind = d.min(dim=1).values
+    return (1.0 - (mind / _PS).clamp(0.0, 1.0))
+
+
+def rollout_gain(roll, c0, B, K):
+    """Per-candidate teacher value (B,K). Integer catches over the horizon plus,
+    when DENSE_LAMBDA>0, a continuous proximity tie-breaker."""
+    gain = (roll.catches - c0).reshape(B, K).float()
+    if DENSE_LAMBDA > 0.0:
+        gain = gain + DENSE_LAMBDA * continuation_bonus(roll).reshape(B, K)
+    return gain
+
 
 def _analytic_steer(sim, plan_target):
     """Production's exact analytic predator step toward `plan_target` (B,2).
@@ -224,8 +256,8 @@ def run_planner_log(seeds, frames, device, K, H, D, M):
             c0 = roll.catches.clone()
             for _ in range(h):
                 _step_with_target(roll, roll_tgt)
-            gain = (roll.catches - c0).reshape(B, K)
-            best = gain.float().argmax(dim=1)
+            gain = rollout_gain(roll, c0, B, K)
+            best = gain.argmax(dim=1)
             held = cand[rows, best]
         # log obs (e3d target as feature) + chosen target (predator-relative)
         e3d_rel = _e3d_target(sim) - sim.pred_pos
@@ -269,7 +301,7 @@ def run_planner_log_cand(seeds, frames, device, K, H, D, M):
             c0 = roll.catches.clone()
             for _ in range(h):
                 _step_with_target(roll, roll_tgt)
-            gain = (roll.catches - c0).reshape(B, K).float()    # (B,K)
+            gain = rollout_gain(roll, c0, B, K)    # (B,K)
             best = gain.argmax(dim=1)
             held = cand[rows, best]
             obs_log.append(ob.float().cpu())
@@ -313,8 +345,8 @@ def run_planner(seeds, frames, device, K, H, D):
             c0 = roll.catches.clone()
             for _ in range(h):
                 _step_with_target(roll, roll_tgt)
-            gain = (roll.catches - c0).reshape(B, K)      # (B,K) catches over horizon
-            best = gain.float().argmax(dim=1)             # (B,)
+            gain = rollout_gain(roll, c0, B, K)      # (B,K) catches (+dense bonus)
+            best = gain.argmax(dim=1)                     # (B,)
             held = cand[rows, best]                       # (B,2)
         _step_with_target(sim, held)
         f += 1
@@ -332,10 +364,13 @@ def main():
     ap.add_argument('--H', type=int, default=60)
     ap.add_argument('--D', type=int, default=15)
     ap.add_argument('--weights', default='js/predator_weights.json')
+    ap.add_argument('--dense', type=float, default=0.0,
+                    help='DENSE_LAMBDA proximity tie-breaker on gain (0=pure integer)')
     ap.add_argument('--out', default=None)
     args = ap.parse_args()
 
-    global WEIGHTS
+    global WEIGHTS, DENSE_LAMBDA
+    DENSE_LAMBDA = args.dense
     device = args.device
     if device.startswith('cuda') and not torch.cuda.is_available():
         device = 'cpu'
