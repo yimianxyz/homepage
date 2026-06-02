@@ -214,6 +214,7 @@ def main():
     ap.add_argument('--load_data', default=None, help='load cached iter-0 dataset, skip gen')
     ap.add_argument('--dense', type=float, default=0.0,
                     help='DENSE_LAMBDA proximity tie-breaker on teacher gain (0=pure integer)')
+    ap.add_argument('--save_net', default=None, help='save net state_dict+arch to this .pt')
     args = ap.parse_args()
 
     device = args.device
@@ -268,6 +269,13 @@ def main():
                 json.dump(dict(args=vars(args), params=num_params(net),
                                planner_mean=gmean, history=history,
                                elapsed=time.time() - t0), fh)
+        if args.save_net:
+            torch.save(dict(state_dict=net.state_dict(),
+                            arch=dict(enc=args.enc, d=args.d, layers=args.layers,
+                                      heads=args.heads, hid=args.hid),
+                            iter=it, mean=mean, of_planner=pct_plan),
+                       args.save_net)
+            print(f"  saved net -> {args.save_net} (mean={mean:.3f})", flush=True)
         if it < args.iters - 1:
             print(f"[v5] iter {it} DAgger relabel", flush=True)
             dr, drm = gen_chunked(net, gen_seeds, args.gen_frames, device,
