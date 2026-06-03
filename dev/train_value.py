@@ -70,7 +70,13 @@ def main():
     device = args.device if (args.device == 'cpu' or torch.cuda.is_available()) else 'cpu'
     losses = args.loss.split(',')
 
-    feat, ctx, gain = load_any(args.data)
+    parts = [load_any(p) for p in args.data.split(',')]
+    feat = torch.cat([p[0] for p in parts], 0)
+    ctx = torch.cat([p[1] for p in parts], 0)
+    gain = torch.cat([p[2] for p in parts], 0)
+    if len(parts) > 1:
+        print(json.dumps(dict(merged=[p.split('/')[-1] for p in args.data.split(',')],
+                              rows=[int(p[0].shape[0]) for p in parts])))
     N, K, FC = feat.shape
     FCTX = ctx.shape[1]
     # standardize features over (N*K) and ctx over N

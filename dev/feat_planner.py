@@ -185,6 +185,51 @@ def run_value_student(seeds, frames, device, model, K, D, Hs=0, bias0=0.0):
     return sim.catches.cpu().numpy()
 
 
+def run_dagger_feat(seeds, frames, device, model, K, H, D, bias0=0.0):
+    """DAgger relabel: the STUDENT drives the episode (predator follows the
+    student's committed target, visiting the student's own state distribution),
+    but at every decision we ALSO run the planner's true H-frame rollout to
+    relabel (feat, ctx, gain). Returns (feat, ctx, gain, student_catches).
+
+    Fixes the v1<E3D distribution-shift: the value net gets trained on the OOD
+    states it actually wanders into, with correct planner targets there."""
+    model.eval()
+    sim = Sim(seeds=seeds, weights=pp.WEIGHTS, device=device,
+              auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    B = sim.B
+    roll = Sim(seeds=list(range(B * K)), weights=pp.WEIGHTS, device=device,
+               auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    rows = torch.arange(B, device=device)
+    feat_log, ctx_log, gain_log = [], [], []
+    held = None
+    f = 0
+    while f < frames:
+        if f % D == 0:
+            cand = pp._candidate_targets(sim, K)
+            feat, ctx = candidate_features(sim, cand)
+            base = pp._save_state(sim)
+            pp._load_state(roll, pp._tile_state(base, K))
+            roll_tgt = cand.reshape(B * K, 2).contiguous()
+            h = min(H, frames - f)
+            c0 = roll.catches.clone()
+            for _ in range(h):
+                pp._step_with_target(roll, roll_tgt)
+            gain = pp.rollout_gain(roll, c0, B, K)
+            feat_log.append(feat.cpu()); ctx_log.append(ctx.cpu()); gain_log.append(gain.cpu())
+            with torch.no_grad():
+                v = model(feat.to(device), ctx.to(device))
+            score = v
+            if bias0 != 0.0:
+                score = score.clone(); score[:, 0] = score[:, 0] + bias0
+            held = cand[rows, score.argmax(dim=1)]
+        pp._step_with_target(sim, held)
+        f += 1
+    feat = torch.cat(feat_log, 0).numpy()
+    ctx = torch.cat(ctx_log, 0).numpy()
+    gain = torch.cat(gain_log, 0).numpy()
+    return feat, ctx, gain, sim.catches.cpu().numpy()
+
+
 if __name__ == '__main__':
     # CPU self-test: tiny run, check shapes + that argmax(gain) student == planner.
     import sys
