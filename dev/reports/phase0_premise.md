@@ -93,6 +93,14 @@ is a **faithful proxy on the mean metric** (the correct metric under chaos —
 from sim_torch (VM2) is trustworthy; we do NOT need to re-run the full planner in
 slow JS at n=256. Saved: `dev/reports/teachers/js_e3d_twopass_n256.json`.
 
+## Early independent signal — two-pass JS ground truth (n=4)
+The headless two-pass JS driver (`eval_planner_worker.js`, real browser dynamics,
+seedStart=200000, 1500 frames) at n=4: e3d=8.25 (SE 1.49), planner=14.25 (SE 2.66)
+→ **1.73× edge**. Tiny n, but it is the *true* browser two-pass world and it
+independently agrees with the single-pass sim 2.08×: the planner's edge over E3D
+**survives two-pass**. Makes a gate-failing (edge-collapse) two-pass sim_torch
+result very unlikely; the n=256 GPU cell will quantify it.
+
 ## Gate status
 Still gated on the two-pass cells. Continue to Phase 1/2 only if two-pass planner
 shows a real edge over two-pass E3D=28.11. If two-pass collapses the edge, the
