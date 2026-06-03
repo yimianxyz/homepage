@@ -25,13 +25,47 @@ import torch
 
 import planner_probe as pp
 import sim_torch as st
-from sim_torch import Sim, PREDATOR_MAX_SPEED
+from sim_torch import Sim, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE
 
 _PS = 200.0          # position scale
 _VS = 6.0            # velocity scale (MAX_SPEED)
 _RHO = 70.0          # local-density radius around a candidate (px)
-FC = 16              # per-candidate feature dim (keep in sync with build below)
+_HB = 90             # ballistic 2-body intercept horizon (frames)
+FC = 19              # per-candidate feature dim (keep in sync with build below)
 FCTX = 4             # global context dim
+
+
+def _ballistic_intercept(px, py, vx, vy, bx, by, bvx, bvy, catch_d, H_b=_HB):
+    """Cheap 2-body pursuit: predator (max-speed seek, no flock) vs a
+    constant-velocity boid. Returns (t_catch_norm, min_dist, caught) per element.
+    Because the predator is SLOWER than prey, a fleeing boid is never caught
+    (t_catch->H_b) while a crossing/approaching one is intercepted -- exactly the
+    'is this target catchable' signal the value net needs and instantaneous
+    features can't express."""
+    px, py, vx, vy = px.clone(), py.clone(), vx.clone(), vy.clone()
+    bx, by = bx.clone(), by.clone()
+    caught = torch.zeros_like(px, dtype=torch.bool)
+    t_catch = torch.full_like(px, float(H_b))
+    mind = torch.full_like(px, float('inf'))
+    for t in range(H_b):
+        dx = bx - px; dy = by - py
+        d = torch.sqrt(dx * dx + dy * dy).clamp(min=1e-6)
+        mind = torch.minimum(mind, d)
+        newly = (d < catch_d) & (~caught)
+        t_catch = torch.where(newly, torch.full_like(t_catch, float(t)), t_catch)
+        caught = caught | newly
+        # seek: desired velocity at max speed toward boid; steering clamped to max force
+        desx = dx / d * PREDATOR_MAX_SPEED - vx
+        desy = dy / d * PREDATOR_MAX_SPEED - vy
+        sm = torch.sqrt(desx * desx + desy * desy).clamp(min=1e-6)
+        sc = torch.clamp(PREDATOR_MAX_FORCE / sm, max=1.0)
+        vx = vx + desx * sc; vy = vy + desy * sc
+        spd = torch.sqrt(vx * vx + vy * vy).clamp(min=1e-6)
+        vsc = torch.clamp(PREDATOR_MAX_SPEED / spd, max=1.0)
+        vx = vx * vsc; vy = vy * vsc
+        px = px + vx; py = py + vy
+        bx = bx + bvx; by = by + bvy
+    return t_catch / H_b, mind, caught.float()
 
 
 def candidate_features(sim, cand):
@@ -88,6 +122,14 @@ def candidate_features(sim, cand):
     ux = rx / dist; uy = ry / dist
     flee_align = mvx * ux + mvy * uy                          # >0: flock fleeing away along LOS
 
+    # 2-body ballistic intercept of the targeted boid (the decisive catchability
+    # signal: predator is slower than prey, so a fleeing boid is uncatchable).
+    catch_d = (sim.pred_size * 0.7)[:, None].expand(B, K)
+    t_catch, bmin_d, caught = _ballistic_intercept(
+        px[:, None].expand(B, K), py[:, None].expand(B, K),
+        pvx[:, None].expand(B, K), pvy[:, None].expand(B, K),
+        bx, by, bvx, bvy, catch_d)
+
     feat = torch.stack([
         rx / _PS, ry / _PS, dist / _PS, is_e3d,
         t_go / 60.0,
@@ -96,6 +138,7 @@ def candidate_features(sim, cand):
         rangepb / _PS, closing / _VS, los_rate * 50.0,
         dens / 20.0, flee_align / _VS,
         (rangepb - dist) / _PS,                               # boid-vs-candidate range gap
+        t_catch, bmin_d / _PS, caught,                        # ballistic intercept (FC 17-19)
     ], dim=2).float()                                        # (B,K,FC)
 
     alive_f = alive.float()
