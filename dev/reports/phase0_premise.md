@@ -8,7 +8,7 @@ single table {E3D, planner} × {single-pass, two-pass} resolves the premise.
 
 | policy   | single-pass | two-pass (deployment-faithful) |
 |----------|------------:|-------------------------------:|
-| E3D      | **34.18** (SE 0.42) | **28.11** (sim_torch) — JS n=256 cross-check in flight |
+| E3D      | **34.18** (SE 0.42) | **28.11** (sim_torch) ✓ JS n=256 = **27.38** (SE 0.41), gap 2.6% — proxy VALIDATED |
 | planner  | **71.18** (SE 0.45) | *running* — VM2 n=256 (decisive) + VM1 n=128 fresh-seeds early read |
 | planner randtie (null) | *pending* | *running* — VM3 n=256 |
 
@@ -82,6 +82,16 @@ number. This is exactly why the decisive cell is **two-pass**.
   stated. It is unachievable *for a static reactive net*, which we already knew;
   it is not unachievable for a lookahead-carrying student (Phase 2 route). The
   in-browser planner's live deployability is the existence proof.
+
+## Proxy-trust check (Phase 0 step 2) — two-pass E3D, sim_torch vs JS ground truth
+JS `eval_planner_worker.js` e3d two-pass, n=256/5000, seedStart=200000 (4 shards
+of 64) → **27.38** (SE 0.41). sim_torch two-pass E3D = **28.11** (SE 0.42). Gap =
+0.74 catches (2.6%), ~1.2 combined-SE — statistically indistinguishable. The
+earlier ~3-catch worry came from an n=4 JS sample; at n=256 the two-pass sim_torch
+is a **faithful proxy on the mean metric** (the correct metric under chaos —
+[[twopass_validation]] key implication). ⇒ the decisive two-pass planner number
+from sim_torch (VM2) is trustworthy; we do NOT need to re-run the full planner in
+slow JS at n=256. Saved: `dev/reports/teachers/js_e3d_twopass_n256.json`.
 
 ## Gate status
 Still gated on the two-pass cells. Continue to Phase 1/2 only if two-pass planner
