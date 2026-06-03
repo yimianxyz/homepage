@@ -269,6 +269,60 @@ def run_value_lookahead(seeds, frames, device, model, K, D, Hs, bias0=0.0):
     return sim.catches.cpu().numpy()
 
 
+def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bias0=0.0):
+    """Browser-affordable lookahead: the rollout only simulates the M nearest boids
+    to each predator (rest frozen). The predator (speed 2.5) travels <= Hs*2.5 px,
+    so far boids are never reached and (flocking is local) barely affect the near
+    ones -> ~same catches at O(M) instead of O(120) rollout cost. The REAL game
+    (between decisions) still uses full dynamics; only the planning rollout is
+    approximated. score = (catches during cheap Hs rollout) + max_j V(terminal)."""
+    model.eval()
+    sim = Sim(seeds=seeds, weights=pp.WEIGHTS, device=device,
+              auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    B = sim.B
+    roll = Sim(seeds=list(range(B * K)), weights=pp.WEIGHTS, device=device,
+               auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    rows = torch.arange(B, device=device)
+    held = None
+    f = 0
+    while f < frames:
+        if f % D == 0:
+            cand = pp._candidate_targets(sim, K)
+            base = pp._save_state(sim)
+            pp._load_state(roll, pp._tile_state(base, K))
+            roll_tgt = cand.reshape(B * K, 2).contiguous()
+            # M nearest boids to each env's predator (at rollout start) = active
+            dx = roll.boid_pos[..., 0] - roll.pred_pos[:, None, 0]
+            dy = roll.boid_pos[..., 1] - roll.pred_pos[:, None, 1]
+            d2 = dx * dx + dy * dy
+            d2 = torch.where(roll.boid_alive, d2, torch.full_like(d2, float('inf')))
+            order = torch.argsort(d2, dim=1)
+            active = torch.zeros_like(roll.boid_alive)
+            active.scatter_(1, order[:, :roll_M], torch.ones_like(order[:, :roll_M], dtype=active.dtype))
+            frozen = ~active
+            c0 = roll.catches.clone()
+            for _ in range(Hs):
+                sp = roll.boid_pos.clone(); sv = roll.boid_vel.clone()
+                roll._step_boids()
+                roll.boid_pos[frozen] = sp[frozen]
+                roll.boid_vel[frozen] = sv[frozen]
+                pp._analytic_steer(roll, roll_tgt)
+                roll._check_catches()
+            c_near = (roll.catches - c0).reshape(B, K).float()
+            tcand = pp._candidate_targets(roll, K)
+            tfeat, tctx = candidate_features(roll, tcand)
+            with torch.no_grad():
+                tv = model(tfeat.to(device), tctx.to(device))
+            boot = tv.max(dim=1).values.reshape(B, K)
+            score = c_near + boot
+            if bias0 != 0.0:
+                score = score.clone(); score[:, 0] = score[:, 0] + bias0
+            held = cand[rows, score.argmax(dim=1)]
+        pp._step_with_target(sim, held)
+        f += 1
+    return sim.catches.cpu().numpy()
+
+
 def run_dagger_feat(seeds, frames, device, model, K, H, D, bias0=0.0):
     """DAgger relabel: the STUDENT drives the episode (predator follows the
     student's committed target, visiting the student's own state distribution),
