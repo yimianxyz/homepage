@@ -101,6 +101,18 @@ rollout. Refined ladder:
       flock / 2-body ballistic) for browser speed at the chosen Hs.
   (e) AlphaEvolve over {features, width, K, Hs, M, D} for the smallest 99.9% artifact.
 
+## RESULT — route B progress (single-pass, n=128; planner=71.5, prod≈E3D=34)
+| config | v1 feats (16) | v2 +ballistic (19) |
+|--------|--------------:|-------------------:|
+| pure-V (Hs=0)        | 33.9 | 34.1  (≈E3D — dist-shift, no DAgger yet) |
+| lookahead Hs=20      | 33.0 | 42.8  (0.60×) |
+| lookahead Hs=40      | 49.3 | **57.5 (0.80×)** |
+The 2-body ballistic-intercept feature lifted the lookahead curve +8–10 catches.
+Best candidate = **57.5 = 0.80× planner = +72% over prod (≈33.5)**. Still: (a) not
+browser-cheap (Hs=40 full-flock rollout), (b) single-pass not live two-pass, (c)
+pure-V capped at E3D (DAgger pending). Next: wider Hs {60,80,100}; DAgger-on-v2;
+scale data to ~320 seeds (v2 gen running VM1/VM2); then shrink Hs / AlphaEvolve.
+
 ## Execution ladder (cheapest first — each step a commit with its catch score)
 1. **[RUNNING] Load-bearing-horizon frontier.** Sweep planner catches vs rollout
    H ∈ {120,90,60,40,30,20,12,8,5}, K=16 D=8, single-pass n=128 (VM1: 120/60/30/
