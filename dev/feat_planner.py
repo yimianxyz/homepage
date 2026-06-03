@@ -185,6 +185,47 @@ def run_value_student(seeds, frames, device, model, K, D, Hs=0, bias0=0.0):
     return sim.catches.cpu().numpy()
 
 
+def run_value_lookahead(seeds, frames, device, model, K, D, Hs, bias0=0.0):
+    """Depth-1 lookahead + value bootstrap (the AlphaZero/Bellman backup): roll
+    each of K candidates Hs frames with TRUE dynamics, then score each by
+    (catches during Hs) + max_j V(candidate j at the TERMINAL state). argmax.
+    The short rollout resolves near-term catches the features can't see; the
+    max-V bootstrap stands in for the beyond-horizon tail. Needs a CALIBRATED
+    (absval) value net so V is in catch units and combines with the rollout
+    catch counts."""
+    model.eval()
+    sim = Sim(seeds=seeds, weights=pp.WEIGHTS, device=device,
+              auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    B = sim.B
+    roll = Sim(seeds=list(range(B * K)), weights=pp.WEIGHTS, device=device,
+               auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    rows = torch.arange(B, device=device)
+    held = None
+    f = 0
+    while f < frames:
+        if f % D == 0:
+            cand = pp._candidate_targets(sim, K)                 # (B,K,2)
+            base = pp._save_state(sim)
+            pp._load_state(roll, pp._tile_state(base, K))
+            roll_tgt = cand.reshape(B * K, 2).contiguous()
+            c0 = roll.catches.clone()
+            for _ in range(Hs):
+                pp._step_with_target(roll, roll_tgt)
+            c_near = (roll.catches - c0).reshape(B, K).float()   # (B,K) catches during Hs
+            tcand = pp._candidate_targets(roll, K)               # (B*K, K, 2) at terminal
+            tfeat, tctx = candidate_features(roll, tcand)
+            with torch.no_grad():
+                tv = model(tfeat.to(device), tctx.to(device))    # (B*K, K)
+            boot = tv.max(dim=1).values.reshape(B, K)            # state value at terminal
+            score = c_near + boot
+            if bias0 != 0.0:
+                score = score.clone(); score[:, 0] = score[:, 0] + bias0
+            held = cand[rows, score.argmax(dim=1)]
+        pp._step_with_target(sim, held)
+        f += 1
+    return sim.catches.cpu().numpy()
+
+
 def run_dagger_feat(seeds, frames, device, model, K, H, D, bias0=0.0):
     """DAgger relabel: the STUDENT drives the episode (predator follows the
     student's committed target, visiting the student's own state distribution),

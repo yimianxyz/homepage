@@ -102,6 +102,10 @@ def main():
             gc = gn - gn.mean(1, keepdim=True)
             sc = score - score.mean(1, keepdim=True)
             tot = tot + F.smooth_l1_loss(sc, gc)
+        if 'absval' in losses:
+            # CALIBRATED absolute-gain regression: score ~ true catch count, so it
+            # can be combined with real rollout catch counts in a value bootstrap.
+            tot = tot + F.smooth_l1_loss(score, gn)
         if 'listnet' in losses:
             tot = tot + F.kl_div(F.log_softmax(score, 1),
                                  F.softmax(gn / args.tau, 1), reduction='batchmean')

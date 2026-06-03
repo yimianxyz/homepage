@@ -40,6 +40,8 @@ def main():
     ap.add_argument('--bias_sweep', default=None,
                     help='comma list of E3D-bias values to sweep, e.g. "0,0.5,1,2,4,8"')
     ap.add_argument('--bias0', type=float, default=0.0)
+    ap.add_argument('--lookahead', action='store_true',
+                    help='depth-1 rollout + max-V bootstrap (needs calibrated absval net)')
     ap.add_argument('--H', type=int, default=120, help='planner reference horizon')
     ap.add_argument('--twopass', action='store_true')
     ap.add_argument('--device', default='cuda')
@@ -55,13 +57,19 @@ def main():
     blob = torch.load(args.net, map_location='cpu')
     model = Deploy(blob, device)
 
+    def deploy(bias0):
+        if args.lookahead:
+            return fp.run_value_lookahead(seeds, args.frames, device, model, args.K,
+                                          args.D, args.Hs, bias0=bias0)
+        return fp.run_value_student(seeds, args.frames, device, model, args.K, args.D,
+                                    Hs=args.Hs, bias0=bias0)
+
     e3d = pp.run_e3d(seeds, args.frames, device)
     if args.bias_sweep:
         biases = [float(x) for x in args.bias_sweep.split(',')]
         sweep = []
         for b in biases:
-            s = fp.run_value_student(seeds, args.frames, device, model, args.K, args.D,
-                                     Hs=args.Hs, bias0=b)
+            s = deploy(b)
             sweep.append(dict(bias0=b, student_mean=float(s.mean()),
                               student_se=float(s.std(ddof=1)/np.sqrt(len(s)))))
             print(json.dumps(dict(bias0=b, student_mean=round(float(s.mean()), 3),
@@ -74,10 +82,10 @@ def main():
         if args.out:
             json.dump(res, open(args.out, 'w'))
         return
-    stu = fp.run_value_student(seeds, args.frames, device, model, args.K, args.D,
-                               Hs=args.Hs, bias0=args.bias0)
+    stu = deploy(args.bias0)
     res = dict(net=args.net, nparams=blob.get('nparams'), n=args.n, frames=args.frames,
-               K=args.K, D=args.D, Hs=args.Hs, two_pass=args.twopass, bias0=args.bias0,
+               K=args.K, D=args.D, Hs=args.Hs, lookahead=args.lookahead,
+               two_pass=args.twopass, bias0=args.bias0,
                student_mean=float(stu.mean()), student_se=float(stu.std(ddof=1)/np.sqrt(len(stu))),
                e3d_mean=float(e3d.mean()))
     if not args.skip_planner:
