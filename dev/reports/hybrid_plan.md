@@ -52,6 +52,27 @@ For each candidate target, compute (cheap, vanilla JS):
 Plus the existing `planner_obs` global features (pred vel, E3D target rel, M
 nearest boids rel pos/vel, frac_alive, centroid rel).
 
+## RESULT — load-bearing-horizon curve (single-pass, n=128, paired, 2026-06-03)
+| H (rollout) | catches | retention | paired Δ vs H=120 (95% CI) |
+|------------:|--------:|----------:|---------------------------:|
+| 120 | 71.55 | 1.000 | — |
+|  40 | 44.37 | 0.620 | [−28.9, −25.4] |
+|  20 | 33.91 | 0.474 | [−39.5, −35.8] (≈E3D 34) |
+|   8 | 33.21 | 0.464 | [−40.1, −36.6] (≈E3D) |
+frac_non_e3d: H40=4.0%, H20=0.2%, H8=0.0%.
+
+**Decisive finding.** The planner's edge is almost entirely a LONG-horizon effect.
+Below H≈40 the planner collapses to the E3D baseline and stops deviating (catch
+signal is too sparse over a short rollout → all-ties → default E3D). ⇒ a cheap
+short-rollout student CANNOT work; the **learned terminal value V is mandatory**
+and must carry ~27+ catches of beyond-horizon value. This is exactly the
+Bertsekas regime where a good V collapses H — but here V is doing the heavy
+lifting, so the value-net quality (features!) is the whole game. Confirms the
+v2 feature idea: a per-candidate **2-body ballistic intercept** (predator +
+targeted boid, const-vel, full horizon, O(1) no flock) is likely the single most
+predictive cheap feature, since instantaneous pursuit geometry must stand in for
+the long rollout. (H=60/30/12/5 from VM1 will fill the knee.)
+
 ## Execution ladder (cheapest first — each step a commit with its catch score)
 1. **[RUNNING] Load-bearing-horizon frontier.** Sweep planner catches vs rollout
    H ∈ {120,90,60,40,30,20,12,8,5}, K=16 D=8, single-pass n=128 (VM1: 120/60/30/
