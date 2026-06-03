@@ -142,9 +142,13 @@ def run_log_feat(seeds, frames, device, K, H, D):
     return feat, ctx, gain, sim.catches.cpu().numpy()
 
 
-def run_value_student(seeds, frames, device, model, K, D, Hs=0):
+def run_value_student(seeds, frames, device, model, K, D, Hs=0, bias0=0.0):
     """Deploy: every D frames, score K candidates by [Hs-frame rollout catches +
-    V(features)], commit argmax. Hs=0 => pure value net (no rollout)."""
+    V(features)], commit argmax. Hs=0 => pure value net (no rollout).
+
+    bias0 adds a constant to candidate 0's (E3D) score, so the student only
+    deviates from E3D when another candidate beats it by > bias0 -- mirrors the
+    planner's tie->E3D default and curbs harmful over-deviation in OOD states."""
     model.eval()
     sim = Sim(seeds=seeds, weights=pp.WEIGHTS, device=device,
               auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
@@ -172,6 +176,9 @@ def run_value_student(seeds, frames, device, model, K, D, Hs=0):
                     pp._step_with_target(roll, roll_tgt)
                 short_gain = pp.rollout_gain(roll, c0, B, K).to(device)
                 score = short_gain + v
+            if bias0 != 0.0:
+                score = score.clone()
+                score[:, 0] = score[:, 0] + bias0
             held = cand[rows, score.argmax(dim=1)]
         pp._step_with_target(sim, held)
         f += 1

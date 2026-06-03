@@ -73,6 +73,34 @@ targeted boid, const-vel, full horizon, O(1) no flock) is likely the single most
 predictive cheap feature, since instantaneous pursuit geometry must stand in for
 the long rollout. (H=60/30/12/5 from VM1 will fill the knee.)
 
+## RESULT — first value net (v1, Hs=0 pure value net, 16 features, 3409 params)
+Trained on n=64 held-out seeds (40k rows, planner_mean 71.08). Val: top_tie=0.716
+(picks a true-max candidate 72%), gain_pick=1.186 > E3D 1.065 (oracle 1.631) — so
+the features DO carry signal (vs the old 4-feat net). BUT deployed closed-loop at
+n=128: **student=30.42 < E3D=34.02 ≪ planner=71.5**. Classic distribution-shift +
+over-deviation: the net argmaxes EVERY decision (deviates from E3D always),
+whereas the planner defaults to E3D 86% of the time and only deviates on a strict
+win; the net's confident-but-wrong deviations in OOD states hurt vs just holding
+E3D. Beats the prior reactive value-reg (21.58) but still sub-E3D.
+
+**Implication / realistic path.** Pure value net over instantaneous features
+cannot reach 99.9% — the horizon curve shows even a TRUE H=40 rollout caps at 44,
+and instantaneous features have strictly less info than a real H=40 rollout. So
+≥99.9% REQUIRES deploy-time rollout (Hs>0) + a learned terminal value V (AlphaZero/
+TD-MPC): short rollout gets near-term catches, V estimates the beyond-horizon
+remainder. Browser speed then needs APPROXIMATE cheap dynamics (few boids) in the
+rollout. Refined ladder:
+  (a) [now] E3D-default bias on v1 (no retrain): only override E3D when a candidate
+      beats it by > b; sweep b. Curbs over-deviation; expect to recover toward/above
+      E3D, bounding the pure-value-net ceiling.
+  (b) Train a proper TERMINAL value: V(state) -> catches BEYOND frame Hs; deploy =
+      argmax (catches in short Hs rollout) + V(terminal). Sweep Hs ∈ {10,20,40}.
+  (c) DAgger: relabel student-visited states with the planner; retrain. Fixes the
+      30.4<E3D dist-shift directly.
+  (d) Approximate cheap rollout dynamics (predator + nearest-M boids, const-vel
+      flock / 2-body ballistic) for browser speed at the chosen Hs.
+  (e) AlphaEvolve over {features, width, K, Hs, M, D} for the smallest 99.9% artifact.
+
 ## Execution ladder (cheapest first — each step a commit with its catch score)
 1. **[RUNNING] Load-bearing-horizon frontier.** Sweep planner catches vs rollout
    H ∈ {120,90,60,40,30,20,12,8,5}, K=16 D=8, single-pass n=128 (VM1: 120/60/30/
