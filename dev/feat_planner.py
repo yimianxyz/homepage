@@ -270,7 +270,7 @@ def run_value_lookahead(seeds, frames, device, model, K, D, Hs, bias0=0.0):
 
 
 def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bias0=0.0,
-                              K_roll=0, prune_by='v'):
+                              K_roll=0, prune_by='v', no_value=False):
     """Browser-affordable lookahead: the rollout only simulates the M nearest boids
     to each predator (rest frozen) -> O(M) instead of O(120) rollout cost.
 
@@ -313,16 +313,20 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
                 pp._analytic_steer(roll, roll_tgt)
                 roll._check_catches()
             c_near = (roll.catches - c0).reshape(B, K).float()
-            tcand = pp._candidate_targets(roll, K)
-            tfeat, tctx = candidate_features(roll, tcand)
-            with torch.no_grad():
-                tv = model(tfeat.to(device), tctx.to(device))
-            boot = tv.max(dim=1).values.reshape(B, K)
-            roll_score = c_near + boot
+            if no_value:
+                roll_score = c_near                                   # no terminal bootstrap
+            else:
+                tcand = pp._candidate_targets(roll, K)
+                tfeat, tctx = candidate_features(roll, tcand)
+                with torch.no_grad():
+                    tv = model(tfeat.to(device), tctx.to(device))
+                roll_score = c_near + tv.max(dim=1).values.reshape(B, K)
             if 0 < K_roll < K:
                 f0, x0 = candidate_features(sim, cand)
-                with torch.no_grad():
-                    vprior = model(f0.to(device), x0.to(device))      # (B,K) prior V
+                vprior = None
+                if (not no_value) or prune_by != 'ball':
+                    with torch.no_grad():
+                        vprior = model(f0.to(device), x0.to(device))  # (B,K) prior V
                 if prune_by == 'ball':
                     # rank candidates by ballistic catchability: caught flag (feat 18)
                     # minus normalized time-to-catch (feat 16). Higher = catch sooner.
@@ -331,7 +335,10 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
                     pscore = vprior
                 thr = torch.topk(pscore, K_roll, dim=1).values[:, -1:]
                 is_top = pscore >= thr                                # top-K_roll get rollout
-                score = torch.where(is_top, roll_score, vprior)
+                # no_value: non-rolled candidates score 0 -> argmax falls back to
+                # cand0 (E3D) when the single rolled candidate yields no catch.
+                nonroll = torch.zeros_like(roll_score) if no_value else vprior
+                score = torch.where(is_top, roll_score, nonroll)
             else:
                 score = roll_score
             if bias0 != 0.0:

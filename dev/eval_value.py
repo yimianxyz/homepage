@@ -44,6 +44,8 @@ def main():
                     help='depth-1 rollout + max-V bootstrap (needs calibrated absval net)')
     ap.add_argument('--roll_M', type=int, default=0,
                     help='if >0 with --lookahead: cheap rollout of only M nearest boids')
+    ap.add_argument('--no_value', action='store_true',
+                    help='zero the value net: roll top-K_roll, non-rolled score 0 (E3D fallback)')
     ap.add_argument('--prune_by', default='v', choices=['v', 'ball'],
                     help='which candidates get rolled: v=value prior, ball=ballistic catchability')
     ap.add_argument('--K_roll', type=int, default=0,
@@ -67,7 +69,8 @@ def main():
         if args.lookahead and args.roll_M > 0:
             return fp.run_value_lookahead_cheap(seeds, args.frames, device, model, args.K,
                                                 args.D, args.Hs, args.roll_M, bias0=bias0,
-                                                K_roll=args.K_roll, prune_by=args.prune_by)
+                                                K_roll=args.K_roll, prune_by=args.prune_by,
+                                                no_value=args.no_value)
         if args.lookahead:
             return fp.run_value_lookahead(seeds, args.frames, device, model, args.K,
                                           args.D, args.Hs, bias0=bias0)
