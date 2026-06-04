@@ -270,7 +270,7 @@ def run_value_lookahead(seeds, frames, device, model, K, D, Hs, bias0=0.0):
 
 
 def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bias0=0.0,
-                              K_roll=0):
+                              K_roll=0, prune_by='v'):
     """Browser-affordable lookahead: the rollout only simulates the M nearest boids
     to each predator (rest frozen) -> O(M) instead of O(120) rollout cost.
 
@@ -323,8 +323,14 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
                 f0, x0 = candidate_features(sim, cand)
                 with torch.no_grad():
                     vprior = model(f0.to(device), x0.to(device))      # (B,K) prior V
-                thr = torch.topk(vprior, K_roll, dim=1).values[:, -1:]
-                is_top = vprior >= thr                                # top-K_roll get rollout
+                if prune_by == 'ball':
+                    # rank candidates by ballistic catchability: caught flag (feat 18)
+                    # minus normalized time-to-catch (feat 16). Higher = catch sooner.
+                    pscore = (f0[:, :, 18] - f0[:, :, 16]).to(device)
+                else:
+                    pscore = vprior
+                thr = torch.topk(pscore, K_roll, dim=1).values[:, -1:]
+                is_top = pscore >= thr                                # top-K_roll get rollout
                 score = torch.where(is_top, roll_score, vprior)
             else:
                 score = roll_score
