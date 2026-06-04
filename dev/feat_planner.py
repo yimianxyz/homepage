@@ -269,13 +269,17 @@ def run_value_lookahead(seeds, frames, device, model, K, D, Hs, bias0=0.0):
     return sim.catches.cpu().numpy()
 
 
-def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bias0=0.0):
+def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bias0=0.0,
+                              K_roll=0):
     """Browser-affordable lookahead: the rollout only simulates the M nearest boids
-    to each predator (rest frozen). The predator (speed 2.5) travels <= Hs*2.5 px,
-    so far boids are never reached and (flocking is local) barely affect the near
-    ones -> ~same catches at O(M) instead of O(120) rollout cost. The REAL game
-    (between decisions) still uses full dynamics; only the planning rollout is
-    approximated. score = (catches during cheap Hs rollout) + max_j V(terminal)."""
+    to each predator (rest frozen) -> O(M) instead of O(120) rollout cost.
+
+    K_roll>0: AlphaZero policy-prior pruning -- score all K candidates by V at the
+    CURRENT state (cheap, no rollout), and only the top-K_roll get the (expensive)
+    rollout score (c_near + bootstrap); the rest keep just their prior V. Cuts
+    rollout cost ~K/K_roll x. (sim_torch still rolls all K to MEASURE the pruned
+    decision's catches; the deploy cost saving is realized in JS.)
+    score = (catches during cheap Hs rollout) + max_j V(terminal)."""
     model.eval()
     sim = Sim(seeds=seeds, weights=pp.WEIGHTS, device=device,
               auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
@@ -314,7 +318,16 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
             with torch.no_grad():
                 tv = model(tfeat.to(device), tctx.to(device))
             boot = tv.max(dim=1).values.reshape(B, K)
-            score = c_near + boot
+            roll_score = c_near + boot
+            if 0 < K_roll < K:
+                f0, x0 = candidate_features(sim, cand)
+                with torch.no_grad():
+                    vprior = model(f0.to(device), x0.to(device))      # (B,K) prior V
+                thr = torch.topk(vprior, K_roll, dim=1).values[:, -1:]
+                is_top = vprior >= thr                                # top-K_roll get rollout
+                score = torch.where(is_top, roll_score, vprior)
+            else:
+                score = roll_score
             if bias0 != 0.0:
                 score = score.clone(); score[:, 0] = score[:, 0] + bias0
             held = cand[rows, score.argmax(dim=1)]

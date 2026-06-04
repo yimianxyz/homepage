@@ -44,6 +44,8 @@ def main():
                     help='depth-1 rollout + max-V bootstrap (needs calibrated absval net)')
     ap.add_argument('--roll_M', type=int, default=0,
                     help='if >0 with --lookahead: cheap rollout of only M nearest boids')
+    ap.add_argument('--K_roll', type=int, default=0,
+                    help='if >0: only top-K_roll candidates (by prior V) get the rollout')
     ap.add_argument('--H', type=int, default=120, help='planner reference horizon')
     ap.add_argument('--twopass', action='store_true')
     ap.add_argument('--device', default='cuda')
@@ -62,7 +64,8 @@ def main():
     def deploy(bias0):
         if args.lookahead and args.roll_M > 0:
             return fp.run_value_lookahead_cheap(seeds, args.frames, device, model, args.K,
-                                                args.D, args.Hs, args.roll_M, bias0=bias0)
+                                                args.D, args.Hs, args.roll_M, bias0=bias0,
+                                                K_roll=args.K_roll)
         if args.lookahead:
             return fp.run_value_lookahead(seeds, args.frames, device, model, args.K,
                                           args.D, args.Hs, bias0=bias0)
