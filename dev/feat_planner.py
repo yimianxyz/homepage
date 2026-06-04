@@ -336,6 +336,50 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
     return sim.catches.cpu().numpy()
 
 
+def run_dagger_lookahead(seeds, frames, device, model, K, H, D, Hs):
+    """DAgger for the LOOKAHEAD student (the correct one): the lookahead+bootstrap
+    student drives the episode (its own state distribution); at each decision the
+    PLANNER's true H-frame rollout relabels (feat, ctx, gain). Two rollouts/decision
+    (student Hs + planner H) -> slow but one-time. Fixes dist-shift for the deployed
+    policy. Returns (feat, ctx, gain, student_catches)."""
+    model.eval()
+    sim = Sim(seeds=seeds, weights=pp.WEIGHTS, device=device,
+              auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    B = sim.B
+    roll = Sim(seeds=list(range(B * K)), weights=pp.WEIGHTS, device=device,
+               auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    rows = torch.arange(B, device=device)
+    feat_log, ctx_log, gain_log = [], [], []
+    held = None
+    f = 0
+    while f < frames:
+        if f % D == 0:
+            cand = pp._candidate_targets(sim, K)
+            feat, ctx = candidate_features(sim, cand)
+            base = pp._save_state(sim)
+            roll_tgt = cand.reshape(B * K, 2).contiguous()
+            pp._load_state(roll, pp._tile_state(base, K))
+            c0 = roll.catches.clone()
+            for _ in range(min(H, frames - f)):
+                pp._step_with_target(roll, roll_tgt)
+            gain = pp.rollout_gain(roll, c0, B, K)
+            feat_log.append(feat.cpu()); ctx_log.append(ctx.cpu()); gain_log.append(gain.cpu())
+            pp._load_state(roll, pp._tile_state(base, K))
+            c0 = roll.catches.clone()
+            for _ in range(Hs):
+                pp._step_with_target(roll, roll_tgt)
+            c_near = (roll.catches - c0).reshape(B, K).float()
+            tfeat, tctx = candidate_features(roll, pp._candidate_targets(roll, K))
+            with torch.no_grad():
+                tv = model(tfeat.to(device), tctx.to(device))
+            held = cand[rows, (c_near + tv.max(dim=1).values.reshape(B, K)).argmax(dim=1)]
+        pp._step_with_target(sim, held)
+        f += 1
+    feat = torch.cat(feat_log, 0).numpy(); ctx = torch.cat(ctx_log, 0).numpy()
+    gain = torch.cat(gain_log, 0).numpy()
+    return feat, ctx, gain, sim.catches.cpu().numpy()
+
+
 def run_dagger_feat(seeds, frames, device, model, K, H, D, bias0=0.0):
     """DAgger relabel: the STUDENT drives the episode (predator follows the
     student's committed target, visiting the student's own state distribution),
