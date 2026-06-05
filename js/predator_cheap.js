@@ -257,8 +257,9 @@
         return cands;
     }
 
-    // The kr=1 ballistic decision. NET = value_net.json (loaded below).
-    var NET = null;
+    // The kr=1 ballistic decision. NET = value_net.json (loaded below). vizModel
+    // mirrors the value net for activation_viz.js (the "predator's brain").
+    var NET = null, vizModel = null;
     function planCheap(s) {
         var cands = candidates(s);
         var st = { px: s.px, py: s.py, pvx: s.pvx, pvy: s.pvy, psize: s.psize,
@@ -278,6 +279,8 @@
         score[top1] = rr.catches + boot;
         var bi = 0, bs = -Infinity;
         for (var k = 0; k < score.length; k++) if (score[k] > bs) { bs = score[k]; bi = k; }
+        // Record the chosen candidate's value-net forward for the brain viz.
+        if (vizModel) cp_value_viz(NET, fr.feat[bi], fr.ctx, vizModel);
         return { x: cands[bi].x, y: cands[bi].y };
     }
 
@@ -336,6 +339,6 @@
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
         window.__predatorReady = fetch('js/value_net.json', { cache: 'no-cache' })
             .then(function (r) { if (!r.ok) throw new Error('value_net fetch failed: ' + r.status); return r.json(); })
-            .then(function (net) { NET = net; });
+            .then(function (net) { NET = net; vizModel = cp_viz_model(net); window.__predatorModel = vizModel; });
     }
 })();

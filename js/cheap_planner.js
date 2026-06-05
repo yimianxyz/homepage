@@ -130,7 +130,46 @@ function cp_top1(feat) {
     return bi;
 }
 
+// --- "predator's brain" visualization adapter ---------------------------------
+// Builds a model object matching activation_viz.js's interface (featureDim,
+// layers[].{outDim, W, lastA}, lastNormalizedInput) from value_net.json, so the
+// existing viz renders the cheap policy's value-net MLP unchanged. The viz reads
+// W in-major (W[i*outDim+j] = weight prev-neuron i -> next-neuron j); value_net
+// stores w[j][i] (out-major), so transpose once here.
+function cp_viz_model(net) {
+    var layers = [];
+    for (var l = 0; l < net.layers.length; l++) {
+        var L = net.layers[l], outDim = L.b.length, inDim = L.w[0].length;
+        var W = new Float64Array(inDim * outDim);
+        for (var j = 0; j < outDim; j++) for (var i = 0; i < inDim; i++) W[i * outDim + j] = L.w[j][i];
+        layers.push({ outDim: outDim, W: W, lastA: new Float64Array(outDim) });
+    }
+    return { featureDim: net.fc + net.fctx, layers: layers,
+        lastNormalizedInput: new Float64Array(net.fc + net.fctx) };
+}
+
+// Forward one candidate's (featRow, ctx) through the value net, recording the
+// standardized input + per-layer activations into vizModel for activation_viz.js.
+// Same math as cp_value (GELU hidden, linear output); used only for the chosen
+// candidate each plan, so the brain viz shows the predator's committed decision.
+function cp_value_viz(net, featRow, ctx, vizModel) {
+    var x = vizModel.lastNormalizedInput, nf = net.fc;
+    for (var i = 0; i < nf; i++) x[i] = (featRow[i] - net.fmu[i]) / net.fsd[i];
+    for (i = 0; i < net.fctx; i++) x[nf + i] = (ctx[i] - net.xmu[i]) / net.xsd[i];
+    var inp = x, last = net.layers.length - 1;
+    for (var l = 0; l < net.layers.length; l++) {
+        var L = net.layers[l], outDim = L.b.length, a = vizModel.layers[l].lastA;
+        for (var j = 0; j < outDim; j++) {
+            var s = L.b[j], wr = L.w[j];
+            for (var q = 0; q < inp.length; q++) s += wr[q] * inp[q];
+            a[j] = (l < last) ? cp_gelu(s) : s;
+        }
+        inp = a;
+    }
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { cp_features: cp_features, cp_value: cp_value, cp_ballistic: cp_ballistic,
-        cp_top1: cp_top1, cp_gelu: cp_gelu, cp_erf: cp_erf, CP: { PS: CP_PS, VS: CP_VS, RHO: CP_RHO, HB: CP_HB } };
+        cp_top1: cp_top1, cp_gelu: cp_gelu, cp_erf: cp_erf, cp_viz_model: cp_viz_model,
+        cp_value_viz: cp_value_viz, CP: { PS: CP_PS, VS: CP_VS, RHO: CP_RHO, HB: CP_HB } };
 }
