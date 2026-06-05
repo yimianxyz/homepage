@@ -1,6 +1,6 @@
 // Cheap ballistic deploy policy — browser port of feat_planner.run_value_lookahead_cheap
 // (prune_by='ball', K_roll=1). Pure functions so the same code runs under Node
-// (parity test vs dev/js_fixture.json) and in predator_planner_worker.js.
+// (parity test vs dev/js_fixture.json) and in predator_cheap.js.
 //
 // Decision (every D frames): generate 16 candidates (cand0=E3D patrol, cand1..15
 // = nearest boids lead-adjusted); compute 19 pursuit features + 4 ctx per

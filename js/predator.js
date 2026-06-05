@@ -112,50 +112,14 @@ function Predator(x, y, simulation) {
 
 Predator.prototype = {
 
-    // Autonomous movement, split by regime exactly as the production teacher
-    // (dev/sim_torch.py) defines it:
-    //   CHASE  (a boid within POLICY_R): analytic seek toward the nearest boid
-    //          — fast-set the offset to MAX_SPEED, subtract velocity, fast-limit
-    //          to MAX_FORCE. This is closed-form and exact (cos 1.0).
-    //   PATROL (no boid in range): the 10,352-param radial net in
-    //          window.__predatorModel, straight from the raw boid set. It does
-    //          internally what the old computeEvolvedTarget (density-weighted
-    //          cluster select) + 35-feat seek-net did in two stages — patrol
-    //          cos_med 0.9878, matching the 129k-param transformer ceiling.
-    // The simulation is gated on the weights being loaded (see boids.js), so
-    // window.__predatorModel is always present here.
+    // The predator's policy: the cheap ballistic patrol (js/predator_cheap.js),
+    // distilled from the receding-horizon planner teacher. Every few frames it
+    // ballistically picks + rolls one candidate target; each frame it chases the
+    // nearest boid within POLICY_R, else seeks that target. The page boot waits on
+    // window.__predatorReady (the value-net load) before starting the sim, so
+    // window.__cheap is always present here.
     getAutonomousForce: function(boids) {
-        // TEMPORARY, URL-flag-gated planner override (?policy=planner). When
-        // inactive (default prod) this is a no-op and the radial net below runs
-        // byte-identically. See js/predator_planner.js. One-commit reversible.
-        if (window.__planner && window.__planner.active) {
-            return window.__planner.force(this, boids);
-        }
-        var model = window.__predatorModel;
-        var n = boids.length;
-        if (n === 0) return new Vector(0, 0);
-
-        var px = this.position.x, py = this.position.y;
-        var bestD2 = Infinity, nx = 0, ny = 0;
-        for (var i = 0; i < n; i++) {
-            var dx = boids[i].position.x - px, dy = boids[i].position.y - py;
-            var d2 = dx * dx + dy * dy;
-            if (d2 < bestD2) { bestD2 = d2; nx = dx; ny = dy; }
-        }
-
-        if (bestD2 < model.POLICY_R * model.POLICY_R) {
-            // CHASE: analytic seek-nearest (matches teacher fast_set_magnitude +
-            // fast_limit exactly).
-            var desired = new Vector(nx, ny);
-            desired.iFastSetMagnitude(PREDATOR_MAX_SPEED);
-            var steer = desired.subtract(this.velocity);
-            steer.iFastLimit(PREDATOR_MAX_FORCE);
-            return steer;
-        }
-
-        // PATROL: radial set-net maps raw boids -> steering force directly.
-        var out = model.forward(this.position, this.velocity, boids);
-        return new Vector(out[0], out[1]);
+        return window.__cheap.force(this, boids);
     },
 
     
@@ -268,18 +232,6 @@ Predator.prototype = {
     }
 };
 
-// Load the trained NN weights at page boot. The simulation start (in
-// boids.js) awaits window.__predatorReady before constructing the
-// Simulation, so the NN is guaranteed to be present from frame 1.
-// Guarded so the file can also be require()'d in node (parity tests) where
-// there is no window/fetch.
-if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-    window.__predatorReady = fetch('js/predator_radial_weights.json', { cache: 'no-cache' })
-        .then(function (r) {
-            if (!r.ok) throw new Error('predator weights fetch failed: ' + r.status);
-            return r.json();
-        })
-        .then(function (json) {
-            window.__predatorModel = PredatorRadial.loadModel(json);
-        });
-}
+// The page boot gate (window.__predatorReady) is owned by js/predator_cheap.js,
+// which loads value_net.json before boids.js starts the simulation — so the cheap
+// policy drives the predator from frame 1.
