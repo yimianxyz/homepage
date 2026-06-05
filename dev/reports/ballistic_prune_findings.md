@@ -79,8 +79,8 @@ already exist and are verified in `js/predator_planner_worker.js`).
 Ball/kr1 vs the full-rollout ceiling, three independent seed sets (n=256, 1500f):
 seed300000 14.97 / 15.23 = **98.3%**; seed500000 14.66 / 15.54 = **94.3%**. The
 single-rollout result is 94–98% of ceiling everywhere. At deployment scale
-(5000f, single-pass, n=128): ball/kr1 M120 = **52.7**, M64 = **51.3** (97%);
-≈ planner 71.5 context = the distilled-lookahead band.
+(5000f, single-pass, n=128): full(16) ceiling = **53.9**, ball/kr1 M120 =
+**52.7 (97.8%)**, M64 = **51.3 (95.2%)** — the 1-rollout headline holds at scale.
 
 ## JS port (browser deploy)
 
