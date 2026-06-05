@@ -74,6 +74,41 @@ candidates the *full* Hs=120 recovers the catches without any net — which woul
 keep the JS port to `rolloutFlat` + `candidates()` + a ballistic scorer (both
 already exist and are verified in `js/predator_planner_worker.js`).
 
+## Cross-seed-set + deployment-scale confirmation
+
+Ball/kr1 vs the full-rollout ceiling, three independent seed sets (n=256, 1500f):
+seed300000 14.97 / 15.23 = **98.3%**; seed500000 14.66 / 15.54 = **94.3%**. The
+single-rollout result is 94–98% of ceiling everywhere. At deployment scale
+(5000f, single-pass, n=128): ball/kr1 M120 = **52.7**, M64 = **51.3** (97%);
+≈ planner 71.5 context = the distilled-lookahead band.
+
+## JS port (browser deploy)
+
+The decision core is ported and **parity-verified to sim_torch < 1e-6**
+(`js/cheap_planner.js`, `dev/test_cheap_parity.js`, fixture
+`dev/js_fixture.json`): 19 features (incl. the 2-body ballistic intercept) +
+standardization + 23→48→48→1 GELU value net. The full kr=1 policy is wired into
+`js/predator_planner_worker.js` (`planCheap`, `rolloutFlatState` returning the
+terminal snapshot for the bootstrap, a `cheap` controller in `evalClosedLoop`,
+and a `cheapconfig` message) — reusing the already-verified `rolloutFlat` +
+`candidates()`. `dev/eval_cheap_headless.js` runs it headless with sim_torch-
+matched seeds.
+
+**Two-pass deploy validation (the live regime, double-flock):** at 1500f, n=8,
+cheap = **8.63** vs e3d = **6.0** — the 1-rollout ballistic policy beats E3D
+patrol in the real deployment dynamics. The cheap/e3d ratio is 1.44× two-pass vs
+1.76× single-pass: BOTH policies score lower two-pass, and cheap compresses more
+because the value net + ballistic intercept were tuned in single-pass dynamics.
+
+## Next step (recommended): two-pass recalibration
+
+The port works live but is single-pass-tuned. To recover the full margin in the
+browser, regenerate the value-net training data with `TWO_PASS=True`
+(`run_log_feat`), retrain, re-export to `js/value_net.json`, re-verify parity.
+Then wire `?policy=cheap` into the live predator and Playwright-verify. Open
+decision: deploy regime (single vs two-pass) — the live page is two-pass, so
+two-pass recalibration is the path to maximizing live catches.
+
 ## Files
 - `feat_planner.py` — `run_value_lookahead_cheap(..., K_roll, prune_by={v,ball},
   no_value)`; `_ballistic_intercept`.
