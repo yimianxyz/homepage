@@ -132,12 +132,15 @@ Simulation.prototype = {
 		if (typeof setFrameMs === 'function') {
 			setFrameMs(REFRESH_INTERVAL_IN_MS);
 		}
-		self.tick();
+		// Single-pass boids: each frame flocks once (render() runs flock()+update()
+		// per boid). The predator's distilled policy was trained/tuned in this same
+		// single-pass regime, so this is the dynamics it expects — and it's also a
+		// ~30-40% speedup. (tick() is the obstacle/death-throw lifecycle, used only
+		// when obstacles are present, which the homepage has none of.)
 		setInterval(function () {
 			if (typeof simTick === 'function') {
 				simTick();
 			}
-			self.tick();
 			self.render();
 		}, REFRESH_INTERVAL_IN_MS);
 	},
