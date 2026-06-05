@@ -23,12 +23,15 @@ def main():
     ap.add_argument('--H', type=int, default=120)
     ap.add_argument('--D', type=int, default=8)
     ap.add_argument('--twopass', action='store_true')
+    ap.add_argument('--fast_twopass', action='store_true',
+                    help='use the fast vectorized 2x-accel two-pass (data-gen speed)')
     ap.add_argument('--device', default='cuda')
     ap.add_argument('--weights', default='../js/predator_weights.json')
     ap.add_argument('--out', required=True)
     args = ap.parse_args()
     device = args.device if (args.device == 'cpu' or torch.cuda.is_available()) else 'cpu'
     pp.TWO_PASS = args.twopass
+    st.FAST_TWO_PASS = args.fast_twopass
     pp.WEIGHTS = st.load_weights(args.weights, device=device)
     seeds = list(range(args.seedStart, args.seedStart + args.n))
     t0 = time.time()

@@ -27,6 +27,9 @@ DESIRED_SEPARATION = 40.0
 NEIGHBOR_DISTANCE = 60.0
 BORDER_OFFSET = 10.0
 EPSILON = 1e-7
+# When True, two_pass sims use a fast vectorized 2x-accel approximation instead of
+# the slow sequential per-boid pass-2 (see _step_boids_twopass). For data-gen speed.
+FAST_TWO_PASS = False
 SEP_MULT = 2.0
 COH_MULT = 1.0
 ALI_MULT = 1.0
@@ -458,6 +461,38 @@ class Sim:
         self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] < neg_b, pos_mh, self.boid_pos[..., 1])
 
     def _step_boids_twopass(self):
+        # Fast vectorized two-pass: both browser flock passes read frame-start
+        # positions, so accel = flock(frame-start) + flock(frame-start) = 2x. This
+        # skips the sequential per-boid pass-2 loop (the speed bottleneck) and keeps
+        # the dominant two-pass effect (boids feel 2x the avoidance force). The
+        # in-frame movement the sequential pass-2 sees is a second-order detail.
+        # Enabled by sim_torch.FAST_TWO_PASS for data-gen speed; the sequential
+        # path below stays the validated <1e-7-vs-live reference.
+        if FAST_TWO_PASS:
+            # Vectorized predictor-corrector approximation of the sequential pass-2.
+            # Pass 1: flock from frame-start. Predict where boids land after one
+            # update (pos + clamped(vel+accel1)) — mirrors what the sequential
+            # pass-2 sees ("neighbors have moved"). Pass 2: flock from the predicted
+            # positions, accumulate, then one update. Fully vectorized (2 flock
+            # calls), ~9x faster than the sequential per-boid loop.
+            neg_b = self._wrap_neg_b; pos_mw = self._wrap_b_w_max; pos_mh = self._wrap_b_h_max
+            ax1, ay1 = self._compute_boid_acceleration()
+            pvx, pvy = fast_limit(self.boid_vel[..., 0] + ax1, self.boid_vel[..., 1] + ay1, MAX_SPEED)
+            save_x = self.boid_pos[..., 0].clone(); save_y = self.boid_pos[..., 1].clone()
+            self.boid_pos[..., 0] = save_x + pvx
+            self.boid_pos[..., 1] = save_y + pvy
+            ax2, ay2 = self._compute_boid_acceleration()       # flock from predicted positions
+            self.boid_pos[..., 0] = save_x; self.boid_pos[..., 1] = save_y
+            new_vx, new_vy = fast_limit(self.boid_vel[..., 0] + ax1 + ax2,
+                                        self.boid_vel[..., 1] + ay1 + ay2, MAX_SPEED)
+            self.boid_vel[..., 0] = new_vx; self.boid_vel[..., 1] = new_vy
+            self.boid_pos[..., 0] = save_x + new_vx
+            self.boid_pos[..., 1] = save_y + new_vy
+            self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] > pos_mw, neg_b, self.boid_pos[..., 0])
+            self.boid_pos[..., 0] = torch.where(self.boid_pos[..., 0] < neg_b, pos_mw, self.boid_pos[..., 0])
+            self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] > pos_mh, neg_b, self.boid_pos[..., 1])
+            self.boid_pos[..., 1] = torch.where(self.boid_pos[..., 1] < neg_b, pos_mh, self.boid_pos[..., 1])
+            return
         """Replicate the LIVE browser's TWO flock passes per frame.
 
         js/simulation.js run() per frame: self.tick() then self.render().

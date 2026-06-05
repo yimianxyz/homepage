@@ -52,6 +52,7 @@ def main():
                     help='if >0: only top-K_roll candidates (by prior V) get the rollout')
     ap.add_argument('--H', type=int, default=120, help='planner reference horizon')
     ap.add_argument('--twopass', action='store_true')
+    ap.add_argument('--fast_twopass', action='store_true')
     ap.add_argument('--device', default='cuda')
     ap.add_argument('--weights', default='../js/predator_weights.json')
     ap.add_argument('--skip-planner', action='store_true')
@@ -59,6 +60,7 @@ def main():
     args = ap.parse_args()
     device = args.device if (args.device == 'cpu' or torch.cuda.is_available()) else 'cpu'
     pp.TWO_PASS = args.twopass
+    st.FAST_TWO_PASS = args.fast_twopass
     pp.WEIGHTS = st.load_weights(args.weights, device=device)
     seeds = list(range(args.seedStart, args.seedStart + args.n))
 
