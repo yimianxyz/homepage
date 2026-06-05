@@ -26,7 +26,7 @@
 // each, return the target with the most catches (ties -> earliest = E3D).
 'use strict';
 
-importScripts('vector.js', 'boid.js', 'predator.js');
+importScripts('vector.js', 'boid.js', 'predator.js', 'cheap_planner.js');
 
 // Sim constants. From imports: PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE,
 // PREDATOR_SIZE, MAX_SPEED, MAX_FORCE, NEIGHBOR_DISTANCE, DESIRED_SEPARATION,
@@ -305,6 +305,7 @@ function evalClosedLoop(s, frames, D, controller) {
             var snap = episodeSnapshot(n, p, size, lastFeed, now);
             if (!snap.bx.length) { tx = p.x; ty = p.y; }
             else if (controller === 'planner') { var r = plan(snap); tx = r.x; ty = r.y; }
+            else if (controller === 'cheap') { var rc = planCheap(snap); tx = rc.x; ty = rc.y; }
             else {
                 var lite = new Array(snap.bx.length);
                 for (var q = 0; q < snap.bx.length; q++) lite[q] = { position: { x: snap.bx[q], y: snap.by[q] }, velocity: { x: snap.bvx[q], y: snap.bvy[q] } };
@@ -434,12 +435,87 @@ function plan(s) {
     return { x: best.x, y: best.y, gain: bestGain };
 }
 
+// ---------------------------------------------------------------------------
+// CHEAP ballistic policy (kr=1): port of feat_planner.run_value_lookahead_cheap,
+// prune_by='ball'. Roll ONLY the single most ballistically-catchable candidate
+// (the rest keep their value-net prior), add the terminal value bootstrap, argmax.
+// 1 rollout instead of 16; sim_torch single-pass = 14.97 vs 15.23 full ceiling.
+// Feature/ballistic/value math lives in cheap_planner.js (parity-verified).
+var CHEAP_NET = null, CHEAP_HS = 60;
+
+function _snapAlive(px, py, vx, vy, alive, n, p, size, lastFeed, now) {
+    var bx = [], by = [], bvx = [], bvy = [];
+    for (var i = 0; i < n; i++) {
+        if (!alive[i]) continue;
+        bx.push(px[i]); by.push(py[i]); bvx.push(vx[i]); bvy.push(vy[i]);
+    }
+    return { bx: bx, by: by, bvx: bvx, bvy: bvy, px: p.x, py: p.y, pvx: p.vx, pvy: p.vy,
+        psize: size, lastFeed: lastFeed, nowMs: now };
+}
+
+// rolloutFlat that also returns the terminal snapshot (for the value bootstrap).
+function rolloutFlatState(s, tx, ty, H) {
+    var n = s.bx.length;
+    ensureCap(n);
+    for (var i = 0; i < n; i++) {
+        _px[i] = s.bx[i]; _py[i] = s.by[i]; _vx[i] = s.bvx[i]; _vy[i] = s.bvy[i];
+        _ax[i] = 0; _ay[i] = 0; _alive[i] = 1;
+    }
+    gridBuild(_px, _py, _alive, n);
+    var p = { x: s.px, y: s.py, vx: s.pvx, vy: s.pvy };
+    var size = s.psize, lastFeed = (s.lastFeed != null ? s.lastFeed : -1e9), now = s.nowMs || 0, catches = 0;
+    for (var f = 0; f < H; f++) {
+        for (i = 0; i < n; i++) if (_alive[i]) accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y);
+        for (i = 0; i < n; i++) if (_alive[i]) { accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y); updateBoid(_px, _py, _vx, _vy, _ax, _ay, i); gridMove(i, _px[i], _py[i]); }
+        predatorStepFlat(_px, _py, _alive, n, p, tx, ty);
+        if (now - lastFeed >= FEED_COOLDOWN) {
+            var cr = size * CATCH_FACTOR;
+            for (i = 0; i < n; i++) {
+                if (!_alive[i]) continue;
+                var ex = p.x - _px[i], ey = p.y - _py[i];
+                if (Math.sqrt(ex * ex + ey * ey) < cr) {
+                    size = Math.min(size + GROWTH, MAX_SIZE); lastFeed = now; _alive[i] = 0; gridRemove(i); catches++; break;
+                }
+            }
+        }
+        if (size > BASE_SIZE) size = Math.max(size - DECAY, BASE_SIZE);
+        now += FRAME_MS;
+    }
+    return { catches: catches, term: _snapAlive(_px, _py, _vx, _vy, _alive, n, p, size, lastFeed, now) };
+}
+
+function planCheap(s) {
+    var cands = candidates(s);
+    var st = { px: s.px, py: s.py, pvx: s.pvx, pvy: s.pvy, psize: s.psize,
+        bx: s.bx, by: s.by, bvx: s.bvx, bvy: s.bvy, nAlive: s.bx.length };
+    var fr = cp_features(st, cands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
+    var vprior = cp_value(CHEAP_NET, fr.feat, fr.ctx);
+    var top1 = cp_top1(fr.feat);
+    var rr = rolloutFlatState(s, cands[top1].x, cands[top1].y, CHEAP_HS);
+    var t = rr.term;
+    var tcands = candidates(t);
+    var tst = { px: t.px, py: t.py, pvx: t.pvx, pvy: t.pvy, psize: t.psize,
+        bx: t.bx, by: t.by, bvx: t.bvx, bvy: t.bvy, nAlive: t.bx.length };
+    var tfr = cp_features(tst, tcands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
+    var tv = cp_value(CHEAP_NET, tfr.feat, tfr.ctx);
+    var boot = -Infinity; for (var j = 0; j < tv.length; j++) if (tv[j] > boot) boot = tv[j];
+    var score = vprior.slice();
+    score[top1] = rr.catches + boot;
+    var bi = 0, bs = -Infinity;
+    for (var k = 0; k < score.length; k++) if (score[k] > bs) { bs = score[k]; bi = k; }
+    return { x: cands[bi].x, y: cands[bi].y, gain: bs };
+}
+
 onmessage = function (e) {
     var m = e.data;
     if (m.type === 'config') {
         cfg.K = m.K; cfg.H = m.H; cfg.POLICY_R = m.POLICY_R;
         cfg.W = m.W; cfg.Hc = m.Hc;
         if (m.predRange) PREDATOR_RANGE = m.predRange;   // match live boid avoidance range
+        return;
+    }
+    if (m.type === 'cheapconfig') {
+        CHEAP_NET = m.net; if (m.Hs) CHEAP_HS = m.Hs;
         return;
     }
     if (m.type === 'selftest') {
