@@ -215,14 +215,12 @@
             for (i = 0; i < n; i++) if (_alive[i]) accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y);
             for (i = 0; i < n; i++) if (_alive[i]) { accumulateFlock(_px, _py, _vx, _vy, _ax, _ay, _alive, i, n, p.x, p.y); updateBoid(_px, _py, _vx, _vy, _ax, _ay, i); gridMove(i, _px[i], _py[i]); }
             predatorStepFlat(_px, _py, _alive, n, p, tx, ty);
-            if (now - lastFeed >= FEED_COOLDOWN) {
-                var cr = size * CATCH_FACTOR;
-                for (i = 0; i < n; i++) {
-                    if (!_alive[i]) continue;
-                    var ex = p.x - _px[i], ey = p.y - _py[i];
-                    if (Math.sqrt(ex * ex + ey * ey) < cr) {
-                        size = Math.min(size + GROWTH, MAX_SIZE); lastFeed = now; _alive[i] = 0; gridRemove(i); catches++; break;
-                    }
+            var cr = size * CATCH_FACTOR;
+            for (i = 0; i < n; i++) {
+                if (!_alive[i]) continue;
+                var ex = p.x - _px[i], ey = p.y - _py[i];
+                if (Math.sqrt(ex * ex + ey * ey) < cr) {
+                    size = Math.min(size + GROWTH, MAX_SIZE); lastFeed = now; _alive[i] = 0; gridRemove(i); catches++; break;
                 }
             }
             if (size > BASE_SIZE) size = Math.max(size - DECAY, BASE_SIZE);

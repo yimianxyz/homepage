@@ -143,11 +143,6 @@ Predator.prototype = {
     
     // Check for boid collisions and handle feeding
     checkForPrey: function(boids) {
-        var currentTime = simNow();
-        if (currentTime - this.lastFeedTime < this.feedCooldown) {
-            return []; // Still digesting
-        }
-        
         var caughtBoids = [];
         var catchRadius = this.currentSize * 0.7; // Catch radius scales with size
         
