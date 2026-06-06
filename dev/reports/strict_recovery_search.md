@@ -28,7 +28,26 @@ fast-sim recovery curve). The strict net's cheap does beat E3D by ~45-53% here
 Bottleneck must be elsewhere: rollout depth Hs, candidate set, prune rule, or
 the value net. → Round 2 pivots to Hs, prune_by, and the full-1500f headline.
 
-## Round 2 — (running)
-- VM1: Hs=120 (match planner horizon), K_roll=1, frames=300.
-- VM2: prune_by=value, K_roll=1, Hs=60, frames=300.
-- VM3: K_roll=1, Hs=60, frames=1500 (headline vs radial 6.6 / planner 18.3).
+## Round 2 — Hs depth + prune (frames=300, n=128, strict)
+| config | cheap | vs E3D 0.92 |
+|--------|------:|------------:|
+| K_roll=1, Hs=60 (R1) | 1.336 | +45% |
+| K_roll=1, **Hs=120** | 1.289 | +40% |
+| K_roll=1, **prune_v** | 0.922 | +0% (= E3D, degenerate) |
+
+**Findings:**
+- **Hs is FLAT** (60→120: 1.34→1.29, within noise). Deeper rollout does NOT help.
+- **prune_by=value degenerates to E3D** — the weak net ranks E3D best and never
+  deviates. Ballistic prune (1.34) >> value prune (0.92). The net is a worse
+  candidate-selector than the analytic ballistic heuristic.
+- **ALL rollout levers are flat**: K_roll (1/2/4), Hs (60/120) → cheap stuck at
+  ~1.3 while the planner gets 18.3. This flatness is a RED FLAG — the rollout
+  signal isn't differentiating candidates. Either a deploy bug or a structural
+  mismatch vs the planner's rollout.
+
+## Round 3 — IDENTITY CORRECTNESS CHECK (running)
+cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
+full depth, argmax true catches). Running it alongside the planner at the same
+seeds (n=64, frames=300). If student_mean ≈ planner_mean → harness correct, cheap
+genuinely caps low. If student_mean << planner_mean → deploy bug to fix before
+trusting any cheap number. (Plus VM2 Hs=120/K4 and VM3 full-1500f still running.)
