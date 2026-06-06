@@ -140,6 +140,33 @@ FIXED-predator only). Empirical checks running: GPU cheap @ exact 12 JS seeds
 (gpu_proxy_12), JS radial @ same seeds. The browser is ground truth — must make the
 GPU match it (or search in JS) before any number is trustworthy.
 
+## Round 7 — ROOT CAUSE of the GPU↔browser 2x gap (frame-by-frame trace)
+Built per-frame tracers (trace_gpu_cheap.py, trace_js_cheap.js) and diffed the
+cheap policy on seed 200000:
+- **Initial predator state IDENTICAL**: pos (840,840), vel (-0.7358,0.2405).
+- **boid[0] IDENTICAL** every early frame; **E3D target IDENTICAL** (454.9752,
+  960.3966); MAX_FORCE (0.05), fast_mag (max*.96+min*.398), setMag/limit, the
+  chase gate (PREDATOR_RANGE=80=POLICY_R), and the ballistic top-1 selector
+  (feat[18]-feat[16]) ALL identical.
+- **Yet at frame 0 the decision diverges**: the computed patrol-toward-E3D steer
+  = (-0.0463, 0.0141) = exactly JS's frame-0 steer (JS chose cand0=E3D), but GPU's
+  steer = (-0.0497, 0.0059) -> GPU chose a DIFFERENT candidate.
+
+Everything upstream of the score is identical, so the ONLY thing that can differ
+is the rollout score. **`sim_torch`'s `run_value_lookahead_cheap` and the browser's
+`rolloutFlatState` are two INDEPENDENT implementations of the 60-frame rollout**;
+they produce slightly different per-candidate catch scores -> the argmax tips to a
+different target -> trajectories diverge (chaotic flocking) -> over a full episode
+the GPU sim is **systematically ~2x easier** for the predator (cheap 14.64 GPU vs
+7.0 browser). The fixed-predator <1e-7 validation never exercised the moving-
+predator closed loop or the second rollout implementation, so it was missed.
+
+**Implication:** the GPU sim is a biased proxy for the deploy. To trust GPU
+numbers, make `run_value_lookahead_cheap`'s rollout (and the main two-pass with a
+moving predator) bit-match the browser's `rolloutFlatState`/`predator.js`; OR run
+the search/validation directly in the JS production path. Browser truth stands:
+cheap ≈ radial (7.0 vs 6.6).
+
 ## (old) Round 3b — IDENTITY CORRECTNESS CHECK (superseded by 4b)
 cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
 full depth, argmax true catches). Running it alongside the planner at the same
