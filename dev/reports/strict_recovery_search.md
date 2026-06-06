@@ -45,7 +45,26 @@ the value net. → Round 2 pivots to Hs, prune_by, and the full-1500f headline.
   signal isn't differentiating candidates. Either a deploy bug or a structural
   mismatch vs the planner's rollout.
 
-## Round 3 — IDENTITY CORRECTNESS CHECK (running)
+## Round 3 — LOSS SWEEP: breaks the 0.55 wall (n=128 val, ds_strict_vm2)
+Data audit first: 46% of decision rows have NO catch (zero signal); E3D(cand0) is
+the argmax in 72% of rows; ranking signal is only 34% of gain variance. So the
+net must win the rare ~28% decisive rows. The original `absval` loss made it
+chase scene-difficulty instead.
+
+| loss | exact (matches planner pick) | gain_pick | gain_e3d | gain_oracle |
+|------|-----:|----:|----:|----:|
+| absval,listnet (orig) | 0.293 | 0.949 | 0.925 | 1.416 |
+| value,listnet,cls | **0.710** | 0.926 | 0.925 | 1.416 |
+| listnet,cls | **0.711** | 0.927 | 0.925 | 1.416 |
+
+**Adding `cls` (classification of the planner's argmax) jumps exact 0.29 -> 0.71**
+— the prior reactive-distillation "0.55 wall" was a LOSS-FUNCTION artifact, not an
+information limit. Caveat: gain_pick barely exceeds gain_e3d even at exact 0.71
+(per-decision edges are tiny but compound over the episode: E3D 7.15 -> planner
+18.3). Deploy catch rate is the real test -> retraining value,listnet,cls as
+net_rank.pt and deploy-evaluating vs the absval net (1.34).
+
+## Round 3b — IDENTITY CORRECTNESS CHECK (running)
 cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
 full depth, argmax true catches). Running it alongside the planner at the same
 seeds (n=64, frames=300). If student_mean ≈ planner_mean → harness correct, cheap
