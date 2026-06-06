@@ -119,6 +119,27 @@ radial by 2.2x — a genuinely browser-affordable, shippable, near-planner polic
 The 1.3 "plateau" was entirely a 300f-horizon + rollout-bug artifact.
 (K1/Hs120 and K4/Hs60 in flight to map the rest of the curve toward 18.3.)
 
+## Round 6 — CRITICAL: GPU-strict does NOT match the real browser (2x gap)
+JS production-path validation of the SAME policy (net_strict, K=16/Hs=60/roll-top-1,
+config + net md5 verified identical to the GPU run), seeds 200000-11, 1500f:
+- per-seed [8,5,4,6,13,4,4,5,6,12,10,7] -> **JS browser mean = 7.0 (n=12)**
+- GPU-strict cheap (K1/Hs60) = **14.64** -> **~2x gap**.
+
+**JS 7.0 ≈ radial (6.6).** So in the REAL browser the cheap policy does NOT clearly
+beat radial — consistent with every prior browser measurement (fast net also ~7.9).
+The GPU-strict 14.64 is a SIM ARTIFACT; the GPU sim is a miscalibrated proxy that
+inflates catches ~2x vs the actual deploy. The recovery curve AND the planner
+ceiling (18.3) are therefore suspect for the browser.
+
+Ruled out as the cause: net (md5 match), deploy config (K=16/Hs=60/top-1 match),
+predator size constants (BASE 12, GROWTH 1.2, DECAY 0.002, catch=size*0.7, MAX 1.8x
+all match), steering (both chase-nearest-in-POLICY_R else seek-target). Remaining
+suspects: catch-check timing/order, candidate generation (_candidate_targets vs JS
+planCheap), or moving-predator two-pass divergence (the <1e-7 validation was
+FIXED-predator only). Empirical checks running: GPU cheap @ exact 12 JS seeds
+(gpu_proxy_12), JS radial @ same seeds. The browser is ground truth — must make the
+GPU match it (or search in JS) before any number is trustworthy.
+
 ## (old) Round 3b — IDENTITY CORRECTNESS CHECK (superseded by 4b)
 cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
 full depth, argmax true catches). Running it alongside the planner at the same
