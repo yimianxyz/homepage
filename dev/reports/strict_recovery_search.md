@@ -64,7 +64,36 @@ information limit. Caveat: gain_pick barely exceeds gain_e3d even at exact 0.71
 18.3). Deploy catch rate is the real test -> retraining value,listnet,cls as
 net_rank.pt and deploy-evaluating vs the absval net (1.34).
 
-## Round 3b — IDENTITY CORRECTNESS CHECK (running)
+## Round 4 — TWO BIG CORRECTIONS
+
+### (a) 300f horizon was misleading; cheap already beats radial at 1500f
+The whole 300f sweep ("flat ~1.3, capped") was a SHORT-HORIZON ARTIFACT. At the
+real 1500f horizon (absval net `net_strict.pt`, K_roll=1, Hs=60, n=128):
+
+**cheap = 10.35  vs  E3D 7.27  vs  radial ~6.6  vs  planner 18.3.**
+
+So cheap BEATS radial by +3.75 and recovers **57% of the planner** — it was never
+stuck. The differentiating catches accumulate late in the episode; 300f can't see
+them. Lesson: run the config search at >=1500f (or verify short-horizon ranking
+first). This is already a SHIPPABLE policy (beats production radial).
+
+### (b) Rollout fidelity bug (found by the identity check)
+cheap(K16,Hs120,no_value) MUST equal the planner. It was 1.19 vs planner 2.17
+(ratio 0.55) at 300f -> bug. Cause: the cheap rollout loop omitted `_decay_size`
++ frame/time advance that the planner's `_step_with_target` does -> predator never
+shrank in the rollout -> over-counted catches -> mis-ranked candidates. FIXED in
+feat_planner.py (run_value_lookahead_cheap). Re-running identity (should -> ratio
+1.0) and the fixed cheap @1500f (should lift 10.35).
+
+### (c) cls ranker net hurts deploy
+net_rank (value,listnet,cls; exact 0.71) deployed at 0.97 < absval's 1.34 — the
+cls net outputs ranking scores, not catch-calibrated values, so it combines badly
+with rollout catch counts in the value bootstrap. Pure net (no rollout) = 0.93
+~ E3D: per-decision planner-matching does NOT transfer to catches (distribution
+shift + the planner's edge is closed-loop). **For DEPLOY use the calibrated absval
+net; the rollout carries the catches.**
+
+## Round 3b — IDENTITY CORRECTNESS CHECK (superseded by Round 4b)
 cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
 full depth, argmax true catches). Running it alongside the planner at the same
 seeds (n=64, frames=300). If student_mean ≈ planner_mean → harness correct, cheap

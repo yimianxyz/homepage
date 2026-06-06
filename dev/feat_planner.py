@@ -312,6 +312,11 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
                 roll.boid_vel[frozen] = sv[frozen]
                 pp._analytic_steer(roll, roll_tgt)
                 roll._check_catches()
+                # FIDELITY FIX: the planner's rollout (_step_with_target) also decays
+                # predator size + advances frame/time each step; omitting these made
+                # the rollout over-count catches (predator never shrinks) and mis-rank
+                # candidates -> cheap(K16,Hs120,no_value) was 0.55x the planner, not 1x.
+                roll._decay_size(); roll.frame += 1; roll._frame_ms += st.FRAME_MS
             c_near = (roll.catches - c0).reshape(B, K).float()
             if no_value:
                 roll_score = c_near                                   # no terminal bootstrap
