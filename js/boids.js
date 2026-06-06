@@ -20,6 +20,50 @@ document.addEventListener('DOMContentLoaded', function() {
 		window.__sim = initialize_canvas_simulation('boids1', false);
 	});
 
+	// --- "What am I looking at?" info panel --------------------------------
+	// The activation viz draws a small "?" badge next to its title and
+	// publishes the badge's circular hit-region on window.__vizInfo (canvas
+	// units == CSS px == clientX/Y here). Tapping it toggles a centered DOM
+	// card describing the rules; hovering brightens the badge (the viz reads
+	// window.__vizInfoHover) and shows a pointer cursor.
+	var infoCard = document.getElementById('viz-info-card');
+	var infoBackdrop = document.getElementById('viz-info-backdrop');
+	var infoClose = infoCard && infoCard.querySelector('.viz-info-close');
+
+	function infoIsOpen() { return infoCard && !infoCard.hidden; }
+	function showInfo() {
+		if (!infoCard) return;
+		infoCard.hidden = false;
+		if (infoBackdrop) infoBackdrop.hidden = false;
+	}
+	function hideInfo() {
+		if (!infoCard) return;
+		infoCard.hidden = true;
+		if (infoBackdrop) infoBackdrop.hidden = true;
+	}
+	function overInfoBadge(x, y) {
+		var i = window.__vizInfo;
+		if (!i) return false;
+		var dx = x - i.cx, dy = y - i.cy;
+		return dx * dx + dy * dy <= i.r * i.r;
+	}
+
+	if (infoClose) infoClose.addEventListener('click', hideInfo);
+	// Tap-outside dismissal is handled in the pointerup handler below — NOT by a
+	// backdrop 'click' listener. On touch, the synthetic click the browser fires
+	// after the *opening* tap lands on the now-visible backdrop and would close
+	// the panel the instant it opened (desktop dodges this because the synthetic
+	// click resolves to <body>, not the backdrop). Routing dismissal through the
+	// pointer stream keeps open/close symmetric across mouse, touch, and pen.
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape' && infoIsOpen()) hideInfo();
+	});
+	document.addEventListener('mousemove', function (e) {
+		var over = overInfoBadge(e.clientX, e.clientY);
+		window.__vizInfoHover = over;
+		document.body.style.cursor = over ? 'pointer' : '';
+	});
+
 	// Tap / click anywhere on the page spawns a new boid at the pointer
 	// position. We use pointer events instead of `click` because iOS Safari
 	// only fires `click` on elements it considers "clickable" (cursor:pointer,
@@ -46,10 +90,22 @@ document.addEventListener('DOMContentLoaded', function() {
 	document.addEventListener('pointerup', function (e) {
 		if (pdId !== e.pointerId) return;
 		pdId = null;
-		if (e.target && e.target.closest && e.target.closest('a')) return;
 		var dx = e.clientX - pdX;
 		var dy = e.clientY - pdY;
-		if (dx * dx + dy * dy > 64) return;             // >8px = drag, not tap
+		var isTap = (dx * dx + dy * dy <= 64);          // <=8px = tap, not drag
+		// The "?" badge toggles the panel and never spawns.
+		if (isTap && overInfoBadge(e.clientX, e.clientY)) {
+			if (infoIsOpen()) hideInfo(); else showInfo();
+			return;
+		}
+		// While the panel is open, a tap outside the card dismisses it; a tap
+		// inside it does nothing. Either way, no boid is spawned.
+		if (infoIsOpen()) {
+			if (!(e.target && e.target.closest && e.target.closest('.viz-info-card'))) hideInfo();
+			return;
+		}
+		if (e.target && e.target.closest && e.target.closest('a')) return;
+		if (!isTap) return;                             // drag, not a tap
 		var sel = window.getSelection && window.getSelection();
 		if (sel && sel.toString().length > 0) return;   // user selected text
 		if (window.__sim) window.__sim.spawnBoid(e.clientX, e.clientY);
