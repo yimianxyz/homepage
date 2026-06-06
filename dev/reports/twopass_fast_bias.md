@@ -50,6 +50,35 @@ the exact version (md5 62f62ba5) that generated the data + net.
    the fast sim (zero train/deploy gap by construction, at a ~11%-easier-catch
    visual cost + a JS predictor-corrector reimplementation).
 
+## Strict-JS production-path validation (2026-06-06)
+The authoritative gate is `dev/eval_cheap_production.js` — pure-Node, loads the
+real `js/` files and runs the actual browser frame loop (strict two-pass via
+`sim.tick()`), so it IS the production code path (not a sim proxy). Slow
+(~250 s/seed for the cheap rollout, single-threaded) so sharded across cores.
+
+Fresh held-out seeds 300000–300007 (n=8), strict two-pass, frames=1500:
+
+| seed | cheap (fast-trained net) | radial (prod) |
+|------|--------------------------|---------------|
+| 300000 | 11 | 2 |
+| 300001 | 0  | 4 |
+| 300002 | 7  | 5 |
+| 300003 | 9  | 7 |
+| 300004 | 13 | 3 |
+| 300005 | 11 | 15 |
+| 300006 | 3  | 11 |
+| 300007 | 9  | 6 |
+| **mean** | **7.875** | **6.625** |
+
+Paired diff (cheap−radial) = **+1.25 ± 2.24 SE — not significant.** So the
+*fast-trained* net's cheap policy is **statistically tied** with the shipped
+radial policy in the strict production regime (huge per-seed variance; the boids
+sim is chaotic). This is why a **strict regen** (faithful labels) is needed: to
+see whether a strict-trained net opens a real margin over radial — and the strict
+`planner_mean` from gen tells us if there's even headroom (radial≈6.6) to exploit.
+
 ## Repro
 `python3 validate_equiv.py 512 2 1500` (E3D arm) — VM2, us-central1-a.
+`node dev/eval_cheap_production.js --js /tmp/js_tp --seedStart 300000 --seeds 8 --frames 1500` (strict cheap).
+`node dev/eval_radial_baseline.js --js /tmp/prod_main/js --seedStart 300000 --seeds 8 --frames 1500` (radial).
 `python3 validate_equiv.py 8 64 1500` (planner arm) — VM3.
