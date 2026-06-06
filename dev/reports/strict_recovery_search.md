@@ -104,6 +104,21 @@ Every prior cheap number was depressed by the _decay_size bug. Re-running the
 recovery curve at the REAL 1500f horizon with the fix:
 - K1/Hs60 (cheapest), K1/Hs120, K4/Hs60, ... -> K16/Hs120 (=planner 18.3).
 
+## Round 5 — 1500f recovery curve with the FIX: cheapest config hits 80% of planner
+| config (1500f, n=128, strict) | catches | % of planner 18.3 |
+|-------------------------------|--------:|-------------------:|
+| radial (production) | ~6.6 | 36% |
+| E3D | 7.27 | 40% |
+| cheap K1/Hs60 (OLD buggy) | 10.35 | 57% |
+| **cheap K1/Hs60 (FIXED)** | **14.64** | **80%** |
+| planner (K16/H120) | 18.3 | 100% |
+
+**The _decay_size fix lifted the cheapest config 10.35 -> 14.64 (+41%).** The cheap
+policy (ONE rollout candidate, Hs=60) now recovers **80% of the planner** and beats
+radial by 2.2x — a genuinely browser-affordable, shippable, near-planner policy.
+The 1.3 "plateau" was entirely a 300f-horizon + rollout-bug artifact.
+(K1/Hs120 and K4/Hs60 in flight to map the rest of the curve toward 18.3.)
+
 ## (old) Round 3b — IDENTITY CORRECTNESS CHECK (superseded by 4b)
 cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
 full depth, argmax true catches). Running it alongside the planner at the same
