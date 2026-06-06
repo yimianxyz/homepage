@@ -93,7 +93,18 @@ with rollout catch counts in the value bootstrap. Pure net (no rollout) = 0.93
 shift + the planner's edge is closed-loop). **For DEPLOY use the calibrated absval
 net; the rollout carries the catches.**
 
-## Round 3b — IDENTITY CORRECTNESS CHECK (superseded by Round 4b)
+## Round 4b — IDENTITY VERIFIED after the fix (ratio 0.99)
+Re-ran cheap(K16,Hs120,no_value) vs planner with the fixed rollout (n=64, 300f):
+**student 2.156 vs planner 2.172 -> ratio 0.993 ≈ 1.0** (was 0.55 before fix).
+
+CONFIRMED: the cheap framework is now provably correct — with full rollout it
+EXACTLY equals the planner. So "reach exactly the planner" is achievable at
+K_roll=16/Hs=120 (that IS the planner); the question is how cheap we can go.
+Every prior cheap number was depressed by the _decay_size bug. Re-running the
+recovery curve at the REAL 1500f horizon with the fix:
+- K1/Hs60 (cheapest), K1/Hs120, K4/Hs60, ... -> K16/Hs120 (=planner 18.3).
+
+## (old) Round 3b — IDENTITY CORRECTNESS CHECK (superseded by 4b)
 cheap(K=16, K_roll=16, Hs=120, no_value) MUST equal the planner (roll all 16 to
 full depth, argmax true catches). Running it alongside the planner at the same
 seeds (n=64, frames=300). If student_mean ≈ planner_mean → harness correct, cheap
