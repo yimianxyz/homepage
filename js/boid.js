@@ -61,9 +61,9 @@ Boid.prototype = {
 	getCohesionVector: function (boids) {
 		var totalPosition = new Vector(0, 0);
 		var neighborCount = 0;
-		for (var bi in boids) {
-			var boid = boids[bi];
-			if (this == boid) {
+		for (var bi_n = boids.length, bi_i = 0; bi_i < bi_n; bi_i++) {
+			var boid = boids[bi_i];
+			if (this === boid) {
 				continue;
 			}
 
@@ -94,9 +94,9 @@ Boid.prototype = {
 		var steeringVector = new Vector(0, 0);
 		var neighborCount = 0;
 
-		for (var bi in boids) {
-			var boid = boids[bi];
-			if (this == boid) {
+		for (var bi_n = boids.length, bi_i = 0; bi_i < bi_n; bi_i++) {
+			var boid = boids[bi_i];
+			if (this === boid) {
 				continue;
 			}
 
@@ -146,9 +146,9 @@ Boid.prototype = {
 		var perceivedFlockVelocity = new Vector(0, 0);
 		var neighborCount = 0;
 
-		for (var bi in boids) {
-			var boid = boids[bi];
-			if (this == boid) {
+		for (var bi_n = boids.length, bi_i = 0; bi_i < bi_n; bi_i++) {
+			var boid = boids[bi_i];
+			if (this === boid) {
 				continue;
 			}
 

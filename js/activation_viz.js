@@ -201,55 +201,31 @@
 
         // --- Labels ------------------------------------------------------
         ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
+        ctx.textAlign = 'right';
         ctx.textBaseline = 'top';
 
-        // Header "predator's brain" plus a small "?" info badge to its right,
-        // the pair centered above the widget on the graph's axis (x0 + W/2).
-        // The columns span x0 (inputs) to x0+W (output), so the box midpoint
-        // is the graph's visual center; a title centered over its figure (with
-        // the live caption centered below) is the standard, balanced layout.
-        // Above the widget is clear canvas at every viewport (y0 >= marginY >=
-        // 10px, top dots start at >= y0). Possessive matches the page's voice
-        // ("my master's degree from Cornell"). Tapping the badge opens a DOM
-        // panel (wired in boids.js / index.html) that explains the boid +
-        // predator rules and the tap-to-hatch interaction; its hit-region is
-        // published on window.__vizInfo in canvas units, which equal CSS px
-        // here (canvas_init.js sizes the canvas to the visual viewport), so a
-        // pointer's clientX/clientY compares against it directly.
-        var title = "predator's brain";
-        ctx.textAlign = 'left';
-        var titleW = ctx.measureText(title).width;
-        var iconR = 6, iconGap = 6;
-        var groupLeft = x0 + W / 2 - (titleW + iconGap + iconR * 2) / 2;
-        var headerY = y0 - 12;
+        // "predator's brain" header — drawn just ABOVE the widget, right-
+        // aligned to its right edge, mirroring the "N left · M eaten" caption
+        // below it. It used to sit INSIDE the widget at top-right, but the
+        // input column's top dots and the edges fanning toward the output
+        // overlapped the text (the top-right corner only looks empty above the
+        // 2-dot output column — the wider label reaches back into the dense
+        // middle). Above the widget is clear canvas at every viewport: y0 is
+        // >= marginY (>=14px), so y0-12 keeps the text on-screen, and the top
+        // network dots start at >= y0, below the label's baseline. Possessive
+        // matches the page's voice ("my master's degree from Cornell"). Static
+        // metadata → dim alpha.
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
-        ctx.fillText(title, groupLeft, headerY);
+        ctx.fillText("predator's brain", x0 + W, y0 - 12);
 
-        // "?" badge — slightly more present than the title (it's interactive),
-        // brighter still on hover (window.__vizInfoHover, set on mousemove).
-        var iconX = groupLeft + titleW + iconGap + iconR;
-        var iconY = headerY + 4.5;
-        var hovered = !!window.__vizInfoHover;
-        ctx.strokeStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.55 : 0.30) + ')';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(iconX, iconY, iconR, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.72 : 0.46) + ')';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('?', iconX, iconY + 0.5);
-        window.__vizInfo = { cx: iconX, cy: iconY, r: 14 };
-
-        // Live numbers caption below the widget, centered on the same axis as
-        // the header. Always shown except on landscape phones (where the
-        // widget anchors to the top of the viewport, no room below it).
-        ctx.textBaseline = 'top';
+        // Live numbers caption below the widget. Always shown except on
+        // landscape phones (where the widget anchors to the top of the
+        // viewport and there's no room below it before the content).
         if (!landscapePhone) {
             var alive = sim.boids ? sim.boids.length : 0;
             var eaten = sim.boidsEaten || 0;
             ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
-            ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W / 2, y0 + H + 8);
+            ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W, y0 + H + 8);
         }
 
         ctx.textAlign = 'left';
