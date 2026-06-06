@@ -286,6 +286,12 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
     B = sim.B
     roll = Sim(seeds=list(range(B * K)), weights=pp.WEIGHTS, device=device,
                auto_target='evolved', auto_target_opts=dict(pp.E3D), two_pass=pp.TWO_PASS)
+    # FAITHFULNESS: the browser's candidates() recomputes the E3D target FRESH
+    # every decision (computeEvolvedTarget(..,null), momentum 0). sim_torch defaults
+    # to FREEZE-during-chase (cand0 goes stale while chasing) which diverges from the
+    # deploy. Force fresh recompute on both sims to match the browser exactly.
+    sim.always_recompute_target = True
+    roll.always_recompute_target = True
     rows = torch.arange(B, device=device)
     held = None
     f = 0
@@ -328,20 +334,32 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
                 roll_score = c_near + tv.max(dim=1).values.reshape(B, K)
             if 0 < K_roll < K:
                 f0, x0 = candidate_features(sim, cand)
-                vprior = None
-                if (not no_value) or prune_by != 'ball':
-                    with torch.no_grad():
-                        vprior = model(f0.to(device), x0.to(device))  # (B,K) prior V
+                with torch.no_grad():
+                    vprior = model(f0.to(device), x0.to(device))      # (B,K) prior V
                 if prune_by == 'ball':
-                    # rank candidates by ballistic catchability: caught flag (feat 18)
-                    # minus normalized time-to-catch (feat 16). Higher = catch sooner.
+                    # ballistic catchability: caught (feat18) - tCatchNorm (feat16).
+                    # NOTE: for a slow predator this TIES at -1 across all candidates
+                    # most frames (no ballistic catch within Hb) -> degenerate prune.
                     pscore = (f0[:, :, 18] - f0[:, :, 16]).to(device)
-                else:
+                elif prune_by == 'mindist':
+                    # closest ballistic approach (feat17, normalized) -- non-tying,
+                    # informative even when no catch. Lower dist = better -> negate.
+                    pscore = (-f0[:, :, 17]).to(device)
+                elif prune_by == 'ballmin':
+                    # ballistic primary, break the -1 ties by closest approach.
+                    pscore = (f0[:, :, 18] - f0[:, :, 16] - 0.01 * f0[:, :, 17]).to(device)
+                elif prune_by == 'vmin':
+                    # value prior primary, closeness tiebreak (mostly non-tying anyway).
+                    pscore = vprior - 0.001 * f0[:, :, 17].to(device)
+                else:  # 'v'
                     pscore = vprior
-                thr = torch.topk(pscore, K_roll, dim=1).values[:, -1:]
-                is_top = pscore >= thr                                # top-K_roll get rollout
-                # no_value: non-rolled candidates score 0 -> argmax falls back to
-                # cand0 (E3D) when the single rolled candidate yields no catch.
+                # deterministic top-K_roll: stable descending sort breaks ties by
+                # lowest index -> matches the browser's first-argmax cp_top1. (The old
+                # `pscore >= topk` selected ALL tied candidates -> secretly the full
+                # 16-roll planner whenever the ballistic prune tied. THE 2x-gap bug.)
+                order = torch.argsort(pscore, dim=1, descending=True, stable=True)
+                is_top = torch.zeros_like(pscore, dtype=torch.bool)
+                is_top.scatter_(1, order[:, :K_roll], torch.ones_like(order[:, :K_roll], dtype=torch.bool))
                 nonroll = torch.zeros_like(roll_score) if no_value else vprior
                 score = torch.where(is_top, roll_score, nonroll)
             else:
