@@ -1,17 +1,17 @@
 // Cheap ballistic predator policy — the SHIPPED production patrol policy.
 //
 // Distilled from the receding-horizon planner "teacher" (dev/planner_probe.py).
-// Every D frames it picks a patrol target by: generate 16 candidates (E3D patrol
-// + 15 nearest-boid lead-adjusted intercepts), rank them by a cheap 2-body
-// ballistic catchability sim, roll ONLY the single most-catchable candidate 60
+// Every D=16 frames it picks a patrol target by: generate 16 candidates (E3D
+// patrol + 15 nearest-boid lead-adjusted intercepts), rank them by a cheap 2-body
+// ballistic catchability sim, roll the K_roll=4 most-catchable candidates Hs=90
 // frames through a faithful flat copy of the flock, and argmax (rolled catches +
 // value-net terminal bootstrap) vs the other candidates' value-net prior. Then
 // each frame it steers with the SAME analytic chase/seek as the old CHASE branch.
 //
-// This reproduces the 16-candidate planner at ~1/16 the rollout cost (sim_torch:
-// 94-98% of the full-rollout ceiling, parity-verified JS scoring < 1e-6 vs GPU),
-// and unlike the planner it is cheap enough to run SYNCHRONOUSLY on the main
-// thread — no Web Worker, no staleness.
+// This recovers ~90% of the receding-horizon planner's catch rate at ~1/4 its
+// rollout cost (sim_torch: K4/Hs90/D16 = 16.88 vs planner 18.75; the deep rollout
+// lets the committed target hold for D=16 frames). Cheap enough to run
+// SYNCHRONOUSLY on the main thread — no Web Worker, no staleness.
 //
 // The page boot gate (window.__predatorReady) waits on the value-net load before
 // boids.js starts the sim, so this policy drives the predator from frame 1.
@@ -28,7 +28,7 @@
     var BASE_SIZE = PREDATOR_SIZE, MAX_SIZE = BASE_SIZE * 1.8, CATCH_FACTOR = 0.7;
     var SEP_MULT = 2, COH_MULT = 1, ALIGN_MULT = 1;
     var LEAD_SCALE = EVOLVED_PATROL.lead_scale, LEAD_MAX = EVOLVED_PATROL.lead_max;
-    var cfg = { K: 16, Hs: 60, D: 8, POLICY_R: 80, W: 1680, Hc: 1680 };
+    var cfg = { K: 16, K_roll: 4, Hs: 90, D: 16, POLICY_R: 80, W: 1680, Hc: 1680 };
 
     function fastMag(x, y) {
         var ax = x < 0 ? -x : x, ay = y < 0 ? -y : y;
@@ -266,17 +266,26 @@
             bx: s.bx, by: s.by, bvx: s.bvx, bvy: s.bvy, nAlive: s.bx.length };
         var fr = cp_features(st, cands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
         var vprior = cp_value(NET, fr.feat, fr.ctx);
-        var top1 = cp_top1(fr.feat);
-        var rr = rolloutFlatState(s, cands[top1].x, cands[top1].y, cfg.Hs);
-        var t = rr.term;
-        var tcands = candidates(t);
-        var tst = { px: t.px, py: t.py, pvx: t.pvx, pvy: t.pvy, psize: t.psize,
-            bx: t.bx, by: t.by, bvx: t.bvx, bvy: t.bvy, nAlive: t.bx.length };
-        var tfr = cp_features(tst, tcands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
-        var tv = cp_value(NET, tfr.feat, tfr.ctx);
-        var boot = -Infinity; for (var j = 0; j < tv.length; j++) if (tv[j] > boot) boot = tv[j];
+        // Roll the top-K_roll candidates by ballistic pscore (caught - tCatchNorm);
+        // ties (the common case for the slow predator) break by lowest index, so
+        // this rolls the E3D patrol + the nearest live boids. Each rolled candidate
+        // is scored by (rollout catches + value-net terminal bootstrap); the rest
+        // keep their value-net prior. argmax commits.
+        var pidx = []; for (var pk = 0; pk < cands.length; pk++) pidx.push(pk);
+        pidx.sort(function (a, b) { var pa = fr.feat[a][18] - fr.feat[a][16], pb = fr.feat[b][18] - fr.feat[b][16]; return (pb - pa) || (a - b); });
         var score = vprior.slice();
-        score[top1] = rr.catches + boot;
+        for (var rk = 0; rk < cfg.K_roll && rk < pidx.length; rk++) {
+            var ci = pidx[rk];
+            var rr = rolloutFlatState(s, cands[ci].x, cands[ci].y, cfg.Hs);
+            var t = rr.term;
+            var tcands = candidates(t);
+            var tst = { px: t.px, py: t.py, pvx: t.pvx, pvy: t.pvy, psize: t.psize,
+                bx: t.bx, by: t.by, bvx: t.bvx, bvy: t.bvy, nAlive: t.bx.length };
+            var tfr = cp_features(tst, tcands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
+            var tv = cp_value(NET, tfr.feat, tfr.ctx);
+            var boot = -Infinity; for (var j = 0; j < tv.length; j++) if (tv[j] > boot) boot = tv[j];
+            score[ci] = rr.catches + boot;
+        }
         var bi = 0, bs = -Infinity;
         for (var k = 0; k < score.length; k++) if (score[k] > bs) { bs = score[k]; bi = k; }
         // Record the chosen candidate's value-net forward for the brain viz.
