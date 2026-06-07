@@ -239,7 +239,7 @@
         if (!hovered && !prefersReducedMotion) {
             if (!infoStart) infoStart = Date.now();
             var e = (Date.now() - infoStart) / 1000;                         // seconds since first shown
-            if (e > 8) glow = Math.abs(Math.sin((e - 8) * (Math.PI / 1.4))); // freeze 8s, then breathe
+            if (e > 8) glow = (1 - Math.cos((e - 8) * (Math.PI / 2.5))) / 2; // freeze 8s, then a slow, smooth breath (~5s/cycle)
         }
         ctx.strokeStyle = 'rgba(85, 85, 85, ' + (0.30 + glow * 0.25) + ')';
         ctx.lineWidth = 1;
