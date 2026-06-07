@@ -21,11 +21,13 @@ document.addEventListener('DOMContentLoaded', function() {
 	});
 
 	// --- "What am I looking at?" info panel --------------------------------
-	// The activation viz draws a small "?" badge next to its title and
-	// publishes the badge's circular hit-region on window.__vizInfo (canvas
-	// units == CSS px == clientX/Y here). Tapping it toggles a centered DOM
-	// card describing the rules; hovering brightens the badge (the viz reads
-	// window.__vizInfoHover) and shows a pointer cursor.
+	// The activation viz publishes its whole-widget hit-region (a rect wrapping
+	// the title, "?" badge, graph, and caption) on window.__vizInfo (canvas
+	// units == CSS px == clientX/Y here). The icon and the area are one
+	// affordance: tapping anywhere over the widget toggles a centered DOM card
+	// describing the rules, and hovering anywhere over it brightens the badge
+	// (the viz reads window.__vizInfoHover, and swaps its caption for a hint)
+	// and shows a pointer cursor.
 	var infoCard = document.getElementById('viz-info-card');
 	var infoBackdrop = document.getElementById('viz-info-backdrop');
 	var infoClose = infoCard && infoCard.querySelector('.viz-info-close');
@@ -44,8 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	function overInfoBadge(x, y) {
 		var i = window.__vizInfo;
 		if (!i) return false;
-		var dx = x - i.cx, dy = y - i.cy;
-		return dx * dx + dy * dy <= i.r * i.r;
+		return x >= i.x && x <= i.x + i.w && y >= i.y && y <= i.y + i.h;
 	}
 
 	if (infoClose) infoClose.addEventListener('click', hideInfo);

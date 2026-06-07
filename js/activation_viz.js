@@ -249,17 +249,34 @@
         ctx.fillStyle = 'rgba(85, 85, 85, ' + (0.46 + glow * 0.26) + ')';
         ctx.textAlign = 'center';
         ctx.fillText('?', iconX, headerY);
-        window.__vizInfo = { cx: iconX, cy: headerY, r: 14 };
+
+        // The whole widget is one hit-target, not just the badge: hovering or
+        // tapping anywhere over it behaves exactly like the "?" (boids.js drives
+        // __vizInfoHover and the panel toggle off this rect), so the icon and the
+        // area stay one consistent affordance. The box wraps the header, the
+        // graph (x0..x0+W), the badge, and the caption, with a little slack.
+        var pad = 4;
+        var boxL = Math.min(x0, groupLeft) - pad;
+        var boxR = Math.max(x0 + W, iconX + iconR) + pad;
+        var boxT = headerY - iconR - pad;
+        var boxB = (landscapePhone ? y0 + H : y0 + H + 17) + pad;
+        window.__vizInfo = { x: boxL, y: boxT, w: boxR - boxL, h: boxB - boxT };
 
         // Live numbers caption below the widget, centered on the same axis as
         // the header. Always shown except on landscape phones (where the
         // widget anchors to the top of the viewport, no room below it).
         ctx.textBaseline = 'top';
         if (!landscapePhone) {
-            var alive = sim.boids ? sim.boids.length : 0;
-            var eaten = sim.boidsEaten || 0;
-            ctx.fillStyle = 'rgba(85, 85, 85, 0.42)';
-            ctx.fillText(alive + ' left · ' + eaten + ' eaten', x0 + W / 2, y0 + H + 8);
+            // On hover the caption becomes the affordance hint; otherwise it's
+            // the live tally. Hovering signals intent to act, not to read the
+            // counter — so the line that's already there does double duty as a
+            // frameless, in-place tooltip (no floating box to clash with the
+            // boxless aesthetic, nothing new to clip near the viewport edge).
+            var hint = !!window.__vizInfoHover;
+            ctx.fillStyle = 'rgba(85, 85, 85, ' + (hint ? 0.6 : 0.42) + ')';
+            var caption = hint ? "what's this?"
+                : (sim.boids ? sim.boids.length : 0) + ' left · ' + (sim.boidsEaten || 0) + ' eaten';
+            ctx.fillText(caption, x0 + W / 2, y0 + H + 8);
         }
 
         ctx.textAlign = 'left';
