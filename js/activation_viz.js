@@ -13,6 +13,7 @@
     'use strict';
 
     var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var infoPulseT0 = 0;   // time the "?" badge first appeared, for its one-time pulse
 
     function clamp(min, v, max) {
         return v < min ? min : v > max ? max : v;
@@ -230,13 +231,22 @@
         // "?" badge — slightly more present than the title (it's interactive),
         // brighter still on hover (window.__vizInfoHover, set on mousemove).
         var iconX = groupLeft + titleW + iconGap + iconR;
-        var hovered = !!window.__vizInfoHover;
-        ctx.strokeStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.55 : 0.30) + ')';
+        // One-time "i'm interactive" hint: when the viz first appears the badge
+        // breathes up toward its hover brightness a few times, then settles, so a
+        // curious eye notices it's clickable. Honors prefers-reduced-motion.
+        // glow: 0 = resting, 1 = hover brightness.
+        var hovered = !!window.__vizInfoHover, glow = hovered ? 1 : 0;
+        if (!hovered && !prefersReducedMotion) {
+            if (!infoPulseT0) infoPulseT0 = Date.now();
+            var e = (Date.now() - infoPulseT0) / 1000;     // seconds since first shown
+            glow = Math.max(0, 1 - e / 4.5) * Math.max(0, Math.sin(e * (2 * Math.PI / 1.5))); // ~3 fading breaths
+        }
+        ctx.strokeStyle = 'rgba(85, 85, 85, ' + (0.30 + glow * 0.25) + ')';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(iconX, headerY, iconR, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.72 : 0.46) + ')';
+        ctx.fillStyle = 'rgba(85, 85, 85, ' + (0.46 + glow * 0.26) + ')';
         ctx.textAlign = 'center';
         ctx.fillText('?', iconX, headerY);
         window.__vizInfo = { cx: iconX, cy: headerY, r: 14 };
