@@ -118,17 +118,19 @@
             activations.push(model.layers[i].lastA);
         }
 
-        // --- Show CHANGE, not magnitude ----------------------------------
-        // Drive brightness by how much each activation is *shifting*, not its
-        // raw value: track a fast and a slow EMA per neuron and display the gap
-        // between them. A neuron (or input) that holds steady fades to dark;
-        // one that moves when the predator commits a new decision flares and
-        // eases back. The policy re-plans only every D frames (predator_cheap.js),
-        // so the raw activations step in place — but both EMAs are continuous,
-        // so their gap swells in over a few frames (no abrupt pop), peaks, then
-        // decays as the slow EMA catches up: the brain breathes smoothly and
-        // continuously. Two EMAs per neuron; nothing downstream changes.
-        var change = [];
+        // --- Even the field: tame only the always-on neurons -------------
+        // True activation alone leaves a few neurons (and the output) pinned
+        // bright every frame — an uneven, static look. Pure change fixes that
+        // but drains everyone, losing the real activation texture. So blend per
+        // neuron: subtract each neuron's steady baseline (its slow EMA) in
+        // proportion to how *dominant* that baseline is in its column.
+        //   w = |baseline| / column's peak |baseline|, in [0,1]
+        //   shown = fastEMA(activation) - w * baseline
+        // The column's persistent leader (w->1) loses its constant glow and
+        // shows only its change; an ordinary neuron (w->0) keeps its true
+        // activation. Two continuous EMAs (fast smooths the onset, slow is the
+        // baseline), so flares swell in instead of popping. No tuned threshold.
+        var shown = [];
         for (var ci = 0; ci < activations.length; ci++) {
             var av = activations[ci], ef = actEmaFast[ci], es = actEmaSlow[ci];
             if (!ef || ef.length !== av.length) {
@@ -136,16 +138,22 @@
                 es = actEmaSlow[ci] = new Float64Array(av.length);
                 for (var s0 = 0; s0 < av.length; s0++) { ef[s0] = av[s0]; es[s0] = av[s0]; }  // start settled — no flash on load
             }
-            var cv = new Float64Array(av.length);
+            var maxBase = 1e-3;
             for (var s1 = 0; s1 < av.length; s1++) {
                 ef[s1] += 0.30 * (av[s1] - ef[s1]);   // fast — smooths the onset over ~5 frames
-                es[s1] += 0.08 * (av[s1] - es[s1]);   // slow — the baseline it's measured against (~16-frame tail)
-                cv[s1] = ef[s1] - es[s1];
+                es[s1] += 0.08 * (av[s1] - es[s1]);   // slow — each neuron's steady baseline (~16-frame tail)
+                var ab = es[s1] < 0 ? -es[s1] : es[s1];
+                if (ab > maxBase) maxBase = ab;
             }
-            change.push(cv);
+            var cv = new Float64Array(av.length);
+            for (var s2 = 0; s2 < av.length; s2++) {
+                var w = (es[s2] < 0 ? -es[s2] : es[s2]) / maxBase;   // 1 = column's always-on leader, ~0 = ordinary
+                cv[s2] = ef[s2] - w * es[s2];
+            }
+            shown.push(cv);
         }
         // Reduced-motion users get the calm raw-magnitude view instead.
-        var dotSrc = prefersReducedMotion ? activations : change;
+        var dotSrc = prefersReducedMotion ? activations : shown;
 
         // Per-column displayed-neuron indices + their screen positions, vertically
         // centered within H. posMap[l] is sparse (length = layer size); entries
@@ -175,7 +183,7 @@
         if (!prefersReducedMotion) {
             for (var L_idx = 0; L_idx < model.layers.length; L_idx++) {
                 var Lr = model.layers[L_idx];
-                var prev = change[L_idx];                 // edges fire on changing inputs, not steady ones
+                var prev = shown[L_idx];                  // same per-neuron signal the dots use
                 var posPrev = posMap[L_idx];
                 var posNext = posMap[L_idx + 1];
                 var dispPrev = disp[L_idx];
