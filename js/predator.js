@@ -186,9 +186,6 @@ Predator.prototype = {
         
         // Handle boundaries
         this.bound();
-        
-        // Handle size decay
-        this.decaySize();
     },
     
     render: function() {

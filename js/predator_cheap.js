@@ -223,7 +223,6 @@
                     size = Math.min(size + GROWTH, MAX_SIZE); lastFeed = now; _alive[i] = 0; gridRemove(i); catches++; break;
                 }
             }
-            if (size > BASE_SIZE) size = Math.max(size - DECAY, BASE_SIZE);
             now += FRAME_MS;
         }
         return { catches: catches, term: snapAlive(_px, _py, _vx, _vy, _alive, n, p, size, lastFeed, now) };
