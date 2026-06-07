@@ -13,7 +13,7 @@
     'use strict';
 
     var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var infoPulseStart = 0, infoNextPulse = 0;   // schedule for the "?" badge's occasional pulse
+    var infoStart = 0;   // time the "?" badge first appeared, for its breathing hint
 
     function clamp(min, v, max) {
         return v < min ? min : v > max ? max : v;
@@ -231,23 +231,15 @@
         // "?" badge — slightly more present than the title (it's interactive),
         // brighter still on hover (window.__vizInfoHover, set on mousemove).
         var iconX = groupLeft + titleW + iconGap + iconR;
-        // "i'm interactive" hint: the badge breathes up toward its hover
-        // brightness for three gentle beats, occasionally, at random gaps — a
-        // charming "i'm here if you're curious" rather than a steady distraction.
-        // It stays frozen for the first ~15s so the reader takes in the page's
-        // important text first; the viz sits off the reading path (bottom-right)
-        // where the boids already move. Honors prefers-reduced-motion.
-        // glow: 0 = resting, 1 = hover brightness.
+        // "i'm interactive" hint: after an ~8s freeze (let the reader take in the
+        // page first — the viz sits off the reading path, where the boids already
+        // move) the badge gently, continuously breathes between its resting and
+        // hover brightness. Honors prefers-reduced-motion. glow: 0 = rest, 1 = hover.
         var hovered = !!window.__vizInfoHover, glow = hovered ? 1 : 0;
         if (!hovered && !prefersReducedMotion) {
-            var now = Date.now();
-            if (!infoNextPulse) infoNextPulse = now + 15000;                 // freeze, then first beat
-            if (!infoPulseStart && now >= infoNextPulse) infoPulseStart = now;
-            if (infoPulseStart) {
-                var e = (now - infoPulseStart) / 1000;
-                if (e < 4.2) glow = Math.abs(Math.sin(e * (Math.PI / 1.4))); // three gentle breaths: 0 -> hover -> 0, x3
-                else { infoPulseStart = 0; infoNextPulse = now + 15000 + Math.random() * 20000; } // again in ~15-35s
-            }
+            if (!infoStart) infoStart = Date.now();
+            var e = (Date.now() - infoStart) / 1000;                         // seconds since first shown
+            if (e > 8) glow = Math.abs(Math.sin((e - 8) * (Math.PI / 1.4))); // freeze 8s, then breathe
         }
         ctx.strokeStyle = 'rgba(85, 85, 85, ' + (0.30 + glow * 0.25) + ')';
         ctx.lineWidth = 1;
