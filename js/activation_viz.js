@@ -38,8 +38,12 @@
         return idx;
     }
 
-    // Per-layer EMA of the max activation magnitude, for stable normalization.
+    // Per-layer EMA of the max signal magnitude, for stable normalization.
     var emaMax = [];
+    // Per-neuron EMA of the raw activation. The display shows the deviation
+    // from this (how much each value is *changing*), not the magnitude, so
+    // steady neurons fade and shifting ones flare — see the change block below.
+    var actEma = [];
     function emaUpdate(layerIdx, value) {
         if (emaMax[layerIdx] === undefined) emaMax[layerIdx] = value;
         else emaMax[layerIdx] = emaMax[layerIdx] * 0.92 + value * 0.08;
@@ -112,6 +116,33 @@
             activations.push(model.layers[i].lastA);
         }
 
+        // --- Show CHANGE, not magnitude ----------------------------------
+        // Drive brightness by how much each activation is *shifting*, not its
+        // raw value: keep a per-neuron EMA and display the deviation from it.
+        // A neuron (or input) that holds steady fades to dark; one that moves
+        // when the predator commits a new decision flares and eases back.
+        // The policy only re-plans every D frames (predator_cheap.js), so the
+        // raw activations step in place — but the EMA keeps chasing the held
+        // value each render frame, so the deviation decays smoothly between
+        // steps and the diagram breathes continuously instead of freezing on
+        // an always-on path. One EMA per neuron; nothing downstream changes.
+        var change = [];
+        for (var ci = 0; ci < activations.length; ci++) {
+            var av = activations[ci], em = actEma[ci];
+            if (!em || em.length !== av.length) {
+                em = actEma[ci] = new Float64Array(av.length);
+                for (var s0 = 0; s0 < av.length; s0++) em[s0] = av[s0];   // start settled — no flash on load
+            }
+            var cv = new Float64Array(av.length);
+            for (var s1 = 0; s1 < av.length; s1++) {
+                cv[s1] = av[s1] - em[s1];
+                em[s1] += 0.09 * cv[s1];                                  // ~16-frame decay ≈ the plan cadence
+            }
+            change.push(cv);
+        }
+        // Reduced-motion users get the calm raw-magnitude view instead.
+        var dotSrc = prefersReducedMotion ? activations : change;
+
         // Per-column displayed-neuron indices + their screen positions, vertically
         // centered within H. posMap[l] is sparse (length = layer size); entries
         // exist only for displayed neurons, so edges to undrawn neurons are skipped.
@@ -140,7 +171,7 @@
         if (!prefersReducedMotion) {
             for (var L_idx = 0; L_idx < model.layers.length; L_idx++) {
                 var Lr = model.layers[L_idx];
-                var prev = activations[L_idx];
+                var prev = change[L_idx];                 // edges fire on changing inputs, not steady ones
                 var posPrev = posMap[L_idx];
                 var posNext = posMap[L_idx + 1];
                 var dispPrev = disp[L_idx];
@@ -174,7 +205,7 @@
         for (var li = 0; li < nLayers; li++) {
             var pos = posMap[li];
             var dispCol = disp[li];
-            var act = activations[li];
+            var act = dotSrc[li];
             var isOutput = (li === nLayers - 1);
 
             // Per-layer EMA normalization (over displayed neurons) so the
