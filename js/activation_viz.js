@@ -40,10 +40,12 @@
 
     // Per-layer EMA of the max signal magnitude, for stable normalization.
     var emaMax = [];
-    // Per-neuron EMA of the raw activation. The display shows the deviation
-    // from this (how much each value is *changing*), not the magnitude, so
-    // steady neurons fade and shifting ones flare — see the change block below.
-    var actEma = [];
+    // Per-neuron fast + slow EMAs of the raw activation. The display shows the
+    // gap between them (a smooth band-pass = how much each value is currently
+    // *changing*), not the raw magnitude, so steady neurons fade and shifting
+    // ones flare. Two EMAs (not raw-minus-EMA) so the onset swells in smoothly
+    // instead of popping — see the change block below.
+    var actEmaFast = [], actEmaSlow = [];
     function emaUpdate(layerIdx, value) {
         if (emaMax[layerIdx] === undefined) emaMax[layerIdx] = value;
         else emaMax[layerIdx] = emaMax[layerIdx] * 0.92 + value * 0.08;
@@ -118,25 +120,27 @@
 
         // --- Show CHANGE, not magnitude ----------------------------------
         // Drive brightness by how much each activation is *shifting*, not its
-        // raw value: keep a per-neuron EMA and display the deviation from it.
-        // A neuron (or input) that holds steady fades to dark; one that moves
-        // when the predator commits a new decision flares and eases back.
-        // The policy only re-plans every D frames (predator_cheap.js), so the
-        // raw activations step in place — but the EMA keeps chasing the held
-        // value each render frame, so the deviation decays smoothly between
-        // steps and the diagram breathes continuously instead of freezing on
-        // an always-on path. One EMA per neuron; nothing downstream changes.
+        // raw value: track a fast and a slow EMA per neuron and display the gap
+        // between them. A neuron (or input) that holds steady fades to dark;
+        // one that moves when the predator commits a new decision flares and
+        // eases back. The policy re-plans only every D frames (predator_cheap.js),
+        // so the raw activations step in place — but both EMAs are continuous,
+        // so their gap swells in over a few frames (no abrupt pop), peaks, then
+        // decays as the slow EMA catches up: the brain breathes smoothly and
+        // continuously. Two EMAs per neuron; nothing downstream changes.
         var change = [];
         for (var ci = 0; ci < activations.length; ci++) {
-            var av = activations[ci], em = actEma[ci];
-            if (!em || em.length !== av.length) {
-                em = actEma[ci] = new Float64Array(av.length);
-                for (var s0 = 0; s0 < av.length; s0++) em[s0] = av[s0];   // start settled — no flash on load
+            var av = activations[ci], ef = actEmaFast[ci], es = actEmaSlow[ci];
+            if (!ef || ef.length !== av.length) {
+                ef = actEmaFast[ci] = new Float64Array(av.length);
+                es = actEmaSlow[ci] = new Float64Array(av.length);
+                for (var s0 = 0; s0 < av.length; s0++) { ef[s0] = av[s0]; es[s0] = av[s0]; }  // start settled — no flash on load
             }
             var cv = new Float64Array(av.length);
             for (var s1 = 0; s1 < av.length; s1++) {
-                cv[s1] = av[s1] - em[s1];
-                em[s1] += 0.09 * cv[s1];                                  // ~16-frame decay ≈ the plan cadence
+                ef[s1] += 0.30 * (av[s1] - ef[s1]);   // fast — smooths the onset over ~5 frames
+                es[s1] += 0.08 * (av[s1] - es[s1]);   // slow — the baseline it's measured against (~16-frame tail)
+                cv[s1] = ef[s1] - es[s1];
             }
             change.push(cv);
         }
