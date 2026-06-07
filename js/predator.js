@@ -91,6 +91,35 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { computeEvolvedTarget: computeEvolvedTarget, EVOLVED_PATROL: EVOLVED_PATROL };
 }
 
+// --- catch test: do the predator's and a boid's drawn triangles overlap? ------
+// Both are arrowheads built exactly as render() does: tip = center +
+// heading*forward, base corners = center +/- perpendicular*half. The predator's
+// forward/half grow with its (feeding) size; a boid uses render_size. Overlap is
+// exact via the separating-axis theorem, with a cheap circle reject first. A
+// touch counts as a catch; any gap does not.
+function catchTriangle(cx, cy, vx, vy, fwd, half) {
+    var m = Math.sqrt(vx * vx + vy * vy) || 1, ux = vx / m, uy = vy / m;
+    return [cx + ux * fwd, cy + uy * fwd, cx - uy * half, cy + ux * half, cx + uy * half, cy - ux * half];
+}
+function catchAxisSeparates(A, C) {            // is any edge-normal of A a separating axis?
+    for (var i = 0; i < 6; i += 2) {
+        var nx = A[i + 1] - A[(i + 3) % 6], ny = A[(i + 2) % 6] - A[i];
+        var a0 = Infinity, a1 = -Infinity, c0 = Infinity, c1 = -Infinity, d;
+        for (var j = 0; j < 6; j += 2) { d = A[j] * nx + A[j + 1] * ny; if (d < a0) a0 = d; if (d > a1) a1 = d; }
+        for (var k = 0; k < 6; k += 2) { d = C[k] * nx + C[k + 1] * ny; if (d < c0) c0 = d; if (d > c1) c1 = d; }
+        if (a1 < c0 || c1 < a0) return true;
+    }
+    return false;
+}
+function predatorCatchesBoid(px, py, pvx, pvy, psize, bx, by, bvx, bvy) {
+    var reach = psize * 1.2 + render_size;     // farthest vertex from either center
+    var dx = bx - px, dy = by - py;
+    if (dx * dx + dy * dy > reach * reach) return false;
+    var P = catchTriangle(px, py, pvx, pvy, psize * 1.2, psize * 0.3);
+    var B = catchTriangle(bx, by, bvx, bvy, render_size, render_size / 3);
+    return !catchAxisSeparates(P, B) && !catchAxisSeparates(B, P);
+}
+
 function Predator(x, y, simulation) {
     this.position = new Vector(x, y);
     this.velocity = new Vector(simRandom() * 2 - 1, simRandom() * 2 - 1); // Start with some velocity
@@ -144,17 +173,16 @@ Predator.prototype = {
     // Check for boid collisions and handle feeding
     checkForPrey: function(boids) {
         var caughtBoids = [];
-        var catchRadius = this.currentSize * 0.7; // Catch radius scales with size
-        
         for (var i = 0; i < boids.length; i++) {
-            var distance = this.position.getDistance(boids[i].position);
-            if (distance < catchRadius) {
+            var b = boids[i];
+            // Catch when the predator's drawn triangle overlaps the boid's.
+            if (predatorCatchesBoid(this.position.x, this.position.y, this.velocity.x, this.velocity.y, this.currentSize,
+                                    b.position.x, b.position.y, b.velocity.x, b.velocity.y)) {
                 caughtBoids.push(i);
                 this.feed();
                 break; // Only catch one boid at a time for smooth animation
             }
         }
-        
         return caughtBoids;
     },
     
