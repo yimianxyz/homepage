@@ -13,7 +13,7 @@
     'use strict';
 
     var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var infoPulseT0 = 0;   // time the "?" badge first appeared, for its one-time pulse
+    var infoPulseStart = 0, infoNextPulse = 0;   // schedule for the "?" badge's occasional pulse
 
     function clamp(min, v, max) {
         return v < min ? min : v > max ? max : v;
@@ -231,15 +231,23 @@
         // "?" badge — slightly more present than the title (it's interactive),
         // brighter still on hover (window.__vizInfoHover, set on mousemove).
         var iconX = groupLeft + titleW + iconGap + iconR;
-        // One-time "i'm interactive" hint: when the viz first appears the badge
-        // breathes up toward its hover brightness a few times, then settles, so a
-        // curious eye notices it's clickable. Honors prefers-reduced-motion.
+        // "i'm interactive" hint: the badge breathes up toward its hover
+        // brightness for one gentle beat, occasionally, at random gaps — a
+        // charming "i'm here if you're curious" rather than a steady distraction.
+        // It stays frozen for the first ~15s so the reader takes in the page's
+        // important text first; the viz sits off the reading path (bottom-right)
+        // where the boids already move. Honors prefers-reduced-motion.
         // glow: 0 = resting, 1 = hover brightness.
         var hovered = !!window.__vizInfoHover, glow = hovered ? 1 : 0;
         if (!hovered && !prefersReducedMotion) {
-            if (!infoPulseT0) infoPulseT0 = Date.now();
-            var e = (Date.now() - infoPulseT0) / 1000;     // seconds since first shown
-            glow = Math.max(0, 1 - e / 4.5) * Math.max(0, Math.sin(e * (2 * Math.PI / 1.5))); // ~3 fading breaths
+            var now = Date.now();
+            if (!infoNextPulse) infoNextPulse = now + 15000;                 // freeze, then first beat
+            if (!infoPulseStart && now >= infoNextPulse) infoPulseStart = now;
+            if (infoPulseStart) {
+                var e = (now - infoPulseStart) / 1000;
+                if (e < 1.4) glow = Math.sin(e * (Math.PI / 1.4));           // one gentle breath: 0 -> hover -> 0
+                else { infoPulseStart = 0; infoNextPulse = now + 15000 + Math.random() * 20000; } // again in ~15-35s
+            }
         }
         ctx.strokeStyle = 'rgba(85, 85, 85, ' + (0.30 + glow * 0.25) + ')';
         ctx.lineWidth = 1;
