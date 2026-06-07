@@ -201,7 +201,7 @@
 
         // --- Labels ------------------------------------------------------
         ctx.font = '9px "Source Code Pro", ui-monospace, monospace';
-        ctx.textBaseline = 'top';
+        ctx.textBaseline = 'middle';
 
         // Header "predator's brain" plus a small "?" info badge to its right,
         // the pair centered above the widget on the graph's axis (x0 + W/2).
@@ -221,25 +221,25 @@
         var titleW = ctx.measureText(title).width;
         var iconR = 6, iconGap = 6;
         var groupLeft = x0 + W / 2 - (titleW + iconGap + iconR * 2) / 2;
-        var headerY = y0 - 12;
+        // Title, badge ring, and "?" all sit on one centerline (textBaseline
+        // 'middle'), so they line up exactly — no per-glyph nudge needed.
+        var headerY = y0 - 8;
         ctx.fillStyle = 'rgba(85, 85, 85, 0.28)';
         ctx.fillText(title, groupLeft, headerY);
 
         // "?" badge — slightly more present than the title (it's interactive),
         // brighter still on hover (window.__vizInfoHover, set on mousemove).
         var iconX = groupLeft + titleW + iconGap + iconR;
-        var iconY = headerY + 4.5;
         var hovered = !!window.__vizInfoHover;
         ctx.strokeStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.55 : 0.30) + ')';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(iconX, iconY, iconR, 0, Math.PI * 2);
+        ctx.arc(iconX, headerY, iconR, 0, Math.PI * 2);
         ctx.stroke();
         ctx.fillStyle = 'rgba(85, 85, 85, ' + (hovered ? 0.72 : 0.46) + ')';
         ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('?', iconX, iconY + 0.5);
-        window.__vizInfo = { cx: iconX, cy: iconY, r: 14 };
+        ctx.fillText('?', iconX, headerY);
+        window.__vizInfo = { cx: iconX, cy: headerY, r: 14 };
 
         // Live numbers caption below the widget, centered on the same axis as
         // the header. Always shown except on landscape phones (where the
