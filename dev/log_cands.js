@@ -22,13 +22,18 @@ function parseArgs(argv) {
         else if (k === '--seeds') a.seeds = +argv[++i];
         else if (k === '--frames') a.frames = +argv[++i];
         else if (k === '--out') a.out = argv[++i];
+        else if (k === '--config') a.baseConfig = argv[++i];
     }
     return a;
 }
 
 async function main() {
     const opt = parseArgs(process.argv);
-    opt.config = JSON.stringify({ logCands: true });
+    // Log on the ship-candidate's (ES-params) visited states — DAgger principle:
+    // train the prune net on the distribution it will actually be deployed under.
+    const base = opt.baseConfig ? JSON.parse(opt.baseConfig) : {};
+    base.logCands = true;
+    opt.config = JSON.stringify(base);
     const ws = fs.createWriteStream(opt.out);
     let rows = 0;
     for (let i = 0; i < opt.seeds; i++) {

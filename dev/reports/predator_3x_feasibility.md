@@ -126,12 +126,32 @@ mean at n=48; the actual best config holds up at n=128.)
 
 ## Better candidate selection (the prune) — AlphaZero-style learned guidance
 
-Diagnostic: rolling ALL 16 candidates at DEPLOYED depth (Hs90/D16) scores 27.34 vs
-the deployed ballistic-top-4's 24.94 — **+9.6%** left on the table by the prune. The
-shipped prune ranks candidates by a hand-crafted ballistic score, not the value net,
-so it sometimes drops the eventually-best candidate. Replacing it with net-guided /
-ballistic+net selection (`PC.prune`) aims to recover that at the SAME K_roll=4 compute
-— under test.
+Diagnostic (training seeds): rolling ALL 16 candidates at DEPLOYED depth scores 27.34
+vs the deployed ballistic-top-4's 24.94 — **+9.6%** left on the table by the prune (the
+shipped prune ranks by a hand-crafted ballistic score, not the value net). This is a
+COMPUTE win (4× rollouts), robust. The cheap capture — `prune:'sum'` (ballistic + the
+existing net's value, zero extra compute) — looked like +2.9% on the 32 training seeds
+but **OVERFIT**: on held-out (n=128) it is −6.0% on phone. The shipped value-net is a
+poor *ranker* (it was trained as a state value, not a candidate gain). So a net trained
+SPECIFICALLY to predict per-candidate rollout-gain is the right tool — the AlphaZero
+distillation (`dev/log_cands.js` logs 60k device-mix candidate→gain samples →
+`dev/train_prune_net.py` trains a drop-in net, val_mse 5.9→1.9). **Result: it does NOT
+help.** On phone held-out (n=64): ES-params + old net 27.75; + distilled net prune:ball
+27.41, prune:net 27.52 — both slightly below. The selection signal is too subtle for a
+single-pass-trained tiny net to rank better than the ballistic heuristic; the +9.6% is
+a genuine COMPUTE gap (more rollouts), not a cheap-net gap. This matches the prior
+project's documented plateau (distillation caps ~90% of the planner). DAgger iteration
+might recover a little, but the convergent signal says the prune is not the cheap lever.
+
+## THE SHIPPABLE WIN: device-mix re-tuned params (held-out confirmed)
+
+`config = {POLICY_R:43, patrol:{cluster_r:122, dens_pow:3.14, reach_scale:1258,
+sharp:12.1, lead_scale:0.48, lead_max:128, nbhd:0.865}}` — found by the ES, **confirmed
+on held-out seeds (250000+, n=128)**: phone +3.1%, iPad-P +6.3%, laptop +10.5%,
+device-weighted **≈ +6%**, at ZERO extra compute (a pure parameter swap). The shipped
+params were over-fit to the 1680² square; POLICY_R 80→43 (chase the nearest boid only
+when very close, otherwise commit to the planned target) is the main driver. This is a
+clean, low-risk improvement to the live policy.
 
 ## Feasibility verdict
 
@@ -156,12 +176,20 @@ current one + an optional 2× deeper search for +5–7% (if the user accepts the
 
 ## Recommendation
 
-1. **Keep the deployed policy** as-is — it is near the practical ceiling; param-tuning
-   and wrap give nothing reliable, and deeper search costs phone smoothness for +5–7%.
-2. If the user wants the marginal gain, ship the `{K_roll:6,Hs:90,D:12}` (2×) config —
-   validated +5–7%, plan spike ~28ms (likely fine on modern phones; A/B on a low-end
-   device first). This is the only change with a real, low-risk gain.
-3. The one untried high-effort lever is **AlphaZero-style distillation of the +22%
-   heavy-search ceiling into the cheap config via a retrained value net** — but prior
-   distillation already plateaued at ~90% of the planner, so expected marginal upside
-   is small; available on request.
+**Ship the device-mix re-tuned params** — the one real, robust, zero-risk win the
+search produced (+6% device-weighted, held-out confirmed, identical compute). It is a
+pure two-line parameter swap; everything else (wrap, ambush, compression, prune,
+distillation, deeper search) was neutral, overfit, or compute-bound.
+
+Production change (no new code, no experimental branches):
+- `js/predator.js` `EVOLVED_PATROL`: `cluster_r 178.09→122.39, dens_pow 2.373→3.137,
+  reach_scale 1515→1257.5, sharp 9.25→12.105, lead_scale 0.454→0.480,
+  lead_max 230.6→127.59, nbhd 0.461→0.865` (keep `momentum 0`).
+- `js/predator_cheap.js` `cfg.POLICY_R: 80→43.16`.
+
+Held-out (seeds 250000+, n=128): phone 26.81→27.65 (+3.1%), iPad 24.85→26.41 (+6.3%),
+laptop 20.96→23.16 (+10.5%). Reversible by reverting the two values.
+
+Optional, if the user accepts a ~2× per-frame plan spike: stack `{K_roll:6,Hs:90,D:12}`
+for a further +2–5% (A/B on a low-end phone first). DAgger-iterated distillation is the
+only remaining path at the heavy-search ceiling, but it plateaus — low expected upside.
