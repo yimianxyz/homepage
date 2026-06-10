@@ -114,14 +114,24 @@ sensitivities, not deployable gains. Verdict stands.
 ## Evolutionary param search (AlphaEvolve-style, the user's "policy explore")
 
 `dev/evolve_policy.py` — CMA-lite ES over the 7 patrol params + POLICY_R, scored on
-the phone/laptop/iPad mix via the fleet, starting from the shipped (square-evolved)
-params. 4 generations × 6 candidates × 3 devices × 48 seeds. Result: the best score
-per generation was 25.48 → 24.94 → 24.85 → 25.14 while the recombined mean stayed at
-the deployed-params score (~24.0). The gen-0 "+5.5%" was a best-of-6 winner's-curse
-outlier at n=48; the search **converged back to the shipped params**. Conclusion:
-the patrol params are already near-optimal on the device mix — re-tuning yields only
-noise-level differences. (Held-out re-validation of the ES "best" on fresh seeds:
-<FILL>.)
+the phone/laptop/iPad mix via the fleet, from the shipped (square-evolved) params.
+The gen-best vector (`POLICY_R 80→43`, i.e. chase the nearest boid only when very
+close and otherwise hold the planned target, + retuned patrol params) was **confirmed
+on held-out seeds** (250000+, n=128): phone **+3.1%**, iPad-P **+6.3%**, laptop
+**+10.5%** vs the deployed params — device-weighted ≈ **+6%**, at ZERO extra compute.
+Laptop/iPad are 2–3 SE (solid); phone is ~1.4 SE (marginal). So the square-evolved
+params WERE over-fit to the square — re-tuning on the device mix is a real, low-risk
+win. (The per-generation "regression" was just the recombination averaging toward the
+mean at n=48; the actual best config holds up at n=128.)
+
+## Better candidate selection (the prune) — AlphaZero-style learned guidance
+
+Diagnostic: rolling ALL 16 candidates at DEPLOYED depth (Hs90/D16) scores 27.34 vs
+the deployed ballistic-top-4's 24.94 — **+9.6%** left on the table by the prune. The
+shipped prune ranks candidates by a hand-crafted ballistic score, not the value net,
+so it sometimes drops the eventually-best candidate. Replacing it with net-guided /
+ballistic+net selection (`PC.prune`) aims to recover that at the SAME K_roll=4 compute
+— under test.
 
 ## Feasibility verdict
 

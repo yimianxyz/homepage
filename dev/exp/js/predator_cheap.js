@@ -300,7 +300,23 @@
         // is scored by (rollout catches + value-net terminal bootstrap); the rest
         // keep their value-net prior. argmax commits.
         var pidx = []; for (var pk = 0; pk < cands.length; pk++) pidx.push(pk);
-        pidx.sort(function (a, b) { var pa = fr.feat[a][18] - fr.feat[a][16], pb = fr.feat[b][18] - fr.feat[b][16]; return (pb - pa) || (a - b); });
+        // Which candidates to ROLL (the prune). Default = hand-crafted ballistic
+        // pscore. PC.prune='net' uses the value-net prior (AlphaZero-style learned
+        // guidance); 'sum' = ballistic + net. Rolling all 16 beats the ballistic
+        // top-4 by ~+9.6% @ deployed depth, so the prune is leaving catches on the
+        // table — a better selector recovers them at the same K_roll compute.
+        var pmode = PC.prune || 'ball';
+        if (pmode === 'net') {
+            pidx.sort(function (a, b) { return (vprior[b] - vprior[a]) || (a - b); });
+        } else if (pmode === 'sum') {
+            pidx.sort(function (a, b) {
+                var pa = (fr.feat[a][18] - fr.feat[a][16]) + vprior[a];
+                var pb = (fr.feat[b][18] - fr.feat[b][16]) + vprior[b];
+                return (pb - pa) || (a - b);
+            });
+        } else {
+            pidx.sort(function (a, b) { var pa = fr.feat[a][18] - fr.feat[a][16], pb = fr.feat[b][18] - fr.feat[b][16]; return (pb - pa) || (a - b); });
+        }
         var score = vprior.slice();
         for (var rk = 0; rk < cfg.K_roll && rk < pidx.length; rk++) {
             var ci = pidx[rk];
@@ -330,6 +346,26 @@
         }
         var bi = 0, bs = -Infinity;
         for (var k = 0; k < score.length; k++) if (score[k] > bs) { bs = score[k]; bi = k; }
+        // DISTILLATION data logging (PC.logCands): roll EVERY candidate (not just
+        // the pruned K_roll) to get its true rollout-gain, and record (features,
+        // ctx, per-candidate gains). A net trained on this to rank candidates is a
+        // better prune than the hand-crafted ballistic score (the roll-all-16
+        // diagnostic shows +9.6% available). Heavy — offline data-gen only.
+        var glog = (typeof globalThis !== 'undefined' ? globalThis.__CANDLOG : null);
+        if (PC.logCands && glog) {
+            var gains = new Array(cands.length);
+            for (var lk = 0; lk < cands.length; lk++) {
+                var lrr = rolloutFlatState(s, cands[lk].x, cands[lk].y, cfg.Hs);
+                var lt = lrr.term, ltc = candidates(lt);
+                var ltst = { px: lt.px, py: lt.py, pvx: lt.pvx, pvy: lt.pvy, psize: lt.psize,
+                    bx: lt.bx, by: lt.by, bvx: lt.bvx, bvy: lt.bvy, nAlive: lt.bx.length };
+                var ltfr = cp_features(ltst, ltc, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
+                var ltv = cp_value(NET, ltfr.feat, ltfr.ctx);
+                var lboot = -Infinity; for (var lj = 0; lj < ltv.length; lj++) if (ltv[lj] > lboot) lboot = ltv[lj];
+                gains[lk] = lrr.catches + lboot;
+            }
+            glog.push({ feat: fr.feat, ctx: fr.ctx, gains: gains });
+        }
         // Record the chosen candidate's value-net forward for the brain viz.
         if (vizModel) cp_value_viz(NET, fr.feat[bi], fr.ctx, vizModel);
         return { x: cands[bi].x, y: cands[bi].y };
