@@ -53,8 +53,20 @@ Full clearance, device mix, held-out seeds, n=32 (TERI gated ≤5 boids):
 | iPad 820×1180 (N120) | 15245 / **90.6%** | 13020 / **100%** (−15%, fixes failures) |
 | laptop 1440×900 (N120) | 17007 / **87.5%** | 15044 / **100%** (−12%, fixes failures) |
 
-With the device-mix ES patrol params added (the prod artifact `dev/ship_teri`), the
-flock phase also speeds up: phone 7576 → 5984 (−21%) on held-out.
+**Final prod artifact `dev/ship_teri` (prod code + ES params + TERI) vs prod**, held-out
+seeds 270000+, n=48:
+| device | prod tClear / clear% | ship tClear / clear% | Δtime |
+|---|---|---|---|
+| phone  | 6976 / 100%  | 5594 / 100%  | −19.8% |
+| iPad   | 14548 / 97.9% | 12451 / 100% | −14.4% |
+| laptop | 16368 / 97.9% | 14526 / 100% | −11.3% |
+Device-weighted ≈ −15% clearance time, **100% clear on every device**, last-boid ~3×.
+
+GPU cross-check: a batched sim_torch port of TERI (`dev/clear_torch_endgame.py`,
+thousands of envs on the L4 GPUs) reproduces the JS 1-boid TTC (580 vs 565) and was
+used to sweep SLACK/FREEZE_R at scale — confirming the hand-tuned params. (The endgame
+is a light geometric computation, so GPU util is low; the heavy compute was the
+run-to-extinction evals across the 3 VMs' 12 CPU cores.)
 
 ## Honest assessment vs the 2× goal
 
