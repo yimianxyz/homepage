@@ -62,7 +62,30 @@ predator; higher density). So "≈2× the quoted number" is already shipped.
   genuinely near-uncatchable by these policy families.
 - **Ambush** (loiter on the flock flow-line outside PREDATOR_RANGE): under test.
 
-## Emerging feasibility verdict (pending ambush + cross-check)
+## Red-team cross-check (independent subagent) and its reconciliation
+
+A fresh red-team ran physics-sensitivity probes and argued the catch RATE is gated by
+the boids' FLEE response, not predator speed: turning flee OFF = +32%, halving the
+turn factor = +26%, late detection (range 80→40) = +27%, vs only +12% from a 20%
+predator-speed boost. Catches are cluster events (mean 4.1 boids within 60px at the
+moment of catch; only 8% lone boids). It proposed herding/compression + strike-timing
+as untested levers with large upside.
+
+**Reconciliation — most of that headroom is NOT policy-reachable:**
+- Flee triggers purely on `distance < PREDATOR_RANGE` (`js/boid.js:180`), with NO
+  approach-speed term — so you cannot "sneak up"/induce late detection. TURN_FACTOR
+  (0.3) is a fixed game constant. So the +26-32% flee-sensitivity is the response to
+  changing GAME RULES we cannot change, not to a reachable policy.
+- The only policy-reachable part is approach GEOMETRY that makes flee compress the
+  flock — and the patrol family ALREADY does this (catches are already cluster events).
+  Three cheap attempts to push it further — ambush candidates, a terminal-density
+  "compression" reward (best λ=0.3 → +4% noisy, larger λ hurts), and lead-past-boid —
+  all came up ~neutral. The +17% heavy-search ceiling is the real reachable ceiling.
+
+So the red-team correctly identified the mechanism but its big numbers are physics-knob
+sensitivities, not deployable gains. Verdict stands.
+
+## Feasibility verdict
 
 Literal 3× as a single-device policy improvement is **not physically reachable**:
 the N cap forbids it on phones, and the patrol-family ceiling is only ~+17% over

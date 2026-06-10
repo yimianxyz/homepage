@@ -38,6 +38,12 @@
     if (PC.Hs != null) cfg.Hs = PC.Hs;
     if (PC.D != null) cfg.D = PC.D;
     if (PC.POLICY_R != null) cfg.POLICY_R = PC.POLICY_R;
+    // Evolvable patrol params (cand0 = the E3D evolved patrol). PC.patrol overrides
+    // any of EVOLVED_PATROL's keys; lets us re-tune on the device mix (the shipped
+    // values were CEM-evolved on the 1680 square).
+    var PATROL = {}; for (var _pk in EVOLVED_PATROL) PATROL[_pk] = EVOLVED_PATROL[_pk];
+    if (PC.patrol) for (var _pk2 in PC.patrol) PATROL[_pk2] = PC.patrol[_pk2];
+    LEAD_SCALE = PATROL.lead_scale; LEAD_MAX = PATROL.lead_max;
 
     function fastMag(x, y) {
         var ax = x < 0 ? -x : x, ay = y < 0 ? -y : y;
@@ -243,7 +249,7 @@
         var n = s.bx.length, i;
         var lite = new Array(n);
         for (i = 0; i < n; i++) lite[i] = { position: { x: s.bx[i], y: s.by[i] }, velocity: { x: s.bvx[i], y: s.bvy[i] } };
-        var e3d = computeEvolvedTarget({ x: s.px, y: s.py }, lite, EVOLVED_PATROL, null) || { x: s.px, y: s.py };
+        var e3d = computeEvolvedTarget({ x: s.px, y: s.py }, lite, PATROL, null) || { x: s.px, y: s.py };
         var cands = [{ x: e3d.x, y: e3d.y }];
         var order = [];
         for (i = 0; i < n; i++) { var dx = wrapDX(s.bx[i] - s.px), dy = wrapDY(s.by[i] - s.py); order.push([dx * dx + dy * dy, i]); }
@@ -306,7 +312,21 @@
             var tfr = cp_features(tst, tcands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
             var tv = cp_value(NET, tfr.feat, tfr.ctx);
             var boot = -Infinity; for (var j = 0; j < tv.length; j++) if (tv[j] > boot) boot = tv[j];
-            score[ci] = rr.catches + boot;
+            // COMPRESSION reward (PC.compress): catches are cluster events (boids
+            // trapped against flockmates), so prefer candidates that END with a
+            // dense cluster around the predator — setting up the next strike rather
+            // than scattering the flock. Counts alive boids within compressR at the
+            // rollout terminal, weighted by PC.compress.
+            var extra = 0;
+            if (PC.compress) {
+                var cR = PC.compressR || 60, cR2 = cR * cR, dn = 0;
+                for (var dci = 0; dci < t.bx.length; dci++) {
+                    var ex = wrapDX(t.bx[dci] - t.px), ey = wrapDY(t.by[dci] - t.py);
+                    if (ex * ex + ey * ey < cR2) dn++;
+                }
+                extra = PC.compress * dn;
+            }
+            score[ci] = rr.catches + boot + extra;
         }
         var bi = 0, bs = -Infinity;
         for (var k = 0; k < score.length; k++) if (score[k] > bs) { bs = score[k]; bi = k; }
@@ -320,9 +340,14 @@
 
     function configure(sim) {
         cfg.W = sim.canvasWidth; cfg.Hc = sim.canvasHeight;
-        // Toroidal min-image is OPT-IN: only when PC.wrap. Else WRAP_W/H stay 0
-        // and wrapDX/wrapDY are the identity — byte-identical to prod.
-        if (PC.wrap) { WRAP_W = cfg.W; WRAP_H = cfg.Hc; } else { WRAP_W = 0; WRAP_H = 0; }
+        // Toroidal min-image is OPT-IN. PC.wrap forces it on; PC.wrapAuto enables it
+        // only on large screens (min dim >= wrapAutoThresh, default 600) where the
+        // clean A/B shows +6-10%, leaving phones (neutral / endgame-negative) raw.
+        // Else WRAP_W/H stay 0 and wrapDX/wrapDY are the identity — byte-identical
+        // to prod.
+        var wrapOn = !!PC.wrap;
+        if (PC.wrapAuto) wrapOn = Math.min(cfg.W, cfg.Hc) >= (PC.wrapAutoThresh || 600);
+        if (wrapOn) { WRAP_W = cfg.W; WRAP_H = cfg.Hc; } else { WRAP_W = 0; WRAP_H = 0; }
         configured = true;
     }
 
