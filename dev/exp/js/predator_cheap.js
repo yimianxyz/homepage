@@ -419,10 +419,88 @@
         return s;
     }
 
+    // ENDGAME INTERCEPTOR — TERI (Torus Earliest-Reachable Lead Intercept, with
+    // bubble-commit). A slow predator (2.5) cannot tail-chase a 2.4x-faster evader,
+    // but a LONE boid flies a straight line (no flockmates) until the predator enters
+    // its 80px flee bubble. So: scan its straight-line track for the EARLIEST future
+    // point the predator can reach in time (min-image so the SHORT way around the
+    // torus wins — often the backward-wrap, putting the predator AHEAD of the boid
+    // for a HEAD-ON intercept, closing up to 8.5). Once inside FREEZE_R (~just outside
+    // the flee bubble) FREEZE the aim and ram through: the flee force then points
+    // backward along the boid's velocity (decelerates it INTO the predator) and the
+    // bounded turn can't dodge ~24px of reach in the ~7 frames it takes to cross.
+    // Target = the boid with the smallest feasible intercept time, committed through
+    // capture. Torus period = the BOID's (W+20, H+20; it wraps at +/-BORDER_OFFSET).
+    var egBoid = null, egAimX = 0, egAimY = 0, egFrozen = false;
+    function intercept(pred, boids) {
+        var px = pred.position.x, py = pred.position.y, sM = PREDATOR_MAX_SPEED;
+        var PX = cfg.W + 2 * BORDER_OFFSET, PY = cfg.Hc + 2 * BORDER_OFFSET;
+        var SLACK = (PC.egSlack != null ? PC.egSlack : 0.97);
+        var TMAX = (PC.egTmax != null ? PC.egTmax : 1400), DT = (PC.egDt != null ? PC.egDt : 4);
+        var FREEZE_R = (PC.egFreeze != null ? PC.egFreeze : 110);
+        function wx(d) { return d - PX * Math.round(d / PX); }
+        function wy(d) { return d - PY * Math.round(d / PY); }
+        function scan(B) {                 // earliest feasible intercept of B's track
+            var bx = B.position.x, by = B.position.y, bvx = B.velocity.x, bvy = B.velocity.y;
+            for (var t = 0; t <= TMAX; t += DT) {
+                var ddx = wx(bx + bvx * t - px), ddy = wy(by + bvy * t - py);
+                var d = Math.sqrt(ddx * ddx + ddy * ddy);
+                if (d <= sM * t * SLACK) return { t: t, ax: ddx, ay: ddy };
+            }
+            return null;
+        }
+        var n = boids.length, iso = arguments.length > 2 ? arguments[2] : false;
+        // isolation test: a boid is "lone" (straight-line) if no other boid within
+        // NEIGHBOR_DISTANCE (min-image). Only those satisfy TERI's prediction.
+        function isolated(B) {
+            for (var j = 0; j < n; j++) { if (boids[j] === B) continue; var dx = wx(boids[j].position.x - B.position.x), dy = wy(boids[j].position.y - B.position.y); if (dx * dx + dy * dy < NEIGHBOR_DISTANCE * NEIGHBOR_DISTANCE) return false; }
+            return true;
+        }
+        // committed target still alive (and, in iso mode, still lone)?
+        if (egBoid) { var found = false; for (var i = 0; i < n; i++) if (boids[i] === egBoid) { found = true; break; } if (!found || (iso && !isolated(egBoid))) { egBoid = null; egFrozen = false; } }
+        // (re)acquire: boid with the smallest feasible intercept time t* (iso mode:
+        // only lone boids; return null so force() defers to the flock policy if none).
+        if (!egBoid) {
+            var bestT = Infinity, bestB = null;
+            for (var i = 0; i < n; i++) { if (iso && !isolated(boids[i])) continue; var s = scan(boids[i]); if (s && s.t < bestT) { bestT = s.t; bestB = boids[i]; } }
+            if (!bestB && !iso) { var nd2 = Infinity; for (i = 0; i < n; i++) { var dx = wx(boids[i].position.x - px), dy = wy(boids[i].position.y - py); var d2 = dx * dx + dy * dy; if (d2 < nd2) { nd2 = d2; bestB = boids[i]; } } }
+            if (!bestB) return null;          // iso mode with no lone boid -> defer
+            egBoid = bestB; egFrozen = false;
+        }
+        var B = egBoid;
+        var cdx = wx(B.position.x - px), cdy = wy(B.position.y - py);
+        var curdist = Math.sqrt(cdx * cdx + cdy * cdy);
+        if (!(curdist < FREEZE_R && egFrozen)) {     // re-solve unless committed inside the bubble
+            var s = scan(B);
+            if (s) { egAimX = s.ax; egAimY = s.ay; }
+            else {                                    // perpendicular cut-off onto the boid's line
+                var bs = Math.sqrt(B.velocity.x * B.velocity.x + B.velocity.y * B.velocity.y) || 1e-6;
+                var ux = B.velocity.x / bs, uy = B.velocity.y / bs;
+                var along = cdx * ux + cdy * uy;
+                egAimX = cdx - along * ux; egAimY = cdy - along * uy;
+            }
+            egFrozen = (curdist < FREEZE_R);
+        }
+        var desired = new Vector(egAimX, egAimY);
+        desired.iFastSetMagnitude(sM);
+        var st = desired.subtract(pred.velocity);
+        st.iFastLimit(PREDATOR_MAX_FORCE);
+        return st;
+    }
+
     window.__cheap = {
         force: function (pred, boids) {
             if (boids.length === 0) return new Vector(0, 0);
             if (!configured && pred.simulation) configure(pred.simulation);
+            if (PC.endgame) {
+                if (boids.length <= (PC.endgameK || 5)) return intercept(pred, boids, false);
+                // isolation-gated: pick off lone stragglers with TERI during the
+                // flock tail; defer (null) to the flock policy when no boid is lone.
+                if (PC.egIsolate && boids.length <= (PC.egIsoMax || 30)) {
+                    var fi = intercept(pred, boids, true);
+                    if (fi) return fi;
+                }
+            }
             if (frame === 0 || frame >= cfg.D) { target = planCheap(snapshot(pred, boids)); frame = 0; }
             frame++;
             return steer(pred, boids);
