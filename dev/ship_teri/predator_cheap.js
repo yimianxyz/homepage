@@ -341,7 +341,9 @@
     function intercept(pred, boids) {
         var px = pred.position.x, py = pred.position.y, sM = PREDATOR_MAX_SPEED;
         var PX = cfg.W + 2 * BORDER_OFFSET, PY = cfg.Hc + 2 * BORDER_OFFSET;
-        var SLACK = 0.97, TMAX = 1400, DT = 4, FREEZE_R = 110;
+        var SLACK = 1.0, TMAX = 1400, DT = 4;
+        // GPU-swept device-tuned commit radius: ~90 on phones, ~130 on big screens.
+        var FREEZE_R = Math.max(90, Math.min(140, 90 + (Math.min(cfg.W, cfg.Hc) - 390) * 0.0784));
         function wx(d) { return d - PX * Math.round(d / PX); }
         function wy(d) { return d - PY * Math.round(d / PY); }
         function scan(B) {
