@@ -320,8 +320,8 @@ def run_planner_log_cand(seeds, frames, device, K, H, D, M):
     return obs, cand, gain, sim.catches.cpu().numpy()
 
 
-def run_e3d(seeds, frames, device):
-    sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
+def run_e3d(seeds, frames, device, num_boids=st.N_BOIDS):
+    sim = Sim(seeds=seeds, weights=WEIGHTS, device=device, num_boids=num_boids,
               auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     for _ in range(frames):
         tgt = _e3d_target(sim)
@@ -329,7 +329,7 @@ def run_e3d(seeds, frames, device):
     return sim.catches.cpu().numpy()
 
 
-def run_planner(seeds, frames, device, K, H, D, randtie=False):
+def run_planner(seeds, frames, device, K, H, D, randtie=False, num_boids=st.N_BOIDS):
     """Returns (per_seed_catches, stats).
 
     randtie: when two or more candidates tie for the max rollout gain, break
@@ -339,11 +339,11 @@ def run_planner(seeds, frames, device, K, H, D, randtie=False):
     an artifact of how near-tied (mostly sub-catch) rollouts get resolved, not
     genuine lookahead. stats also reports the fraction of decisions whose
     committed target was NOT E3D (candidate 0)."""
-    sim = Sim(seeds=seeds, weights=WEIGHTS, device=device,
+    sim = Sim(seeds=seeds, weights=WEIGHTS, device=device, num_boids=num_boids,
               auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     B = sim.B
     # rollout sim with B*K envs, state injected each decision point
-    roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device,
+    roll = Sim(seeds=list(range(B * K)), weights=WEIGHTS, device=device, num_boids=num_boids,
                auto_target='evolved', auto_target_opts=dict(E3D), two_pass=TWO_PASS)
     held = None        # (B,2) currently committed target
     rows = torch.arange(B, device=device)
@@ -399,6 +399,14 @@ def main():
     ap.add_argument('--randtie', action='store_true',
                     help='planner: break tied-max-gain candidates at random '
                          '(selection-on-chaos null arm)')
+    # Device-realistic screen geometry. Default = the historical square. Set
+    # these to drive phone/laptop/iPad canvases; the sim reads CANVAS_W/H at
+    # construction and PREDATOR_RANGE/num_boids per device class.
+    ap.add_argument('--canvasW', type=int, default=None, help='canvas width (px)')
+    ap.add_argument('--canvasH', type=int, default=None, help='canvas height (px)')
+    ap.add_argument('--numBoids', type=int, default=None)
+    ap.add_argument('--predRange', type=float, default=None,
+                    help='boid predator-avoidance range (60 mobile / 80 desktop)')
     ap.add_argument('--out', default=None)
     args = ap.parse_args()
 
@@ -408,16 +416,24 @@ def main():
     device = args.device
     if device.startswith('cuda') and not torch.cuda.is_available():
         device = 'cpu'
+    # Patch device geometry into sim_torch BEFORE any Sim is constructed.
+    if args.canvasW is not None:
+        st.CANVAS_W = float(args.canvasW)
+    if args.canvasH is not None:
+        st.CANVAS_H = float(args.canvasH)
+    if args.predRange is not None:
+        st.PREDATOR_RANGE = float(args.predRange)
+    num_boids = args.numBoids if args.numBoids is not None else st.N_BOIDS
     WEIGHTS = st.load_weights(args.weights, device=device)
 
     seeds = list(range(args.seedStart, args.seedStart + args.n))
     t0 = time.time()
     stats = None
     if args.controller == 'e3d':
-        catches = run_e3d(seeds, args.frames, device)
+        catches = run_e3d(seeds, args.frames, device, num_boids=num_boids)
     else:
         catches, stats = run_planner(seeds, args.frames, device, args.K, args.H,
-                                     args.D, randtie=args.randtie)
+                                     args.D, randtie=args.randtie, num_boids=num_boids)
     elapsed = time.time() - t0
 
     mean = float(catches.mean())
@@ -425,6 +441,8 @@ def main():
     res = dict(controller=args.controller, n=args.n, seedStart=args.seedStart,
                frames=args.frames, K=args.K, H=args.H, D=args.D,
                two_pass=TWO_PASS, randtie=args.randtie, stats=stats,
+               W=st.CANVAS_W, canvasH=st.CANVAS_H, numBoids=num_boids,
+               predRange=st.PREDATOR_RANGE,
                mean=mean, se=se, elapsed=elapsed, device=device,
                per_seed=catches.astype(float).round(0).tolist())
     print(json.dumps({k: v for k, v in res.items() if k != 'per_seed'}))
