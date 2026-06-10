@@ -52,7 +52,7 @@ def eval_population(pop, fixed, seeds, frames, seed0):
     for ci, vec in enumerate(pop):
         cfg = vec_to_config(vec, fixed)
         for (W, H, w) in DEVICES:
-            jobs.append(dict(label=f"c{ci}_{W}x{H}", policy="exp", config=cfg,
+            jobs.append(dict(label=f"c{ci}_{W}x{H}", policy="exp2", config=cfg,
                              W=W, H=H, seeds=seeds, frames=frames, seed0=seed0))
     p = subprocess.run([sys.executable, os.path.join(HERE, "fleet_eval.py")],
                        input=json.dumps(jobs), capture_output=True, text=True, timeout=7200)

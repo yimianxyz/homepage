@@ -1,0 +1,93 @@
+{
+  "params": [
+    "cluster_r",
+    "dens_pow",
+    "reach_scale",
+    "sharp",
+    "lead_scale",
+    "lead_max",
+    "nbhd",
+    "POLICY_R"
+  ],
+  "gens": [
+    {
+      "gen": 0,
+      "best_score": 25.483,
+      "mean_score": 22.076,
+      "mu_score": 24.159,
+      "best_vec": {
+        "cluster_r": 122.389,
+        "dens_pow": 3.137,
+        "reach_scale": 1257.499,
+        "sharp": 12.105,
+        "lead_scale": 0.48,
+        "lead_max": 127.592,
+        "nbhd": 0.865,
+        "POLICY_R": 43.157
+      }
+    },
+    {
+      "gen": 1,
+      "best_score": 24.94,
+      "mean_score": 22.03,
+      "mu_score": 23.902,
+      "best_vec": {
+        "cluster_r": 173.749,
+        "dens_pow": 2.976,
+        "reach_scale": 1400.308,
+        "sharp": 9.19,
+        "lead_scale": 0.415,
+        "lead_max": 207.572,
+        "nbhd": 0.507,
+        "POLICY_R": 85.037
+      }
+    },
+    {
+      "gen": 2,
+      "best_score": 24.846,
+      "mean_score": 23.951,
+      "mu_score": 24.846,
+      "best_vec": {
+        "cluster_r": 155.113,
+        "dens_pow": 2.86,
+        "reach_scale": 1106.168,
+        "sharp": 9.334,
+        "lead_scale": 0.443,
+        "lead_max": 201.122,
+        "nbhd": 0.454,
+        "POLICY_R": 70.725
+      }
+    },
+    {
+      "gen": 3,
+      "best_score": 25.139,
+      "mean_score": 23.477,
+      "mu_score": 23.961,
+      "best_vec": {
+        "cluster_r": 160.444,
+        "dens_pow": 2.668,
+        "reach_scale": 1083.206,
+        "sharp": 10.325,
+        "lead_scale": 0.412,
+        "lead_max": 188.104,
+        "nbhd": 0.44,
+        "POLICY_R": 78.367
+      }
+    }
+  ],
+  "best": {
+    "score": 25.483,
+    "config": {
+      "POLICY_R": 43.156585988539646,
+      "patrol": {
+        "cluster_r": 122.38904719931048,
+        "dens_pow": 3.136767627610225,
+        "reach_scale": 1257.4986896875616,
+        "sharp": 12.105434852790298,
+        "lead_scale": 0.4801852227381807,
+        "lead_max": 127.59219829558566,
+        "nbhd": 0.864799473613797
+      }
+    }
+  }
+}
