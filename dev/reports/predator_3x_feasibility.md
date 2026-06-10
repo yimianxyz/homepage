@@ -187,8 +187,12 @@ Production change (no new code, no experimental branches):
   lead_max 230.6→127.59, nbhd 0.461→0.865` (keep `momentum 0`).
 - `js/predator_cheap.js` `cfg.POLICY_R: 80→43.16`.
 
-Held-out (seeds 250000+, n=128): phone 26.81→27.65 (+3.1%), iPad 24.85→26.41 (+6.3%),
-laptop 20.96→23.16 (+10.5%). Reversible by reverting the two values.
+**TRUE production change validated** (prod code + new params vs prod, held-out seeds
+250000+, n=160, identical seeds): phone 26.52→27.11 (+2.2%, 1.1 SE), iPad
+25.11→26.62 (+6.0%, 2.4 SE), laptop 20.91→22.73 (+8.7%, 3.0 SE) — **device-weighted
++4.9%** (24.48→25.67). Robust on iPad/laptop, marginal on phone (near the N=60 cap).
+Zero extra compute, reversible by reverting the two values. The ready diff is in
+`dev/ship_js/` (predator.js + predator_cheap.js).
 
 Optional, if the user accepts a ~2× per-frame plan spike: stack `{K_roll:6,Hs:90,D:12}`
 for a further +2–5% (A/B on a low-end phone first). DAgger-iterated distillation is the
