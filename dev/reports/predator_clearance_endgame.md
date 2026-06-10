@@ -88,3 +88,13 @@ few dozen lines, reversible. It makes the live predator **always** clear the scr
 with the last-boid hunt ~3× faster and visibly purposeful (it cuts across the edge to
 ambush). Recommended to ship; not auto-deployed (outward-facing; user keeps prod as
 baseline).
+
+## GPU param sweep (4096 envs/config, all 3 L4 chips)
+
+Confirms TERI at scale: 100% clear across all configs. The optimal commit radius
+FREEZE_R is **device-dependent** — ~90px on phone (390×844) but ~130px on laptop
+(1440×900); bigger screens (larger distances) favour committing earlier. Best phone
+TTC 572 (SLACK 1.0, FREEZE 90) vs the shipped compromise 110 → 626 (~−9% endgame,
+~−2% overall available by scaling FREEZE_R with min(W,H)). SLACK is near-flat (1.0
+marginally best). Shipped params (SLACK 0.97, FREEZE 110) kept as validated; the
+device-scaled refinement is a cheap follow-up if desired.
