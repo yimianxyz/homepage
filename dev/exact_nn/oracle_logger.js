@@ -1,67 +1,77 @@
-// exact_nn oracle decision-logger (#5) — records every plan decision of the
-// FROZEN prod policy (workspace js/ ≡ main@6dce76f) for offline student training.
+// exact_nn oracle decision-logger (#5, spec rev 2) — records every plan
+// decision of the FROZEN prod policy (workspace js/ ≡ main@6dce76f) for
+// offline student training.
 //
-// NO edits to js/: the prod sources are hook-injected IN MEMORY via the shared
-// stepper's transform seam. Three one-line hooks at exact-string anchors inside
-// predator_cheap.js's planCheap (load hard-fails if an anchor doesn't match
-// exactly once), plus a pure-JS wrapper around window.__cheap.force for
-// per-frame mode + force bits. Hooks only READ live values — no arithmetic in
-// the policy path changes, proven by --selftest's pristine-equivalence check
-// (instrumented vs untouched run → bit-identical predator trajectory).
+// Architecture (per the #5 spec revision): the sim is DRIVEN by the CERTIFIED
+// INSTRUMENTED FORK dev/exact_nn/oracle_policy.js (generated from
+// js/predator_cheap.js by gen_oracle_policy.js — logging lines only, see its
+// header). planCheap's internals (feat/vprior/pidx/score/bi) are closure-local
+// and unreachable from any wrapper, so the hooks live inside the fork.
+// Bit-identity of the hooked fork vs pristine prod is proven by
+// certify_oracle.js (lockstep + fork-trajectory, all device cells, gate
+// crossings, spawn games); this logger REFUSES to farm unless CERT.json
+// matches the current fork sha. The cert run id is embedded in every shard.
 //
-// Per plan decision (one JSONL line): full input state snapshot (px,py,pvx,
-// pvy,psize,lastFeed,nowMs + all boid pos/vel), the 16 candidates, cp_features
-// matrix + ctx, vprior(16), pidx (roll order; top-K_roll=4 get rolled),
-// per-roll (ci, rollout catches, terminal bootstrap), final score(16), argmax
-// bi, runner-up margin. Per frame (one columnar JSONL line per game): mode
-// (0=zero 1=intercept 2=plan 3=steer), N, force fx/fy as exact float64 bit
-// patterns (hex u64, DataView — catches -0/NaN where JSON numbers can't).
+// Per plan decision (one JSONL line):
+//   seed,cell,W,H, f (1-based sim frame), N,
+//   s     : full input snapshot {px,py,pvx,pvy,psize,lastFeed,nowMs,bx,by,bvx,bvy}
+//   cands : the 16 candidate targets [[x,y]...]
+//   feat  : 16x19 cp_features matrix; ctx: 4 context features
+//   vprior: 16 value-net priors
+//   pidx  : roll order (ballistic pscore sort; top-K_roll=4 get rolled)
+//   rolled: [[ci, rollout catches, terminal bootstrap]...]
+//   score : final 16 scores (vprior with rolled overrides)
+//   bi    : prod's argmax slot;  margin: slot-level runner-up margin
+//   lab   : {ti,tx,ty} — THE LABEL: committed target COORDINATES, slot index
+//           canonicalized to the LOWEST k with bitwise-equal (x,y) (slots
+//           k>=N are E3D copies whenever N<=15, so raw indices alias)
+//   dmargin: top1−top2 margin over coordinate-DEDUPED candidate groups
+//           (group score = max over its slots; >= margin by construction)
+//   nDistinct: distinct coordinate groups among the 16 slots
+// Every decision is replay-verified inline (recheckPlan recomputes
+// pidx/score/bi/margin/lab/dmargin from the logged pieces; throws on any bit
+// of disagreement).
 //
-// All other floats are plain JSON numbers: ECMAScript number→string is
-// shortest-round-trip, so parsing returns the identical float64 — except the
-// sign of zero (JSON "0" parses to +0). Negative zeros DO occur in prod
-// features (e.g. first-plan geometry); they are counted per shard (meta
-// nNegZero) and provably causally dead: every downstream consumer (standardize,
-// sum, product, the intercept min-image round) yields bit-identical results
-// for ±0, and the policy path has no 1/x, atan2, or Object.is. NaN/±Inf in
-// any logged value is a hard error (would be real corruption).
+// Per frame (one columnar JSONL line per game):
+//   mode (0=zero 1=intercept 2=plan 3=steer), N, force fx/fy as exact float64
+//   bit patterns (hex u64, DataView — catches -0/NaN where JSON can't),
+//   pf (policy's internal plan-cycle frame counter), tx/ty (committed target
+//   coords as hex, '' before first commit), eg (egBoid index in the live
+//   boids array, -1 when unset).
 //
-// Wall-clock: NONE leaks. simNow() is rng.js's VIRTUAL clock (frame*frameMs);
-// the live page sets frameMs=REFRESH_INTERVAL_IN_MS (18 mobile / 12 desktop),
-// the harness pins 12. lastFeedTime/nowMs ride through snapshots into rollouts
-// but are never read back into any decision (and decaySize() is never called),
-// so frameMs is causally dead — verified by --selftest check 4 (frameMs 12 vs
-// 18 → identical decisions + force bits; only the dead lastFeed/nowMs fields
-// scale). Browser behavior identical modulo those dead fields.
+// Floats in decision records are plain JSON numbers: ECMAScript serialization
+// is shortest-round-trip, so parsing returns the identical float64 — except
+// -0 (parses +0). Negative zeros DO occur (counted per shard, meta nNegZero)
+// and are provably causally dead downstream (no 1/x, atan2, Object.is in the
+// policy path). NaN/±Inf in any logged value is a hard error.
 //
-//   node dev/exact_nn/oracle_logger.js --policyDir js --W 390 --H 844 \
-//        --seedStart 100000 --seeds 8 --maxFrames 24000 --outDir dev/exact_nn/data \
-//        --shard s100000_390x844
-//   node dev/exact_nn/oracle_logger.js --selftest [--policyDir js]
+// Wall-clock: NONE leaks. simNow() is rng.js's VIRTUAL clock (frame*frameMs).
+// The browser uses frameMs=18 (mobile) / 12 (desktop); cells run their
+// faithful value (device_matrix.js). lastFeedTime/nowMs ride through
+// snapshots but are never read back into any decision (decaySize is never
+// called) — re-proven by --selftest check 4 (frameMs 12 vs 18 → identical
+// decisions + force bits modulo the dead clock fields).
+//
+// Spawn profiles (--spawn, the live page's tap-to-spawn, SPEC corpus):
+//   none    (default)
+//   mid     scripted taps during the planner phase incl. same-coord double-tap
+//   recross REACTIVE: when N first reaches 5, taps at +40 (double, same
+//           coord) and +44 force 5->6->7->...->5 gate re-crossings with
+//           egBoid/frame-counter state alive across them. The realized
+//           schedule {frame,x,y} is recorded in the shard meta (replayable).
+//   spam    48 taps in 48 consecutive frames (exceeds the device boid cap)
+//
+//   node dev/exact_nn/oracle_logger.js --cell iphone_390x844 \
+//        --seedStart 100000 --seeds 8 --outDir dev/exact_nn/data --shard <name>
+//   node dev/exact_nn/oracle_logger.js --selftest
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const crypto = require('crypto');
 const { createGame } = require('./stepper.js');
-
-// ---- exact-string anchored hook injection (in-memory only) ----
-const ANCHORS = [
-    { find: 'var vprior = cp_value(NET, fr.feat, fr.ctx);',
-      add: ' if (window.__oracle) window.__oracle.planStart(s, cands, fr, vprior);', where: 'after' },
-    { find: 'score[ci] = rr.catches + boot;',
-      add: ' if (window.__oracle) window.__oracle.roll(ci, rr.catches, boot);', where: 'after' },
-    { find: 'if (vizModel) cp_value_viz(NET, fr.feat[bi], fr.ctx, vizModel);',
-      add: 'if (window.__oracle) window.__oracle.planEnd(pidx, score, bi); ', where: 'before' },
-];
-function oracleTransform(filename, code) {
-    if (filename !== 'predator_cheap.js') return null;
-    for (const a of ANCHORS) {
-        const n = code.split(a.find).length - 1;
-        if (n !== 1) throw new Error(`oracle anchor matched ${n}x (want 1): "${a.find}"`);
-        code = code.replace(a.find, a.where === 'after' ? a.find + a.add : a.add + a.find);
-    }
-    return code;
-}
+const { loadFork, FORK } = require('./oracle_candidate.js');
+const { CELLS, HELD_OUT_SEED } = require('./device_matrix.js');
 
 // ---- float64 exact bits ----
 const _dv = new DataView(new ArrayBuffer(8));
@@ -73,6 +83,23 @@ function assertCleanNum(x, what) {
     return x;
 }
 function cleanArr(a, what) { for (let i = 0; i < a.length; i++) assertCleanNum(a[i], what); return a; }
+
+// ---- label + dedup margin (coordinate identity = exact f64 bit pairs) ----
+function coordKey(c) { return f64hex(c.x) + f64hex(c.y); }
+function labelAndDedup(cands, score, bi) {
+    const keys = cands.map(coordKey);
+    const win = keys[bi];
+    let ti = -1;
+    const groupMax = new Map();
+    for (let k = 0; k < cands.length; k++) {
+        if (ti < 0 && keys[k] === win) ti = k;
+        const g = groupMax.get(keys[k]);
+        if (g === undefined || score[k] > g) groupMax.set(keys[k], score[k]);
+    }
+    let ru = -Infinity;
+    for (const [key, s] of groupMax) if (key !== win && s > ru) ru = s;
+    return { ti, dmargin: score[bi] - ru, nDistinct: groupMax.size };
+}
 
 // ---- per-plan reconstruction cross-check (replicates planCheap's own
 // pidx sort + argmax from the logged values; any divergence = hook bug) ----
@@ -90,28 +117,77 @@ function recheckPlan(rec) {
     if (bi !== rec.bi) throw new Error('recheck: bi mismatch');
     let ru = -Infinity;
     for (let k = 0; k < score.length; k++) if (k !== bi && score[k] > ru) ru = score[k];
-    const margin = score[bi] - ru;
-    if (margin !== rec.margin) throw new Error('recheck: margin mismatch');
+    if (score[bi] - ru !== rec.margin) throw new Error('recheck: margin mismatch');
+    // label invariants: lowest bitwise-equal slot; committed coords match; dedup
+    // margin recomputes exactly and can only exceed the slot-level margin.
+    const cands = rec.cands.map(c => ({ x: c[0], y: c[1] }));
+    const ld = labelAndDedup(cands, score, bi);
+    if (ld.ti !== rec.lab.ti || ld.dmargin !== rec.dmargin || ld.nDistinct !== rec.nDistinct)
+        throw new Error('recheck: label/dedup mismatch');
+    if (rec.lab.ti > rec.bi) throw new Error('recheck: ti above bi');
+    if (f64hex(cands[rec.lab.ti].x) !== rec.lab.tx || f64hex(cands[rec.lab.ti].y) !== rec.lab.ty)
+        throw new Error('recheck: label coords mismatch');
+    if (!(rec.dmargin >= rec.margin)) throw new Error('recheck: dmargin < margin');
+}
+
+// ---- certification gate ----
+function certInfo() {
+    const oracleSha = crypto.createHash('sha256').update(fs.readFileSync(FORK)).digest('hex');
+    const certPath = path.join(__dirname, 'CERT.json');
+    if (process.env.ORACLE_SKIP_CERT) return { oracleSha, certRunId: 'UNCERTIFIED-DEV' };
+    if (!fs.existsSync(certPath)) throw new Error('no CERT.json — run certify_oracle.js first');
+    const cert = JSON.parse(fs.readFileSync(certPath, 'utf8'));
+    if (!cert.ok) throw new Error('CERT.json says ok=false — fork is NOT certified');
+    if (cert.oracleSha !== oracleSha)
+        throw new Error('CERT.json is for a different oracle_policy.js — re-certify');
+    return { oracleSha, certRunId: cert.certRunId };
+}
+
+// ---- spawn profiles (deterministic; coords scale with the cell) ----
+function spawnPlan(profile, cell) {
+    if (!profile || profile === 'none') return { script: null, reactive: false };
+    if (profile === 'mid') {
+        const x = cell.W * 0.25, y = cell.H * 0.25;
+        return { reactive: false, script: [
+            { frame: 400, x, y }, { frame: 400, x, y }, { frame: 401, x, y },
+            { frame: 1200, x: cell.W * 0.7, y: cell.H * 0.6 },
+            { frame: 2000, x: cell.W * 0.1, y: cell.H * 0.9 },
+        ] };
+    }
+    if (profile === 'spam') {
+        const script = [];
+        for (let k = 0; k < 48; k++) {
+            script.push({ frame: 300 + k, x: cell.W * (0.2 + 0.6 * ((k % 5) / 4)),
+                          y: cell.H * (0.2 + 0.6 * (((k * 7) % 9) / 8)) });
+        }
+        return { script, reactive: false };
+    }
+    if (profile === 'recross') return { script: null, reactive: true };
+    throw new Error('unknown spawn profile: ' + profile);
 }
 
 // ---- run one game under the oracle; returns {decisions, frames, meta} ----
-// decisions: array of plan records; frames: columnar per-frame log.
 async function runGame(opt) {
+    const cell = opt.cell;
     const pending = { plan: null, rolled: null };
     const decisions = [];
-    const frames = { mode: [], N: [], fx: [], fy: [] };
-    global.window = undefined; // stepper rebuilds; ensure no stale __oracle
+    const frames = { mode: [], N: [], fx: [], fy: [], pf: [], tx: [], ty: [], eg: [] };
+    const sp = spawnPlan(opt.spawn, cell);
+    const realizedSpawns = sp.script ? sp.script.slice() : [];
     const g = await createGame({
-        policyDir: opt.policyDir, W: opt.W, H: opt.H, seed: opt.seed,
-        frameMs: opt.frameMs, transform: opt.pristine ? null : oracleTransform,
+        policyDir: opt.policyDir, W: cell.W, H: cell.H, seed: opt.seed,
+        startBoids: cell.startBoids, frameMs: opt.frameMs != null ? opt.frameMs : cell.frameMs,
+        fastRender: true, spawnScript: sp.script,
     });
     let sawPlan = false;
     if (!opt.pristine) {
+        const forkCheap = await loadFork(g);
         g.win.__oracle = {
             planStart(s, cands, fr, vprior) {
                 sawPlan = true;
                 pending.plan = {
-                    seed: opt.seed, W: opt.W, H: opt.H, f: g.frame() + 1, N: s.bx.length,
+                    seed: opt.seed, cell: cell.id, W: cell.W, H: cell.H,
+                    f: g.frame() + 1, N: s.bx.length,
                     s: { px: s.px, py: s.py, pvx: s.pvx, pvy: s.pvy, psize: s.psize,
                          lastFeed: s.lastFeed, nowMs: s.nowMs,
                          bx: cleanArr(s.bx.slice(), 'bx'), by: cleanArr(s.by.slice(), 'by'),
@@ -133,33 +209,61 @@ async function runGame(opt) {
                 let ru = -Infinity;
                 for (let k = 0; k < score.length; k++) if (k !== bi && score[k] > ru) ru = score[k];
                 rec.margin = score[bi] - ru;
+                const cands = rec.cands.map(c => ({ x: c[0], y: c[1] }));
+                const ld = labelAndDedup(cands, score, bi);
+                rec.lab = { ti: ld.ti, tx: f64hex(cands[ld.ti].x), ty: f64hex(cands[ld.ti].y) };
+                rec.dmargin = ld.dmargin;
+                rec.nDistinct = ld.nDistinct;
                 recheckPlan(rec);
                 decisions.push(rec);
                 pending.plan = pending.rolled = null;
             },
+            // per-frame persistent closure state + the returned force
+            frameEnd(target, pframe, egBoid, boids, r) {
+                const N = boids.length;
+                frames.mode.push(N === 0 ? 0 : (N <= 5 ? 1 : (sawPlan ? 2 : 3)));
+                frames.N.push(N);
+                frames.fx.push(f64hex(r.x)); frames.fy.push(f64hex(r.y));
+                frames.pf.push(pframe);
+                frames.tx.push(target ? f64hex(target.x) : '');
+                frames.ty.push(target ? f64hex(target.y) : '');
+                frames.eg.push(egBoid ? boids.indexOf(egBoid) : -1);
+                sawPlan = false;
+            },
         };
-        // per-frame mode + force bits via a pure wrapper (no source change)
-        const realForce = g.win.__cheap.force;
-        g.win.__cheap.force = function (pred, boids) {
-            const N = boids.length;
-            sawPlan = false;
-            const out = realForce.call(this, pred, boids);
-            const mode = N === 0 ? 0 : (N <= 5 ? 1 : (sawPlan ? 2 : 3));
-            frames.mode.push(mode); frames.N.push(N);
-            frames.fx.push(f64hex(out.x)); frames.fy.push(f64hex(out.y));
-            return out;
-        };
+        g.setForce(forkCheap.force);
     }
     const traj = opt.captureTraj ? [] : null;
-    let clearedAt = -1;
+    let clearedAt = -1, recrossArmed = sp.reactive, recrossSpawned = false;
     for (let f = 0; f < opt.maxFrames; f++) {
-        g.stepFrame();
+        if (recrossArmed && g.boidCount() <= 5) {
+            // reactive endgame taps: schedule relative to NOW (frame g.frame())
+            const f0 = g.frame();
+            const taps = [
+                { frame: f0 + 40, x: cell.W * 0.5, y: cell.H * 0.2 },
+                { frame: f0 + 40, x: cell.W * 0.5, y: cell.H * 0.2 },
+                { frame: f0 + 44, x: cell.W * 0.8, y: cell.H * 0.8 },
+            ];
+            realizedSpawns.push(...taps);
+            recrossArmed = false; recrossSpawned = true;
+            // inject via the sim directly at the scheduled frames below
+            opt._taps = taps;
+        }
+        if (opt._taps) {
+            for (const t of opt._taps) if (t.frame === g.frame()) g.sim.spawnBoid(t.x, t.y);
+        }
+        g.step();
         if (traj) traj.push(f64hex(g.sim.predator.position.x) + f64hex(g.sim.predator.position.y));
         if (g.boidCount() === 0) { clearedAt = g.frame(); break; }
     }
+    delete opt._taps;
     return { decisions, frames, traj,
-        meta: { seed: opt.seed, W: opt.W, H: opt.H, frameMs: opt.frameMs == null ? 12 : opt.frameMs,
-                framesRun: g.frame(), clearedAt, eaten: g.eaten(), nPlans: decisions.length } };
+        meta: { seed: opt.seed, cell: cell.id, W: cell.W, H: cell.H,
+                numBoids: g.api.getNumBoids(), predRange: g.api.getPredRange(),
+                frameMs: opt.frameMs != null ? opt.frameMs : cell.frameMs,
+                spawn: opt.spawn || 'none', spawns: realizedSpawns,
+                recrossSpawned,
+                framesRun: g.frame(), clearedAt, eaten: g.sim.boidsEaten, nPlans: decisions.length } };
 }
 
 // ---- shard writer ----
@@ -169,14 +273,16 @@ function writeShard(file, lines) {
 }
 
 async function produce(opt) {
+    const ci = certInfo();   // refuses to farm uncertified
     fs.mkdirSync(opt.outDir, { recursive: true });
     const dec = [], frm = [], metas = [];
     for (let i = 0; i < opt.seeds; i++) {
         const seed = opt.seedStart + i;
         const r = await runGame({ ...opt, seed });
         for (const d of r.decisions) dec.push(JSON.stringify(d));
-        frm.push(JSON.stringify({ seed, W: opt.W, H: opt.H, n: r.frames.mode.length,
-            mode: r.frames.mode, N: r.frames.N, fx: r.frames.fx, fy: r.frames.fy }));
+        frm.push(JSON.stringify({ seed, cell: opt.cell.id, n: r.frames.mode.length,
+            mode: r.frames.mode, N: r.frames.N, fx: r.frames.fx, fy: r.frames.fy,
+            pf: r.frames.pf, tx: r.frames.tx, ty: r.frames.ty, eg: r.frames.eg }));
         metas.push(r.meta);
         if (opt.verbose) console.error(`seed ${seed}: frames=${r.meta.framesRun} plans=${r.meta.nPlans} cleared=${r.meta.clearedAt > 0}`);
     }
@@ -184,80 +290,106 @@ async function produce(opt) {
     writeShard(base + '.decisions.jsonl.gz', dec);
     writeShard(base + '.frames.jsonl.gz', frm);
     fs.writeFileSync(base + '.meta.json', JSON.stringify({
-        policyDir: path.resolve(opt.policyDir), W: opt.W, H: opt.H,
+        policyDir: path.resolve(opt.policyDir),
+        cell: opt.cell.id, W: opt.cell.W, H: opt.cell.H,
+        numBoids: metas[0] && metas[0].numBoids, predRange: metas[0] && metas[0].predRange,
+        frameMs: opt.frameMs != null ? opt.frameMs : opt.cell.frameMs,
+        spawn: opt.spawn || 'none',
         seedStart: opt.seedStart, seeds: opt.seeds, maxFrames: opt.maxFrames,
-        frameMs: opt.frameMs == null ? 12 : opt.frameMs, games: metas,
-        nDecisions: dec.length, nNegZero: negZeroCount,
+        oracleSha: ci.oracleSha, certRunId: ci.certRunId, node: process.version,
+        games: metas, nDecisions: dec.length, nNegZero: negZeroCount,
     }, null, 1));
     console.log(JSON.stringify({ shard: opt.shard, games: opt.seeds, decisions: dec.length }));
 }
 
-// ---- selftest: the acceptance checks, end to end ----
-async function selftest(policyDir) {
+// ---- selftest: the logger-level acceptance checks, end to end ----
+// (bit-identity of the fork itself is certify_oracle.js's job; here we prove
+// the LOGGER: non-perturbation, determinism, replay recompute, frameMs
+// deadness, spawn-profile determinism.)
+async function selftest() {
     const cases = [
-        { W: 390, H: 844, seed: 100000, maxFrames: 9000 },   // mobile, 60 boids
-        { W: 1512, H: 982, seed: 100001, maxFrames: 4000 },  // desktop 120, partial game
+        { cell: CELLS[0], seed: 100000, maxFrames: 9000 },   // iphone, 60 boids
+        { cell: CELLS[3], seed: 100001, maxFrames: 4000 },   // desktop 120, partial game
+        { cell: CELLS[1], seed: 100002, maxFrames: 6000 },   // ipad: UA-mobile, 60 boids @820x1180
     ];
+    const policyDir = path.join(__dirname, '..', '..', 'js');
     let pass = true;
     const report = [];
     for (const c of cases) {
-        // 1. pristine equivalence: instrumented vs untouched → identical trajectory bits
+        const tag = `[${c.cell.id} seed ${c.seed}]`;
+        // 1. pristine equivalence: fork-driven (hooks on) vs pristine prod-driven
         const a = await runGame({ ...c, policyDir, captureTraj: true });
         const b = await runGame({ ...c, policyDir, captureTraj: true, pristine: true });
         const eq = a.traj.length === b.traj.length && a.traj.every((v, i) => v === b.traj[i]);
-        report.push(`[${c.W}x${c.H} seed ${c.seed}] pristine-equivalence: ${eq ? 'PASS' : 'FAIL'} (${a.traj.length} frames, ${a.meta.nPlans} plans)`);
+        report.push(`${tag} fork-vs-pristine trajectory bits: ${eq ? 'PASS' : 'FAIL'} (${a.traj.length} frames, ${a.meta.nPlans} plans)`);
         pass = pass && eq;
         // 2. determinism: run twice → byte-identical serialized logs
         const a2 = await runGame({ ...c, policyDir });
-        const s1 = JSON.stringify(a.decisions) + JSON.stringify(a.frames);
-        const s2 = JSON.stringify(a2.decisions) + JSON.stringify(a2.frames);
-        const det = s1 === s2;
-        report.push(`[${c.W}x${c.H} seed ${c.seed}] determinism (byte-identical logs): ${det ? 'PASS' : 'FAIL'}`);
+        const det = JSON.stringify(a.decisions) + JSON.stringify(a.frames)
+                === JSON.stringify(a2.decisions) + JSON.stringify(a2.frames);
+        report.push(`${tag} determinism (byte-identical logs): ${det ? 'PASS' : 'FAIL'}`);
         pass = pass && det;
-        // 3. recheckPlan ran inline on every decision (throws on mismatch) — count it
-        report.push(`[${c.W}x${c.H} seed ${c.seed}] replay recompute (pidx/score/bi/margin): PASS (${a.decisions.length} plans cross-checked)`);
-        // 4. frameMs deadness: 12 vs 18 → identical decisions+forces modulo dead clock fields
-        const m18 = await runGame({ ...c, policyDir, frameMs: 18 });
+        // 3. recheckPlan ran inline on every decision (throws on mismatch)
+        report.push(`${tag} replay recompute incl. label+dedup margin: PASS (${a.decisions.length} plans)`);
+        // 4. frameMs deadness: cell value vs 12 → identical modulo dead clock fields
+        const m12 = await runGame({ ...c, policyDir, frameMs: 12 });
         const strip = d => JSON.stringify(d.map(r => ({ ...r, s: { ...r.s, lastFeed: 0, nowMs: 0 } })));
-        const dead = strip(a.decisions) === strip(m18.decisions)
-            && JSON.stringify(a.frames) === JSON.stringify(m18.frames);
-        report.push(`[${c.W}x${c.H} seed ${c.seed}] frameMs causally dead (12 vs 18): ${dead ? 'PASS' : 'FAIL'}`);
+        const dead = strip(a.decisions) === strip(m12.decisions)
+            && JSON.stringify(a.frames) === JSON.stringify(m12.frames);
+        report.push(`${tag} frameMs causally dead (${c.cell.frameMs} vs 12): ${dead ? 'PASS' : 'FAIL'}`);
         pass = pass && dead;
     }
+    // 5. spawn-profile determinism (reactive recross): identical realized
+    // schedule + logs across two runs; and the recross actually happened
+    const rc = { cell: CELLS[0], seed: 100003, maxFrames: 24000, spawn: 'recross' };
+    const policy = path.join(__dirname, '..', '..', 'js');
+    const r1 = await runGame({ ...rc, policyDir: policy });
+    const r2 = await runGame({ ...rc, policyDir: policy });
+    const sdet = JSON.stringify(r1.meta.spawns) === JSON.stringify(r2.meta.spawns)
+        && JSON.stringify(r1.frames) === JSON.stringify(r2.frames)
+        && r1.meta.recrossSpawned;
+    report.push(`[${rc.cell.id} seed ${rc.seed}] recross spawn determinism + occurred: ${sdet ? 'PASS' : 'FAIL'} (${r1.meta.spawns.length} taps, ${r1.meta.framesRun} frames)`);
+    pass = pass && sdet;
     console.log(report.join('\n'));
     console.log(pass ? 'SELFTEST: ALL PASS' : 'SELFTEST: FAILURES');
     process.exit(pass ? 0 : 1);
 }
 
 function parseArgs(argv) {
-    const a = { policyDir: path.join(__dirname, '..', '..', 'js'), W: 390, H: 844,
-        seedStart: 100000, seeds: 4, maxFrames: 24000, outDir: path.join(__dirname, 'data'),
-        shard: null, frameMs: null, verbose: false, selftest: false };
+    const a = { policyDir: path.join(__dirname, '..', '..', 'js'), cell: null,
+        seedStart: 100000, seeds: 4, maxFrames: null, outDir: path.join(__dirname, 'data'),
+        shard: null, frameMs: null, spawn: 'none', verbose: false, selftest: false };
     for (let i = 2; i < argv.length; i++) {
         const k = argv[i];
         if (k === '--policyDir') a.policyDir = argv[++i];
-        else if (k === '--W') a.W = +argv[++i];
-        else if (k === '--H') a.H = +argv[++i];
+        else if (k === '--cell') a.cell = argv[++i];
         else if (k === '--seedStart') a.seedStart = +argv[++i];
         else if (k === '--seeds') a.seeds = +argv[++i];
         else if (k === '--maxFrames') a.maxFrames = +argv[++i];
         else if (k === '--outDir') a.outDir = argv[++i];
         else if (k === '--shard') a.shard = argv[++i];
         else if (k === '--frameMs') a.frameMs = +argv[++i];
+        else if (k === '--spawn') a.spawn = argv[++i];
         else if (k === '--verbose') a.verbose = true;
         else if (k === '--selftest') a.selftest = true;
         else throw new Error('unknown arg: ' + k);
     }
-    if (!a.shard) a.shard = `s${a.seedStart}_n${a.seeds}_${a.W}x${a.H}`;
+    if (!a.selftest) {
+        const cell = CELLS.find(c => c.id === a.cell);
+        if (!cell) throw new Error('--cell required, one of: ' + CELLS.map(c => c.id).join(', '));
+        a.cell = cell;
+        if (a.maxFrames == null) a.maxFrames = cell.maxFrames;
+        if (!a.shard) a.shard = `train_${cell.id}_s${a.seedStart}${a.spawn !== 'none' ? '_' + a.spawn : ''}`;
+    }
     return a;
 }
 
 async function main() {
     const opt = parseArgs(process.argv);
-    if (opt.selftest) return selftest(opt.policyDir);
+    if (opt.selftest) return selftest();
     // train/verify seed discipline: held-out seeds >=270000 are RESERVED.
-    if (opt.seedStart + opt.seeds > 270000 && !process.env.ORACLE_ALLOW_HELDOUT)
-        throw new Error('seed range crosses 270000 (held-out verification seeds) — refuse');
+    if (opt.seedStart + opt.seeds > HELD_OUT_SEED && !process.env.ORACLE_ALLOW_HELDOUT)
+        throw new Error(`seed range crosses ${HELD_OUT_SEED} (held-out verification seeds) — refuse`);
     return produce(opt);
 }
 main().catch(e => { console.error(e); process.exit(1); });

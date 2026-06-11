@@ -18,19 +18,27 @@ const vm = require('vm');
 
 const FORK = path.join(__dirname, 'oracle_policy.js');
 
-module.exports.create = async function (game) {
+// Re-eval the fork in the live context (same pattern as stepper's
+// loadPolicyAgain, different file): an independent policy closure with its
+// own target/frame/egBoid/NET state; the reference closure and the running
+// sim stay untouched. Shared by the cert candidate and oracle_logger.js.
+async function loadFork(game) {
     const win = game.win;
-    // Re-eval the fork in the live context (same pattern as stepper's
-    // loadPolicyAgain, different file): an independent policy closure with its
-    // own target/frame/egBoid/NET state; the reference closure and the running
-    // sim stay untouched.
     const prevCheap = win.__cheap, prevReady = win.__predatorReady,
           prevModel = win.__predatorModel;
-    vm.runInThisContext(fs.readFileSync(FORK, 'utf8'), { filename: 'oracle_policy.js#cert' });
+    vm.runInThisContext(fs.readFileSync(FORK, 'utf8'), { filename: 'oracle_policy.js#fork' });
     const forkCheap = win.__cheap, forkReady = win.__predatorReady;
     win.__cheap = prevCheap; win.__predatorReady = prevReady;
     win.__predatorModel = prevModel;
     if (forkReady && typeof forkReady.then === 'function') await forkReady;
+    return forkCheap;
+}
+module.exports.loadFork = loadFork;
+module.exports.FORK = FORK;
+
+module.exports.create = async function (game) {
+    const win = game.win;
+    const forkCheap = await loadFork(game);
 
     // Counting sink: hooks active (farm configuration), output discarded.
     const counts = { planStart: 0, roll: 0, planEnd: 0, frameEnd: 0 };
