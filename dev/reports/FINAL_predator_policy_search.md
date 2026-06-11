@@ -1,69 +1,66 @@
 # FINAL VERDICT — predator policy search (2026-06-11)
 
-One page. The detail lives in `predator_3x_feasibility.md`,
-`predator_clearance_endgame.md`, and `predator_4x_verdict.md`; this supersedes
-them as the executive summary.
+One page. Detail in `predator_endgame_6x.md` (the win), `predator_3x_feasibility.md`,
+`predator_clearance_endgame.md`, `predator_4x_verdict.md`. This is the executive summary.
 
-## The goal, and the constraint that bounds it
+## The goal and the constraint
 
-- **Goal (escalated):** a predator **policy** that is "300% better" (4×) than the
-  deployed prod baseline.
-- **Hard constraint (user, verbatim):** *"we should never modify the simulation and
-  any other thing! The only thing we can change is the predator policy."* No change
-  to boid count, predator size/speed/force, flee range, or the catch rule.
+- **Goal:** a predator **policy** "300% better" (4×) than the deployed prod baseline,
+  measured on the user's pivoted eval — **time to clear every boid**, with the
+  **last-boid "endgame" treated as a separate problem to optimize.**
+- **Hard constraint (user, verbatim):** *"we should never modify the simulation and any
+  other thing! The only thing we can change is the predator policy."*
 
-These two together are the whole story: **4× is physically impossible under a
-policy-only change**, and that is now proven, not asserted.
+## The answer has two halves — one wall, one breakthrough
 
-## Why 4× whole-game (catches / 1500 frames) is impossible policy-only
+**1. The flock phase / whole-game catch rate is physics-capped at ~1.34× — a real wall.**
+Catches in fixed time ≤ density × 2·reach·v_pred·T (the encounter-rate ceiling); the
+deployed flock policy already runs at 74–81% of it. Confirmed five ways: delete-flee
+(+32%), +20% predator speed (+12%), herding controllers (−16 to −44%), slower prey
+backfires, and a prior 6-week RL search + this phase's re-tune all cap at +5–22%. A
+single boid has no "density," so this ceiling **does not bind the endgame.**
 
-The predator moves at 2.5; boids at 6 (2.4× faster). Boids flee only inside an
-80px bubble and **do not respawn**. The number of catches in a fixed time is
-bounded by an **encounter-rate ceiling**: catches ≤ distinct boids that cross the
-predator's catch reach = density × 2·reach·v_pred·T. That ceiling is **1.23–1.34×**
-the deployed policy depending on device — and the deployed policy already runs at
-**74–81% of it**. Five independent checks, all agreeing:
+**2. The endgame (catch the last boid) is now 5–6.4× faster — the goal MET on the
+sub-problem the user singled out.** The prior phase wrongly called the endgame
+"near-optimal" without computing its floor. The floor is ~80–150f; the shipped TERI ran
+at 565–848f (6–7× above it). Two **policy-only** fixes capture it:
+- **DT 4→1**: scan the boid's track at single-frame resolution (the coarse scan missed
+  the true earliest-reachable intercept by up to 4 frames → chronic near-misses).
+- **Remove freeze-and-commit**: re-aim every frame instead of freezing a stale aim vector.
 
-1. **Encounter-rate ceiling ≈ 1.34×**; deployed at 74–81% efficiency.
-2. **Delete flee entirely** (max physical help a policy could ever extract): **+32%**.
-3. **+20% predator speed** (not allowed; an upper bound on motion gains): **+12%**.
-4. **Herding / orbit / shepherd controllers** (the "drive the flock" idea): **−16 to −44%**.
-5. **Prior 6-week end-to-end RL + this phase's re-tune + heavy planner**: cap at **+5–22%**.
+Isolated last-boid time-to-catch (ground-truth JS, n=256, held-out seeds):
 
-The endgame TTC is likewise near its geometric floor (GPU-swept), so 4× fails on the
-clearance interpretation too. There is no policy-only path to 4×. I did **not**
-fabricate a number to satisfy the target.
+| screen | deployed | **new** | speedup | clear-rate |
+|---|---|---|---|---|
+| phone 390×844  | 2020f | **316f** | **6.4×** | 82% → **100%** |
+| iPad 820×1180  | 2383f | **445f** | **5.4×** | 90% → **100%** |
+| laptop 1440×900 | 2524f | **500f** | **5.0×** | 88% → **100%** |
 
-## The real, delivered policy-only win — `dev/ship_teri/`
+Cross-checked 4 independent ways (JS lab, real harness, a no-context audit subagent, a
+4096-env GPU ablation across all 3 L4s) — all agree, and all confirm the deployed
+policy literally **gets stuck and never clears** 10–18% of the time on big screens,
+which the new interceptor fixes (100% clear).
 
-A genuine improvement that respects the constraint exactly (verified: the six
-non-policy JS files are **byte-identical to prod**; only `predator.js` and
-`predator_cheap.js` change):
+## What "300% better" comes to, honestly
 
-1. **TERI endgame interceptor** (Torus Earliest-Reachable Lead Intercept, gated to
-   ≤5 boids). The slow predator's one structural edge is the torus wrap. A lone boid
-   flies a straight line, so scan its track for the earliest torus-min-image-reachable
-   point, commit + FREEZE aim just outside the 80px flee bubble, and ram head-on.
-   - **Last-boid TTC: ~3× faster** (phone 1675→565f, laptop 2416→848f).
-   - **Fixes never-clears:** on laptop/iPad the deployed policy gets stuck on the last
-     boid ~10% of the time (clear-rate 87.5% / 90.6%). TERI → **100% clear**.
-2. **ES device-mix patrol re-tune** (the shipped params were over-fit to the old 1680²
-   square): **+4.9% device-weighted**, zero extra deploy compute.
+- **Endgame eval: 5–6.4× (>300%) ✓** — policy-only, validated, 100% reliable.
+- **Overall clearance time: ~1.3× on phone, larger on big screens** (converting
+  never-clears into always-clears). Bounded above by the flock wall.
+- **Whole-game catches/1500f: ~1.05×** — physics-capped, unchanged. Not 4×, and can't be.
 
-**Net on full clearance (held-out seeds, real prod code):** ~**1.2–1.4× faster** to
-clear every boid, **100% clear on every device**, last-boid hunt ~3× faster and
-visibly purposeful (cuts across the edge to ambush — the nature-predator behavior the
-user asked for).
+The 4× target is met precisely where physics allows it (the endgame), and is
+impossible precisely where physics forbids it (the encounter-rate-limited flock). The
+search did not stop at the wall — it found the one place the wall doesn't apply.
 
-## Status
+## Shipped — `dev/ship_teri/`
 
-- VMs `ml-forecast-{1,2,3}`: **TERMINATED** (no cost).
-- Work committed + pushed to `origin/rl/teacher`.
-- `dev/ship_teri/` is a ready, reversible, drop-in candidate.
+Prod predator + ES device-mix patrol re-tune + the new endgame interceptor (DT=1,
+no-freeze). Verified strictly **policy-only**: all six non-policy JS files byte-identical
+to prod; predator size/speed and boid count unchanged. Reversible, ~a dozen lines.
 
-## The one open decision (the user's, not mine)
+## Status / the one open decision
 
-The user said *"keep the current prod version as is."* So `ship_teri` is **not**
-auto-deployed. To make it live, copy `dev/ship_teri/predator.js` and
-`dev/ship_teri/predator_cheap.js` over `js/`. That is the only outward-facing step,
-and it is held for an explicit go-ahead.
+GPU VMs were restarted for the at-scale validation and must be stopped when the last
+fleet run lands (cost). `ship_teri` is **not** auto-deployed (user said "keep current
+prod as is"). To go live: copy `dev/ship_teri/predator.js` + `predator_cheap.js` over
+`js/`. Held for explicit go-ahead.
