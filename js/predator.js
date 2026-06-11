@@ -10,13 +10,13 @@ var PREDATOR_SIZE = 12;
 // dev/reports/evolve_patrol_results.md and dev/sim_torch.py 'evolved' branch
 // (this JS is a line-for-line port of that computation).
 var EVOLVED_PATROL = {
-    cluster_r: 178.09,   // neighbor radius for the density count
-    dens_pow: 2.373,     // exponent on (neighbors+1) — how much density attracts
-    reach_scale: 1515.0, // exp(-distPred/reach_scale) — slow predator prefers near
-    sharp: 9.25,         // peakiness of the softmax-like weighting (->densest boid)
-    lead_scale: 0.454,   // adaptive travel-time lead gain
-    lead_max: 230.6,     // cap on lead distance
-    nbhd: 0.461,         // blend toward the densest boid's neighborhood centroid
+    cluster_r: 122.389,   // neighbor radius for the density count
+    dens_pow: 3.137,     // exponent on (neighbors+1) — how much density attracts
+    reach_scale: 1257.499, // exp(-distPred/reach_scale) — slow predator prefers near
+    sharp: 12.105,         // peakiness of the softmax-like weighting (->densest boid)
+    lead_scale: 0.480,   // adaptive travel-time lead gain
+    lead_max: 127.592,     // cap on lead distance
+    nbhd: 0.865,         // blend toward the densest boid's neighborhood centroid
     momentum: 0.0        // frame-to-frame target smoothing (0 = off)
 };
 
