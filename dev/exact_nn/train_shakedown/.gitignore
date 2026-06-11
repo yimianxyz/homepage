@@ -1,0 +1,3 @@
+ckpt_*.pt
+smoke_data/
+__pycache__/
