@@ -28,7 +28,7 @@
     var BASE_SIZE = PREDATOR_SIZE, MAX_SIZE = BASE_SIZE * 1.8, CATCH_FACTOR = 0.7;
     var SEP_MULT = 2, COH_MULT = 1, ALIGN_MULT = 1;
     var LEAD_SCALE = EVOLVED_PATROL.lead_scale, LEAD_MAX = EVOLVED_PATROL.lead_max;
-    var cfg = { K: 16, K_roll: 4, Hs: 90, D: 16, POLICY_R: 80, W: 1680, Hc: 1680 };
+    var cfg = { K: 16, K_roll: 4, Hs: 90, D: 16, POLICY_R: 43.157, W: 1680, Hc: 1680 };
 
     function fastMag(x, y) {
         var ax = x < 0 ? -x : x, ay = y < 0 ? -y : y;
