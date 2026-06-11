@@ -96,7 +96,7 @@ function fnvWord(h, w) { return ((h ^ BigInt(w >>> 0)) * FNV_PRIME) & MASK64; }
 async function makeCandidate(spec, game, opt) {
     if (spec === 'identity') {
         const h = await game.loadPolicyAgain();
-        return { name: 'identity-prod', configure() {}, force: h.force, reset() {} };
+        return { name: 'identity-prod', configure() {}, force: h.cheap.force, reset() {} };
     }
     if (spec === 'broken1ulp') {
         const h = await game.loadPolicyAgain();
@@ -107,7 +107,7 @@ async function makeCandidate(spec, game, opt) {
             perturbedCalls: perturbed,
             configure() {}, reset() { calls = 0; perturbed.length = 0; },
             force(pred, boids) {
-                const f = h.force(pred, boids);
+                const f = h.cheap.force(pred, boids);
                 calls++;
                 if (calls % opt.ulpEvery === 0) {
                     perturbed.push(calls - 1);          // 0-based call (== frame) index
@@ -126,7 +126,7 @@ async function makeCandidate(spec, game, opt) {
             perturbedCalls: perturbed,
             configure() {}, reset() { calls = 0; perturbed.length = 0; },
             force(pred, boids) {
-                const f = h.force(pred, boids);
+                const f = h.cheap.force(pred, boids);
                 calls++;
                 if (calls % opt.ulpEvery === 0) { perturbed.push(calls - 1); return { x: f.x + 1e-2, y: f.y }; }
                 return f;
@@ -135,7 +135,7 @@ async function makeCandidate(spec, game, opt) {
     }
     const mod = require(path.resolve(spec));
     if (typeof mod.create !== 'function') throw new Error('candidate must export create()');
-    return await mod.create(game, { policyDir: game.opt.policyDir });
+    return await mod.create(game, { policyDir: opt.policyDir });
 }
 
 // ---- single game under the differential hook ----
@@ -147,9 +147,10 @@ async function runGame(opt, seed, candidateSpec) {
         startBoids: opt.startBoids, scatter: opt.scatter,
         fastRender: opt.fastRender, spawnScript: opt.spawnScript,
     });
+    // Capture the reference closure BEFORE any candidate loads or hooks land.
+    const refForce = game.win.__cheap.force;
     const cand = candidateSpec ? await makeCandidate(candidateSpec, game, opt) : null;
     if (cand) cand.configure(game.sim);
-    const refForce = game.refForce;
     const fork = opt.mode === 'fork';
 
     let mmCount = 0, firstMM = -1;
@@ -190,7 +191,7 @@ async function runGame(opt, seed, candidateSpec) {
     let tDigest = fnvInit();
     const p = game.sim.predator;
     while (game.boidCount() > 0 && game.frame() < opt.maxFrames) {
-        game.step();
+        game.stepFrame();
         _f64[0] = p.position.x; _f64[1] = p.position.y;
         _f64[2] = p.velocity.x; _f64[3] = p.velocity.y;
         for (let w = 0; w < 8; w++) tDigest = fnvWord(tDigest, _u32[w]);
