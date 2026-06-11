@@ -1,4 +1,4 @@
-# EXACT-NN — equivalence program spec
+# EXACT-NN — equivalence program spec (v2)
 
 **User goal (2026-06-11, verbatim):** "try to find the best single NN based
 system that can achieve exactly the same output as the current in production
@@ -6,6 +6,13 @@ predator policy in all situation. you may use the hyber way, like part of it is
 deterministic system like rollout and part of them are NN, but NN is necessary.
 and it should be a single policy cover all situation including >5 and <5, while
 output exactly the same as the current in production policy."
+
+**v2** incorporates the 4-lens adversarial spec review (30 findings; adoption
+record in the commit message). Headline changes vs v1: oracle = certified
+instrumented fork (wrapper impossible); L0 = verbatim reuse (not a clean-up);
+margin-CDF measurement ordered BEFORE any GPU training; τ gets a three-way
+split; ranking = exactness as qualifying bar, then NN share; new rungs L1r and
+L1e; corpus gains spawn events and an engine-pinning discipline.
 
 ## 1. The frozen reference target
 
@@ -31,10 +38,27 @@ force(pred, boids):
     every frame: steer()                # nearest-within-80 chase else seek target (det.)
 ```
 
-Persistent state across frames: `target`, `frame` counter, `egBoid`, predator
-`currentSize`/`lastFeedTime` (affect features/rollout). All arithmetic IEEE-754
-float64 (JS numbers). **Prod is already a hybrid NN system** — the value net is
-load-bearing in every plan. The program's real question is therefore:
+**Force-influencing state (the complete dependence set):**
+
+- per-frame inputs: boid array **order** + positions/velocities; predator
+  position/velocity/`currentSize`.
+- persistent policy state: `target` (coords), `frame` counter (frozen while
+  N≤5), `egBoid` (object identity; serialise as index), `configured` latch.
+- derived config, fixed per page load: `cfg.W/Hc` (canvas + 2·BORDER_OFFSET;
+  defaults 1680×1680 until the first `force()` with `pred.simulation`),
+  `PREDATOR_RANGE` (60 mobile / 80 desktop via UA regex — iPad 820×1180 is
+  mobile-by-UA), `NUM_BOIDS` (60/120), and the NET weights.
+- **Verified dead in the force path:** `lastFeedTime`/`nowMs` — `feed()`
+  updates them but no feature, rollout, or steering term reads them; `simNow`
+  is a virtual frame clock, not wall-clock. (One-line proof: grep shows the
+  only reads are in size-decay rendering, outside `force()`.)
+
+Every oracle record, harness state-injection, and student input must carry the
+derived-config vector — omitting it aliases labels across devices.
+
+All arithmetic IEEE-754 float64 (JS numbers). **Prod is already a hybrid NN
+system** — the value net is load-bearing in every plan. The program's real
+question is therefore:
 
 > What is the most NN-centric *single* policy that keeps the output **exactly**
 > equal — and how much of the deterministic machinery (rollouts above all) can
@@ -47,16 +71,41 @@ identical initial state, the force vector returned each frame is **bitwise
 identical** (`fx`, `fy` as float64) to prod's for every frame of G — which
 implies identical trajectories, catches, and frame counts. Operationalised by a
 **lockstep differential harness**: one shared sim; both policies evaluated on
-the same state each frame; prod's force applied; any bit mismatch is recorded
-with full state. (Trajectory-fork mode — apply C's force — as a second check.)
+the same state **every frame, in every regime (N>5, N≤5, N==0)**; prod's force
+applied; any bit mismatch recorded with full state. (Trajectory-fork mode —
+apply C's force — as a second check.)
 
 Two exactness tiers, reported separately and honestly:
 
 - **T1 — exact by construction.** Every operation that influences the output is
-  the same arithmetic in the same order as prod. Provable for all inputs.
-- **T2 — exact on the verification corpus.** Zero bit mismatches over the full
-  corpus (§5), with the trust margin quantified. Not a proof for unseen states;
-  the report must say so.
+  the same arithmetic in the same order as prod — including the same `Math.*`
+  calls in the same order, which makes T1 **engine-invariant** (exact in every
+  browser, including ones we never test). Provable for all inputs.
+- **T2 — exact on the verification corpus, within a pinned engine+version.**
+  Zero bit mismatches over the full corpus (§5). `Math.exp`/`Math.pow` are
+  implementation-approximated (spike: 1–2 ulp divergence on 10–27% of calls
+  across engines), so T2 evidence gathered in node/V8 does **not** transfer to
+  Safari/Firefox by itself. Every T2 claim names its engine; cross-engine
+  evidence per §5.
+
+### 2a. Harness conventions (normative)
+
+- **Comparison:** `fx`,`fy` compared as raw u64 bit patterns (DataView);
+  `-0` and `+0` are distinct; NaN bit patterns compared exactly.
+- **Decision-level metric is primary:** at every plan (and every egBoid
+  commit), compare the **committed target coordinates** (and egBoid identity),
+  with candidates **deduplicated by coordinates** first (see §3). Per-frame
+  force equality is the secondary, stricter check.
+- **Resync:** after a recorded disagreement, copy prod's `{target, frame,
+  egBoid}` into C so disagreements are counted per decision, not inflated by
+  cascade.
+- **State injection** (for synthetic states): both policies seeded with the
+  identical tuple `{target, frame, egBoid-as-index, configured, cfg.W/Hc,
+  currentSize}` plus the boid array in identical order.
+- **Sim-loop semantics:** the harness replicates prod's exact call sequence
+  (the browser's two-pass flock accumulate + single update, spawn insertion
+  semantics, catch/removal ordering), certified once against a recorded
+  real-browser trace per device cell before any large-scale farming.
 
 ## 3. Exactness theory — where an NN can live
 
@@ -64,18 +113,29 @@ A trained approximator's continuous output is never bitwise equal to a
 different computation. Exactness survives only where the NN's role is:
 
 (a) **the same net evaluated identically** (today's `cp_value`), or
-(b) **a discrete decision** — *which* candidate index, *which* boid — whose
-    chosen object is then handed to byte-identical deterministic arithmetic
-    (seek/steer/scan), so the force floats are produced by the same code path.
+(b) **a discrete decision** — *which* candidate, *which* boid — whose chosen
+    object is handed to byte-identical deterministic arithmetic (seek/steer/
+    scan), so the force floats are produced by the same code path. Because the
+    downstream calls are prod's own, (b) is engine-portable.
+
+**Ties are not an edge case — they occur by construction.** `candidates()`
+pads slots k≥N with copies of the E3D point, so every plan with 6≤N≤14 holds
+coordinate-duplicate candidates with bitwise-equal features and scores. Hence:
+
+- *decision agreement* is defined on the **committed target coordinates**
+  (canonical form: lowest index among bitwise-equal (x,y)), never on the raw
+  index;
+- any top-2 margin (for gating or analysis) is computed **after coordinate
+  dedup**, else it reads 0 on every padded plan.
 
 Discrete decision points in prod, by cost and risk:
 
 | # | decision | cost | exact-NN viability |
 |---|---|---|---|
-| D1 | `planCheap` argmax over 16 cands | ~4×90 rollout steps + ~80 net forwards / plan | **the prize** — NN picks index, scaffold seeks; risk = near-ties |
+| D1 | `planCheap` argmax over 16 cands | ~4×90 rollout steps + ~80 net forwards / plan | **the prize** — NN picks the target, scaffold seeks; risk = near-ties |
 | D2 | steer's nearest-within-80 | O(N) per frame | trivial det.; NN adds risk, saves nothing |
 | D3 | gate N≤5 | O(1) | stays literal |
-| D4 | intercept target + scan | O(N·TMAX) only when N≤5 | scan must run anyway for the aim point → NN saves nothing |
+| D4 | intercept egBoid commit | O(N·TMAX) at commit | **in scope (L1e)** — NN proposes egBoid, exact scan = fallback/validator; the per-frame aim scan stays det. |
 
 ## 4. Candidate systems (the search space)
 
@@ -83,80 +143,182 @@ All are ONE policy module with one entry point covering N>5 and N≤5 — the
 regimes are internal structure, not separate policies (prod's own gate is part
 of the spec'd behavior and must be reproduced regardless).
 
-- **L0 — unified-exact (guaranteed floor, ships no matter what).** Single
-  `exactnn.force()` module; NN = `value_net.json` exactly as today; all D1–D4
-  decisions via the original arithmetic, reorganised into one clean code path.
-  T1-exact by construction. Differentially verified anyway.
-- **L1p — pointer student.** An NN (set encoder over boids + predator → pointer
-  over the 16 deterministic candidates) replaces *vprior + all 4 rollouts +
-  bootstrap* at D1. Biggest possible NN share; exactness = closed-loop argmax
-  agreement (T2 only).
-- **L1s — score student.** Same inputs, regresses the 16 final scores; argmax
-  downstream. Richer training signal, margin comes for free.
-- **L1h — margin-gated hybrid (the user's "hybrid way", expected winner).**
-  L1s/L1p first; if the student's top-2 margin < τ, fall back to prod's own
-  scoring (vprior + top-4 rollouts) for that plan — the deterministic rollout
-  is the fallback, the NN is the fast path AND the fallback's value net, so the
-  NN is necessary in every path. Mismatch only possible when student is
-  confident *and* wrong; τ tuned until corpus mismatches = 0. Reports: trusted
-  fraction (compute saved), min trusted margin, residual-risk analysis.
-- **L2 (stretch, only if L1 hits 100%)** — extend the student over D4's target
-  choice with deterministic scan validation.
+- **L0 — unified-exact floor (ships no matter what).** A thin single-entry
+  dispatcher around **verbatim reuse** of prod's code: `cheap_planner.js`
+  exports + the `predator_cheap.js` internals copied byte-for-byte. NN =
+  `value_net.json` exactly as today. Explicit non-goal: "clean reorganisation"
+  — the quirks are load-bearing (two-pass `accumulateFlock`, the no-tie-break
+  `candidates()` sort at :241 vs the tie-broken pidx sort at :272, the
+  NaN→−Infinity extermination path, LIFO grid insertion order). Any
+  restructuring downgrades the claim to "T1 pending op-order audit".
+  T1-exact by construction; differentially verified anyway. **L0 is the
+  labeled floor, not the program's winner.**
+- **L1r — rolled-scores student (new; dominates L1s/L1p on risk).** Keep
+  `cp_features` + `vprior` exactly as prod (12 of 16 final scores are then
+  exact for free); the NN learns only the 4 rolled scores (rollout + bootstrap
+  replacement). A plan can mismatch only when the argmax depends on a rolled
+  score. Margin gate applies to student-score vs exact-vprior margins.
+- **L1s — score student.** NN regresses all 16 final scores from (state,
+  cands); argmax downstream. Richer signal than pointer, margin for free.
+- **L1p — pointer student.** Set encoder over boids+predator → pointer over
+  the 16 deterministic candidates; replaces vprior + rollouts + bootstrap
+  wholesale. Biggest NN share at D1; highest risk.
+- **L1h — margin-gated hybrid (the user's "hybrid way").** L1r/L1s/L1p fast
+  path; if the student's **deduped** top-2 margin < τ, fall back to prod's own
+  scoring (vprior + top-4 rollouts) for that plan. The NN is necessary in
+  every path (fast path AND the fallback's value net). Mismatch only possible
+  when the student is confident *and* wrong. τ calibration per §4c.
+- **L1e — endgame-commit student (new; covers the user's "<5" explicitly).**
+  At each intercept commit point, the NN proposes the egBoid; margin-gated
+  with the exact full scan as fallback/validator. Per-frame aim-point scan and
+  seek arithmetic stay verbatim. The D4 analogue of L1h.
+- **L2 (stretch, only if L1 hits 0 sealed-set mismatches)** — student over
+  combined D1+D4 with deterministic validation everywhere.
 
-"**Best**" among systems passing their exactness tier, lexicographic:
-1. exactness tier (T1 ≻ T2-with-0-mismatches),
-2. NN share of decision compute (fraction of plans decided by the NN alone),
-3. browser runtime ≤ prod's (planCheap today is the budget),
-4. simplicity (params, code size).
+### 4a. What "best" means (revised — the v1 ranking provably crowned L0)
 
-Honest expectation, stated upfront: ~300 plans/game ⇒ bit-exact *full games*
-need per-decision agreement ≳1−1e−6 — almost certainly unreachable for bare
-L1p/L1s (near-ties exist; the old tie-handling bug proves ties occur). L1h is
-designed to reach 0 corpus mismatches with a real compute saving; L0 guarantees
-the user a T1-exact deliverable regardless.
+Exactness is a **qualifying bar**, not a rank key: a candidate must pass its
+declared tier (T1, or T2 with 0 mismatches on the sealed corpus §4c, with the
+engine scope stated). Among qualifiers:
+
+1. **NN share of discrete decisions** — fraction of all plan decisions AND
+   endgame commits (both regimes, weighted by occurrence) decided by the NN
+   alone (no fallback invoked). Gated fallback plans count against NN share.
+2. Simplicity (params, code size) as tiebreak.
+
+Browser runtime is a **pass/fail constraint**, not a rank key: measured
+wall-time per plan frame, mean AND worst-case, fast path and fallback path;
+worst-case must fit the frame budget and expected cost ≤ prod's
+(`c_fast + (1−trusted)·c_prod`).
+
+**The dilemma, surfaced honestly:** under the user's universal "all situation"
+reading, only L0 (T1) is *provably* exact everywhere; every NN-decides system
+is T2 = corpus-plus-engine-scoped evidence. The deliverable is therefore two
+artifacts: the T1 floor (L0) and the **best risk-bounded T2 system** (max NN
+share, 0 sealed mismatches, quantified residual risk) — plus this distinction
+stated plainly in the final report.
+
+## 4b. Output-similarity metric (the user's stop condition, pinned up front)
+
+The active goal gate is "> 95% output similarity to the deployed predator on
+main". Operationalised BEFORE any results exist. Measured by the lockstep
+harness on the §5 on-distribution corpus, per candidate:
+
+- **S_dec** — fraction of plan decisions where the candidate commits the same
+  **target coordinates** (deduped, §3) as prod. Primary similarity number.
+- **S_frame** — fraction of frames whose force vector is bitwise-equal.
+- **S_traj** — trajectory-fork divergence: median first-divergence frame and
+  fraction of full games identical to extinction.
+
+The goal gate is **S_dec > 95% AND S_frame > 95%** for a system whose plan
+decision is made by the NN alone (no rollout fallback) — L0 passing trivially
+(100% by construction) does NOT count toward the gate; it is the floor, not
+the goal. L1h reports the same metrics with its trusted fraction noted.
+
+### 4c. τ calibration & residual-risk protocol (anti-circularity)
+
+- **Three-way split by seed range:** student **training** set / τ-**calibration**
+  set / **sealed** verification set. The sealed seeds are never touched during
+  any tuning; τ is frozen before the sealed run; one shot.
+- Report on the sealed set: (a) mismatches among trusted decisions, (b) the
+  full tail curve of student margin vs disagreement-with-prod (risk vs τ),
+  (c) trusted fraction.
+- **Residual risk in the right units:** trusted plan *decisions*, not frames.
+  0 mismatches in n sealed trusted decisions ⇒ per-decision mismatch
+  probability ≤ 3/n at 95% (rule of three); per-game bound = 1−(1−3/n)^(plans
+  per game). State both numbers.
+- τ is calibrated against the **deployed JS student** (the artifact that
+  ships), never the torch copy.
+- **Adversarial search attacks the student, not prod:** search (GPU screening,
+  JS confirmation) for legal states maximising the student's deduped top-2
+  margin *subject to* student argmax ≠ prod argmax. Report the max adversarial
+  trusted margin found vs τ. (Prod's own near-ties are the *fallback's* load,
+  not the failure mode — the only way L1h errs is student-confident-and-wrong.)
+- **Cross-engine condition:** re-evaluate harvested near-tie and
+  minimum-trusted-margin states under JSC (playwright-webkit) and SpiderMonkey
+  (a few thousand states, not 1e8 frames); require min trusted margin ≫ max
+  observed cross-engine score perturbation. Otherwise τ is V8-only and the
+  report must say so.
 
 ## 5. Verification corpus ("all situation", operationalised)
 
 - **On-distribution:** full games to extinction, held-out seeds (≥270000),
-  device matrix {390×844, 820×1180, 1024×768, 1512×982, 1680×1050, 2560×1440},
-  both regimes (planner phase + endgame phase + the N=6→5 gate crossing), boid
-  counts 60 (mobile) and 120 (desktop). Target ≥1e8 frames bitwise-checked in
-  JS on the VM CPU farm + local cores.
-- **Boundary/adversarial:** states harvested where the runner-up margin is
-  small (from oracle logs); GPU perturbation search around decision boundaries;
-  synthetic states (arbitrary legal boid configurations, not just reachable
-  ones — "all situation" is read broadly).
-- Ground truth is **always JS** (float64, node): [[feedback-all-strict-search]]
-  + the GPU↔JS float-divergence finding. GPUs are for training and screening;
-  any GPU-screened claim is re-proven in JS before it is reported.
+  device matrix {390×844, 820×1180, 1024×768, 1512×982, 1680×1050, 2560×1440}
+  with the full derived-config tuple per cell **(W, Hc, NUM_BOIDS,
+  PREDATOR_RANGE-as-evaluated, frameMs)** asserted against a recorded
+  real-browser trace before farming; both regimes incl. the N=6→5 crossing.
+  Target ≥1e8 frames bitwise-checked in JS (node) on the VM CPU farm + local.
+- **Interaction (spawn) games — live prod behavior:** scripted
+  `tap→spawnBoid` schedules (js/boids.js:112): spawns during planner phase;
+  spawns during endgame forcing **5→6→5 re-crossings with the egBoid still
+  alive and the frame counter frozen-then-resumed**; same-coordinate
+  double-taps (coordinate-duplicate boids); spawn-then-extinction; spam past
+  120 boids (N > NUM_BOIDS, fracAlive > 1).
+- **Boundary/adversarial:** states harvested where prod's deduped runner-up
+  margin is small (oracle logs); the §4c student-attack search; synthetic
+  states sampling persistent state **jointly** with boid configurations
+  ({frame ∈ 0..16, stale target, committed egBoid index} × legal boid sets —
+  "all situation" read broadly, not just reachable states).
+- **Engines:** ground truth and all labels are **JS/node (V8)** —
+  [[feedback-all-strict-search]] + the GPU↔JS divergence finding. GPUs are
+  for training and screening only; any GPU-screened claim is re-proven in JS.
+  Cross-engine legs (JSC, SpiderMonkey) run the harvested boundary states per
+  §4c — full-corpus reruns per engine are not required, but every T2 claim
+  names its engine scope.
 
-## 6. Pipeline / infra / who
+## 6. Pipeline / infra / who (explicitly ordered)
 
-- **Issue #5 (side-a) — oracle logger + dataset.** Instrument prod `force()`
-  in node (no behavior change — wrapper, not edit): per plan-decision record
-  (state snapshot, 16 cands, feat, vprior, rolled set, final scores, bi,
-  margin; per-frame mode + force). JSONL.gz shards → packed tensors for GPU.
-  Farm across the 3 VMs' CPUs + local. First cut: ~1e6 decisions, then 1e7.
-- **Issue #6 (side-b) — L0 unified policy + lockstep differential harness.**
-  The harness is the program's north star (eval-first doctrine); L0 is both
-  the guaranteed deliverable and the harness's first client. Acceptance:
-  0 bit mismatches over ≥1e7 frames across the device matrix.
-- **Lead + GPUs — training & search.** VM1: dataset farm then L1s/L1p training
-  (arch sweep: deep-set / small transformer / pointer; float64 heads where it
-  matters). VM2: second arch family + τ calibration for L1h. VM3: boundary
-  adversarial search + closed-loop screening (torch float64 replica spike — if
-  bitwise-validated vs JS traces it upgrades to a screening sim; else stays
-  approximate). Never-idle watchdog on all three.
+**Ordering is normative — later stages are sized by earlier ones:**
+
+1. **#6 (side-b): lockstep differential harness** — the program's primary
+   instrument (eval-first doctrine). Must satisfy §2a; acceptance includes
+   catching a deliberately 1-ulp-broken candidate.
+2. **#5 (side-a): certified oracle fork.** An instrumented **fork** of
+   `predator_cheap.js` (logging lines only — a wrapper cannot reach the
+   closure-locals `feat/vprior/pidx/score/bi`), certified bit-identical to
+   pristine prod by the harness over gate-crossing + spawn games on every
+   device cell. Oracle SHA + certification run ID embedded in every shard.
+3. **Margin CDF = deliverable zero (CPU-only, before ANY GPU training):**
+   ~200–500 games (~1e4 plans) → per-plan record {snapshot, config vector,
+   cands, feat, vprior, pidx, rolled scores, score[], bi, **deduped top1−top2
+   margin**}; CDF stratified by N (6–14 vs 15+) and device. This number sizes
+   the entire GPU program: near-tie density bounds every L1 system's
+   achievable NN share *before* a single net is trained.
+4. **Dataset farm:** 1e6 decisions, then 1e7, JSONL.gz shards → packed
+   tensors. Per-shard header {W, Hc, PREDATOR_RANGE, NUM_BOIDS, seed, frameMs,
+   oracle SHA, cert run ID}; per-frame persistent state {frame, target,
+   egBoid index} alongside mode+force.
+5. **GPU training & search**, sized by (3): VM1 L1r + arch sweep (deep-set /
+   small transformer / pointer; float64 heads where it matters); VM2 second
+   arch family + τ calibration for L1h/L1e; VM3 student-attack boundary
+   search + closed-loop screening. Never-idle watchdog on all three.
+
+**Torch float64 bitwise replica (VM3 track) — throughput gate first:** the
+op-level spike passed (CUDA IEEE-exact except exp/pow; fdlibm port in flight),
+but the policy's structure is sequential-over-boids (two-pass accumulate,
+LIFO grid order). Before further investment past the port: build the batched
+sequential-order rollout skeleton with stock transcendentals and measure
+plan-decisions/sec vs the ~30-core node farm. **Kill the bitwise-replica
+track if GPU < ~10× the farm** — VM3 then reverts to screening-only with
+stock ops (labels stay JS regardless).
+
 - Branch: `rl/teacher` under `dev/exact_nn/`. Prod `main` untouched (PR #4
   stays staged & unmerged; the target is frozen at 6dce76f regardless).
 
 ## 7. Risks
 
-- Near-tie density too high → L1h trusted fraction small → NN share low. Then
-  report the measured ceiling honestly; L0 still delivers the letter of the
-  goal (NN necessary, single policy, T1-exact).
-- `simNow()`/`lastFeedTime` (wall-clock) leaks into features → snapshot uses
-  sim-frame time in harness; verify prod's actual dependence and replicate.
-- Hidden state mismatch at gate crossing (frame counter, stale target, egBoid
-  re-commit) — the differential harness must run gate-crossing games.
-- GPU float divergence contaminating labels → labels are generated ONLY in JS.
+- **Near-tie density too high** → trusted fraction small → NN share low. The
+  §6.3 margin CDF measures this *first*; if the ceiling is low, report it
+  honestly — L0 still delivers the letter of the goal.
+- **Student-confident-and-wrong states** exist below any τ we can calibrate →
+  the §4c adversarial search hunts them; sealed-set rule-of-three bounds the
+  residual; report the bound, never claim zero risk beyond it.
+- **Cross-engine drift:** T2/τ evidence is engine-scoped; min trusted margin
+  must dominate measured cross-engine score perturbation, else claims are
+  V8-only and say so.
+- **Hidden-state mismatch at gate crossings** (frozen frame counter, stale
+  target, egBoid re-commit, upward 5→6 via spawn) — first-class corpus items.
+- **GPU float divergence contaminating labels** → labels generated ONLY in JS.
+- **Config aliasing** (W/Hc, PREDATOR_RANGE) → config vector carried in every
+  record, injection, and student input; mobile cells asserted against a real
+  browser trace.
