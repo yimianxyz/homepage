@@ -43,7 +43,7 @@ function parseArgs(argv) {
     const a = { policyDir: path.join(__dirname, '..', '..', 'js'),
         candidate: 'identity', mode: 'lockstep',
         W: 390, H: 844, seedStart: 270000, seeds: 4,
-        startBoids: 0, scatter: false, maxFrames: 20000,
+        startBoids: 0, scatter: false, maxFrames: 20000, frameMs: 12,
         spawnScript: null, ulpEvery: 997, mismatchLimit: 50,
         out: null, json: false, perseed: false, selftest: false,
         fastRender: true };
@@ -59,6 +59,7 @@ function parseArgs(argv) {
         else if (k === '--startBoids') a.startBoids = +argv[++i];
         else if (k === '--scatter') a.scatter = true;
         else if (k === '--maxFrames') a.maxFrames = +argv[++i];
+        else if (k === '--frameMs') a.frameMs = +argv[++i];   // mobile cells: 18 (causally dead; kept faithful)
         else if (k === '--spawnScript') a.spawnScript = JSON.parse(argv[++i]);
         else if (k === '--ulpEvery') a.ulpEvery = +argv[++i];
         else if (k === '--mismatchLimit') a.mismatchLimit = +argv[++i];
@@ -146,6 +147,7 @@ async function runGame(opt, seed, candidateSpec) {
         policyDir: opt.policyDir, W: opt.W, H: opt.H, seed,
         startBoids: opt.startBoids, scatter: opt.scatter,
         fastRender: opt.fastRender, spawnScript: opt.spawnScript,
+        frameMs: opt.frameMs == null ? 12 : opt.frameMs,
     });
     const cand = candidateSpec ? await makeCandidate(candidateSpec, game, opt) : null;
     if (cand) cand.configure(game.sim);
