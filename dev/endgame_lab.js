@@ -99,6 +99,9 @@ function runEpisode(W, H, speed, seed, polName, polOpts, noFlee, maxFrames) {
     // catch check happens in predator.update() each frame (after predator moves)
     if (catches(px, py, pvx, pvy, PREDATOR_SIZE, bx, by, bvx, bvy)) return f + 1;
     // ---- boid flees + moves ----
+    // The live browser accumulates flee TWICE per frame (simulation.tick() runs
+    // flock() once, then render()->run() runs flock() again) before ONE update().
+    // For a lone boid that doubles the evasion force, so replicate it (passes=2).
     let acx = 0, acy = 0;
     if (!noFlee) {
       const dist = Math.hypot(bx - px, by - py) + EPSILON;
@@ -108,7 +111,8 @@ function runEpisode(W, H, speed, seed, polName, polOpts, noFlee, maxFrames) {
         const strength = (PREDATOR_RANGE - dist) / PREDATOR_RANGE;
         avx *= strength * PREDATOR_TURN_FACTOR; avy *= strength * PREDATOR_TURN_FACTOR;
         [avx, avy] = limit(avx, avy, BMAX_FORCE * 1.5);
-        acx += avx; acy += avy;
+        const passes = (st.passes != null ? st.passes : 2);
+        acx += avx * passes; acy += avy * passes;
       }
     }
     bvx += acx; bvy += acy; [bvx, bvy] = limit(bvx, bvy, MAX_SPEED);
