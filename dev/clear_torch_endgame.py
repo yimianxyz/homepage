@@ -150,12 +150,18 @@ def main():
         ttc, cr, el = run(base)
         print(f'TERI K={args.K} B={args.B} {args.W}x{args.H}: TTC={ttc:.0f} clear={cr*100:.1f}%  ({el:.1f}s)')
         return
-    print(f'GPU TERI param sweep, K={args.K}, B={args.B}, {args.W}x{args.H}:')
-    for SLACK in (0.90, 0.95, 0.97, 1.0):
-        for FREEZE_R in (90.0, 110.0, 130.0):
-            t = dict(base); t['SLACK'] = SLACK; t['FREEZE_R'] = FREEZE_R
-            ttc, cr, el = run(t)
-            print(f'  SLACK={SLACK} FREEZE={FREEZE_R:.0f}: TTC={ttc:.0f} clear={cr*100:.1f}%  ({el:.1f}s)')
+    # Direct old-vs-new comparison at GPU scale: the shipped TERI (freeze=110, dt=4)
+    # vs the new interceptor (no freeze, dt=1), plus two ablations to attribute the gain.
+    NAMED = [
+        ('old_teri  (fz110 dt4)', dict(SLACK=0.97, FREEZE_R=110.0, DT=4, TMAX=1400)),
+        ('new       (fz0   dt1)', dict(SLACK=1.0,  FREEZE_R=0.0,   DT=1, TMAX=1400)),
+        ('ablate-dt (fz110 dt1)', dict(SLACK=1.0,  FREEZE_R=110.0, DT=1, TMAX=1400)),
+        ('ablate-fz (fz0   dt4)', dict(SLACK=1.0,  FREEZE_R=0.0,   DT=4, TMAX=1400)),
+    ]
+    print(f'GPU endgame old-vs-new, K={args.K}, B={args.B}, {args.W}x{args.H}:')
+    for name, t in NAMED:
+        ttc, cr, el = run(t)
+        print(f'  {name}: TTC={ttc:.0f} clear={cr*100:.1f}%  ({el:.1f}s)', flush=True)
 
 
 if __name__ == '__main__':

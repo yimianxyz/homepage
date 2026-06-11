@@ -470,9 +470,19 @@
         var B = egBoid;
         var cdx = wx(B.position.x - px), cdy = wy(B.position.y - py);
         var curdist = Math.sqrt(cdx * cdx + cdy * cdy);
+        var AHEAD = (PC.egAhead != null ? PC.egAhead : 0);
         if (!(curdist < FREEZE_R && egFrozen)) {     // re-solve unless committed inside the bubble
             var s = scan(B);
-            if (s) { egAimX = s.ax; egAimY = s.ay; }
+            if (s) {
+                egAimX = s.ax; egAimY = s.ay;
+                // aim a touch PAST the intercept point along the boid's track so the
+                // predator gets ahead and the fleeing boid rams into it (the slow
+                // pursuer's only winning geometry is head-on, not tail-chase).
+                if (AHEAD) {
+                    var bs2 = Math.sqrt(B.velocity.x * B.velocity.x + B.velocity.y * B.velocity.y) || 1e-6;
+                    egAimX += B.velocity.x / bs2 * AHEAD; egAimY += B.velocity.y / bs2 * AHEAD;
+                }
+            }
             else {                                    // perpendicular cut-off onto the boid's line
                 var bs = Math.sqrt(B.velocity.x * B.velocity.x + B.velocity.y * B.velocity.y) || 1e-6;
                 var ux = B.velocity.x / bs, uy = B.velocity.y / bs;
