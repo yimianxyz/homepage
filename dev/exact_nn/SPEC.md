@@ -115,6 +115,25 @@ L1p/L1s (near-ties exist; the old tie-handling bug proves ties occur). L1h is
 designed to reach 0 corpus mismatches with a real compute saving; L0 guarantees
 the user a T1-exact deliverable regardless.
 
+## 4b. Output-similarity metric (the user's stop condition, pinned up front)
+
+The active goal is "> 95% output similarity to the deployed predator on main".
+Operationalised BEFORE any results exist, to keep ourselves honest. Measured by
+the lockstep differential harness on the §5 on-distribution corpus, we report,
+per candidate system:
+
+- **S_dec** — fraction of plan decisions (planCheap invocations) where the
+  candidate selects the same argmax index as prod. The primary similarity
+  number for NN-maximal systems (decisions are where behavior lives).
+- **S_frame** — fraction of frames whose force vector is bitwise-equal.
+- **S_traj** — trajectory-fork divergence: median first-divergence frame and
+  fraction of full games identical to extinction.
+
+The goal gate is **S_dec > 95% AND S_frame > 95%** for a system whose plan
+decision is made by the NN alone (no rollout fallback) — L0 passing trivially
+(100% by construction) does NOT count toward the gate; it is the floor, not
+the goal. L1h reports the same metrics with its trusted-fraction noted.
+
 ## 5. Verification corpus ("all situation", operationalised)
 
 - **On-distribution:** full games to extinction, held-out seeds (≥270000),
