@@ -106,6 +106,13 @@ and `range_bake_probe.js`. The `uaMobile` cells flip only NUM_BOIDS→60.)
 matrix, both regimes, gate-crossing + spawn games, held-out seeds ≥272000. Every
 game reached extinction; post-extinction N==0 frames exercised in every game.
 
+**Synthetic/adversarial coverage (SPEC §5, "all situation" read broadly):** beyond
+the reachable game manifold, `verifier/synth_states.js` checked **132,000 random
+legal states** (N ∈ {0..200} incl. out-of-domain positions, with persistent state
+{target, frame 0..16, egBoid index, configured} sampled jointly and **injected
+identically** into prod + L0) — **0 mismatches**. This also validates the §2a
+state-injection convention the student sealed-verdict relies on.
+
 ## 4. Throughput (honest, per-regime)
 
 Measured `framesPerMinPerCore` from the matrix, by cell class. The SPEC's
