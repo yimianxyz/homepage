@@ -180,13 +180,18 @@ async function runGame(opt) {
         fastRender: true, spawnScript: sp.script,
     });
     let sawPlan = false;
+    // derived-config vector (SPEC §1): captured from the policy's OWN cfg object
+    // (as-evaluated) + the engine globals. Constant per game; stamped on every
+    // record so a shard is self-describing and labels never alias across cells.
+    const numBoids = g.api.getNumBoids();
     if (!opt.pristine) {
         const forkCheap = await loadFork(g);
         g.win.__oracle = {
-            planStart(s, cands, fr, vprior) {
+            planStart(s, cands, fr, vprior, cfg) {
                 sawPlan = true;
                 pending.plan = {
                     seed: opt.seed, cell: cell.id, W: cell.W, H: cell.H,
+                    cfg: { W: cfg.W, Hc: cfg.Hc, PREDATOR_RANGE: cfg.POLICY_R, NUM_BOIDS: numBoids },
                     f: g.frame() + 1, N: s.bx.length,
                     s: { px: s.px, py: s.py, pvx: s.pvx, pvy: s.pvy, psize: s.psize,
                          lastFeed: s.lastFeed, nowMs: s.nowMs,

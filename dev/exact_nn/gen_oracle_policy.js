@@ -35,7 +35,7 @@ const INSERTS = [
     {   // full plan inputs: state snapshot, 16 candidates, feature matrix, NN prior
         find: '        var vprior = cp_value(NET, fr.feat, fr.ctx);',
         where: 'after',
-        lines: ['        ' + MARK + ' if (window.__oracle) window.__oracle.planStart(s, cands, fr, vprior);'],
+        lines: ['        ' + MARK + ' if (window.__oracle) window.__oracle.planStart(s, cands, fr, vprior, cfg);'],
     },
     {   // each rolled candidate: rollout catches + terminal value bootstrap
         find: '            score[ci] = rr.catches + boot;',

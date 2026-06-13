@@ -270,7 +270,7 @@
             bx: s.bx, by: s.by, bvx: s.bvx, bvy: s.bvy, nAlive: s.bx.length };
         var fr = cp_features(st, cands, PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
         var vprior = cp_value(NET, fr.feat, fr.ctx);
-        /*ORACLE*/ if (window.__oracle) window.__oracle.planStart(s, cands, fr, vprior);
+        /*ORACLE*/ if (window.__oracle) window.__oracle.planStart(s, cands, fr, vprior, cfg);
         // Roll the top-K_roll candidates by ballistic pscore (caught - tCatchNorm);
         // ties (the common case for the slow predator) break by lowest index, so
         // this rolls the E3D patrol + the nearest live boids. Each rolled candidate
