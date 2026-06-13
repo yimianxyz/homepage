@@ -55,7 +55,11 @@ def pack_shard(dec_path):
             b[:n, 0] = s['bx']; b[:n, 1] = s['by']; b[:n, 2] = s['bvx']; b[:n, 3] = s['bvy']
             m = np.zeros(MAXB, dtype=bool); m[:n] = True
             c = r['cfg']
-            pidx = np.asarray(r['pidx'], dtype=np.int64)
+            # the oracle record's pidx is the FULL 16-element ballistic-rank
+            # permutation; train.py/ds.py want the 4 ROLLED indices (== pidx[0:4],
+            # the candidates prod actually rolls). Store the 4 to match the synth
+            # contract (gather/scatter over rolled scores).
+            pidx = np.asarray(r['pidx'][:4], dtype=np.int64)
             tri = r['rolled']                         # [[ci, catches, boot]...]
             rolled = np.empty(len(tri))
             for i, (ci, catches, boot) in enumerate(tri):
