@@ -1,0 +1,14 @@
+{
+ "tau": "Infinity (L1h≡prod, NN-share 0)",
+ "cells": 6,
+ "games": 48,
+ "cleared": 39,
+ "plans": 37657,
+ "frames": 640223,
+ "forceMismatches": 0,
+ "planDisagreements": 0,
+ "egDisagreements": 0,
+ "S_dec": 1,
+ "S_frame": 1,
+ "trajIdenticalGames": "48/48"
+}
