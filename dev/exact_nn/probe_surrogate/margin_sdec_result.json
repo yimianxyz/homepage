@@ -1,0 +1,60 @@
+{
+  "nrec": 1400,
+  "modes": {
+    "short30": {
+      "S_dec": 0.49714285714285716,
+      "rolledArgmaxAgree_bootDecided": 0.5240585774058577,
+      "rollArgTot": 956,
+      "S_dec_sparse": 0.4841997961264016,
+      "sparseTot": 981,
+      "S_dec_dense": 0.5274463007159904,
+      "denseTot": 419,
+      "bootErrMedian_sparse": 0.10480382478808314,
+      "bootErrMedian_dense": 0.16006945075555423
+    },
+    "short45": {
+      "S_dec": 0.5507142857142857,
+      "rolledArgmaxAgree_bootDecided": 0.5564853556485355,
+      "rollArgTot": 956,
+      "S_dec_sparse": 0.5545361875637105,
+      "sparseTot": 981,
+      "S_dec_dense": 0.5417661097852029,
+      "denseTot": 419,
+      "bootErrMedian_sparse": 0.0865684353152204,
+      "bootErrMedian_dense": 0.12574204630495323
+    },
+    "short60": {
+      "S_dec": 0.6385714285714286,
+      "rolledArgmaxAgree_bootDecided": 0.6307531380753139,
+      "rollArgTot": 956,
+      "S_dec_sparse": 0.6483180428134556,
+      "sparseTot": 981,
+      "S_dec_dense": 0.6157517899761337,
+      "denseTot": 419,
+      "bootErrMedian_sparse": 0.06430768196978565,
+      "bootErrMedian_dense": 0.09748541734868144
+    },
+    "nopredavoid": {
+      "S_dec": 0.6807142857142857,
+      "rolledArgmaxAgree_bootDecided": 0.7615062761506276,
+      "rollArgTot": 956,
+      "S_dec_sparse": 0.7308868501529052,
+      "sparseTot": 981,
+      "S_dec_dense": 0.5632458233890215,
+      "denseTot": 419,
+      "bootErrMedian_sparse": 0.006671176461320094,
+      "bootErrMedian_dense": 0.0648424746427525
+    },
+    "full": {
+      "S_dec": 1,
+      "rolledArgmaxAgree_bootDecided": 1,
+      "rollArgTot": 956,
+      "S_dec_sparse": 1,
+      "sparseTot": 981,
+      "S_dec_dense": 1,
+      "denseTot": 419,
+      "bootErrMedian_sparse": 0,
+      "bootErrMedian_dense": 0
+    }
+  }
+}

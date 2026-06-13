@@ -1,0 +1,18 @@
+{
+  "nPlans": 2500,
+  "fracBootDecided_true": 0.3276,
+  "perMode": {
+    "avoid": {
+      "S_dec_overall": 0.3952,
+      "nBootDecided": 819,
+      "S_dec_on_bootDecided": 0.3663003663003663,
+      "S_dec_on_catchDecided": 0.45011600928074247
+    },
+    "const": {
+      "S_dec_overall": 0.4,
+      "nBootDecided": 819,
+      "S_dec_on_bootDecided": 0.41514041514041516,
+      "S_dec_on_catchDecided": 0.37122969837587005
+    }
+  }
+}

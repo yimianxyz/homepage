@@ -1,0 +1,41 @@
+{
+  "nRecords": 500,
+  "nShards": 1,
+  "stride": 7,
+  "perShard": "all",
+  "perMode": {
+    "full": {
+      "catchAgreement": {
+        "overall": 1,
+        "byRank": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "signedDeltaHist": {
+          "0": 2000
+        }
+      },
+      "bootErrorCDF": {
+        "n": 2000,
+        "median": 0,
+        "p90": 0,
+        "p99": 0,
+        "max": 0,
+        "fracBelow_0p001": 1,
+        "fracBelow_0p01": 1,
+        "fracBelow_0p05": 1,
+        "fracBelow_0p1": 1
+      },
+      "negInf": {
+        "true": 0,
+        "cheap": 0,
+        "bothMatch": 0
+      },
+      "S_dec": 1,
+      "usPerRollout": 6214.9324325,
+      "usPerPlan": 24859.72973
+    }
+  }
+}

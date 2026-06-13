@@ -1,0 +1,20 @@
+{
+  "nRecords": 400,
+  "const": {
+    "usPerRollout": 987.2190937500001,
+    "usPerPlan": 3948.8763750000003,
+    "nRoll": 1600
+  },
+  "avoid": {
+    "usPerRollout": 1401.6786725000002,
+    "usPerPlan": 5606.714690000001,
+    "nRoll": 1600
+  },
+  "full": {
+    "usPerRollout": 10605.545044375,
+    "usPerPlan": 42422.1801775,
+    "nRoll": 1600
+  },
+  "speedup_const_vs_full": 10.742848382408527,
+  "speedup_avoid_vs_full": 7.566316911606571
+}

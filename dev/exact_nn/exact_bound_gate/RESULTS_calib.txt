@@ -1,0 +1,20 @@
+
+================= calib_data (ALL 18 files) =================
+plans: 52061   (true global boot range used for ceiling: [0.0102, 3.2456])
+--- Deliverable 1: SOUND-deploy certified NN-share ---
+  SOUND gate (full IBP boot bound)  : 0.0058%  (3)   FALSE certs = 0
+  losRate-capped IBP variant (|<=110|): 0.0058%  (3)   FALSE certs = 0
+  SOUNDNESS SELF-TEST (perfect bounds): 99.6101%  FALSE certs = 0  (must be 100% / 0)
+--- Deliverable 2: ORACLE CEILING ---
+  no rolled in deduped top-2 (TRUE)  : 8.3709%  (4358)
+  robust to ANY rolled perturbation  : 0.0058%  (3)   FALSE certs = 0
+    [ceiling = certify with rolled in [0, Cmax_true + Bstar]]
+--- Deliverable 3: TIGHTNESS BREAKDOWN (of the 52058 SOUND-gate failures) ---
+  certified if BOOT were perfect      : 0.1614%  (84)
+  certified if CATCH were perfect     : 0.0000%  (0)
+  blocked SOLELY by boot bound        : 0.1614%  (84)
+  blocked SOLELY by catch bound       : 0.0000%  (0)
+  either fix alone suffices           : 0.0000%  (0)
+  needs BOTH bounds tightened         : 99.8386%  (51974)
+
+(28.6s)

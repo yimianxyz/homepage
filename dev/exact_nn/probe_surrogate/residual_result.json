@@ -1,0 +1,112 @@
+{
+  "avoid": {
+    "nFinitePairs": 10000,
+    "pearson_r": 0.656786120837246,
+    "spearman_rho": 0.6808390617379486,
+    "bootTrue_std": 0.6697613936689013,
+    "rawError": {
+      "n": 10000,
+      "median": 0.2741112885671009,
+      "p90": 0.9663994942349968,
+      "fracBelow_0p001": 0.0045,
+      "fracBelow_0p01": 0.0314,
+      "fracBelow_0p05": 0.1292,
+      "fracBelow_0p1": 0.2348
+    },
+    "baselineMeanResid": {
+      "n": 10000,
+      "median": 0.5783793254116922,
+      "p90": 1.014515817016961,
+      "fracBelow_0p001": 0.0006,
+      "fracBelow_0p01": 0.0071,
+      "fracBelow_0p05": 0.0358,
+      "fracBelow_0p1": 0.0719
+    },
+    "linFit1_residual": {
+      "coef": [
+        0.19201496105491267,
+        0.6983077268906925
+      ],
+      "cdf": {
+        "n": 10000,
+        "median": 0.29020394714139763,
+        "p90": 0.8264125956178525,
+        "fracBelow_0p001": 0.0019,
+        "fracBelow_0p01": 0.016,
+        "fracBelow_0p05": 0.0788,
+        "fracBelow_0p1": 0.1719
+      }
+    },
+    "linFit2_residual_withCheapCatches": {
+      "coef": [
+        0.19669592080309276,
+        0.7073869703534003,
+        -0.06188018223541474
+      ],
+      "cdf": {
+        "n": 10000,
+        "median": 0.2849526630510092,
+        "p90": 0.8255869768676847,
+        "fracBelow_0p001": 0.0017,
+        "fracBelow_0p01": 0.0162,
+        "fracBelow_0p05": 0.0812,
+        "fracBelow_0p1": 0.1761
+      }
+    }
+  },
+  "const": {
+    "nFinitePairs": 10000,
+    "pearson_r": 0.6186452776125587,
+    "spearman_rho": 0.6454840424640607,
+    "bootTrue_std": 0.6697613936689013,
+    "rawError": {
+      "n": 10000,
+      "median": 0.30522306547998324,
+      "p90": 1.1220655198462437,
+      "fracBelow_0p001": 0.0042,
+      "fracBelow_0p01": 0.0269,
+      "fracBelow_0p05": 0.121,
+      "fracBelow_0p1": 0.2167
+    },
+    "baselineMeanResid": {
+      "n": 10000,
+      "median": 0.5783793254116922,
+      "p90": 1.014515817016961,
+      "fracBelow_0p001": 0.0006,
+      "fracBelow_0p01": 0.0071,
+      "fracBelow_0p05": 0.0358,
+      "fracBelow_0p1": 0.0719
+    },
+    "linFit1_residual": {
+      "coef": [
+        0.22285523959382547,
+        0.6204004698308458
+      ],
+      "cdf": {
+        "n": 10000,
+        "median": 0.31047489916629745,
+        "p90": 0.8530544581553247,
+        "fracBelow_0p001": 0.0008,
+        "fracBelow_0p01": 0.0134,
+        "fracBelow_0p05": 0.0742,
+        "fracBelow_0p1": 0.1596
+      }
+    },
+    "linFit2_residual_withCheapCatches": {
+      "coef": [
+        0.23346460900950625,
+        0.6540438406455875,
+        -0.055164588099343465
+      ],
+      "cdf": {
+        "n": 10000,
+        "median": 0.30150976458584267,
+        "p90": 0.8471596407016211,
+        "fracBelow_0p001": 0.0023,
+        "fracBelow_0p01": 0.0185,
+        "fracBelow_0p05": 0.0832,
+        "fracBelow_0p1": 0.1691
+      }
+    }
+  }
+}
