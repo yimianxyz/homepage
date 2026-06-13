@@ -6,3 +6,5 @@ dev/datasets/
 *.pt
 dev/exact_nn/runs/
 dev/exact_nn/student/calib_margins.json
+dev/exact_nn/student/calib_margins_v2a.json
+dev/exact_nn/student_v2a/student_weights.json
