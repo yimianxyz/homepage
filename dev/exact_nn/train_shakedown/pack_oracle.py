@@ -40,7 +40,7 @@ def pack_shard(dec_path):
     header = json.load(open(meta_path)) if os.path.exists(meta_path) else {}
     cols = {k: [] for k in ('seed', 'n', 'boids', 'bmask', 'pred', 'cfg', 'cands',
                             'cand_kind', 'cand_bref', 'feat', 'ctx', 'vprior',
-                            'pidx', 'rolled', 'score', 'bi')}
+                            'pidx', 'rolled', 'catches', 'boot', 'score', 'bi')}
     with gzip.open(dec_path, 'rt') as f:
         for line in f:
             if not line.strip():
@@ -61,10 +61,12 @@ def pack_shard(dec_path):
             # contract (gather/scatter over rolled scores).
             pidx = np.asarray(r['pidx'][:4], dtype=np.int64)
             tri = r['rolled']                         # [[ci, catches, boot]...]
-            rolled = np.empty(len(tri))
-            for i, (ci, catches, boot) in enumerate(tri):
+            rolled = np.empty(len(tri)); catches = np.empty(len(tri), dtype=np.int64); boot = np.empty(len(tri))
+            for i, (ci, c, b) in enumerate(tri):
                 assert ci == pidx[i], 'rolled ci %d != pidx[%d]=%d (roll order broke)' % (ci, i, pidx[i])
-                rolled[i] = catches + _f(boot)
+                catches[i] = c                        # integer rollout catch-count (split-head label)
+                boot[i] = _f(b)                        # terminal value-net bootstrap (−inf if exterminated)
+                rolled[i] = c + _f(b)                  # combined rolled score (single-head label)
             kind = np.empty(K, dtype=np.int64); kind[0] = 0
             for j in range(1, K):
                 kind[j] = 1 if j <= n else 2          # boid vs E3D pad (candidates())
@@ -80,6 +82,8 @@ def pack_shard(dec_path):
             cols['vprior'].append(np.asarray(r['vprior'], dtype=np.float64))
             cols['pidx'].append(pidx)
             cols['rolled'].append(rolled)
+            cols['catches'].append(catches)
+            cols['boot'].append(boot)
             cols['score'].append(np.asarray([_f(v) for v in r['score']], dtype=np.float64))
             cols['bi'].append(r['bi'])
     out = {k: np.asarray(v) for k, v in cols.items()}

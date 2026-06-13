@@ -32,6 +32,7 @@ import pack_oracle
 from models import build_model, n_params
 
 INPUT_KEYS = ('boid_tok', 'bmask', 'glob', 'cand_tok')
+CATCH_CLASSES = 24   # l1rs catches head: classes 0..23 (max observed 13; slow-predator 90-step rollout won't exceed)
 
 
 def class_pool_logits(logits, cls):
@@ -48,6 +49,13 @@ def student_final_score(task, out, batch):
     if task == 'l1r':
         s = batch['vprior'].clone()
         s.scatter_(1, batch['pidx'], out.double())
+        return s
+    if task == 'l1rs':
+        idx = batch['pidx'].unsqueeze(2).expand(-1, -1, out.shape[2])
+        g = out.gather(1, idx)                               # (B,4,CATCH_CLASSES+1)
+        pred = g[..., :CATCH_CLASSES].argmax(-1).double() + g[..., CATCH_CLASSES].double()
+        s = batch['vprior'].clone()
+        s.scatter_(1, batch['pidx'], pred)
         return s
     return out.double()
 
@@ -71,6 +79,13 @@ def task_loss(task, out, batch):
     if task == 'l1r':
         pred = out.gather(1, batch['pidx'])
         return masked_mse(pred, batch['rolled'])
+    if task == 'l1rs':
+        idx = batch['pidx'].unsqueeze(2).expand(-1, -1, out.shape[2])
+        g = out.gather(1, idx)                               # (B,4,CATCH_CLASSES+1)
+        c = batch['catches']
+        assert int(c.max()) < CATCH_CLASSES, 'catches %d >= CATCH_CLASSES %d -- raise it' % (int(c.max()), CATCH_CLASSES)
+        ce = F.cross_entropy(g[..., :CATCH_CLASSES].reshape(-1, CATCH_CLASSES).float(), c.reshape(-1))
+        return ce + masked_mse(g[..., CATCH_CLASSES], batch['boot'])
     if task == 'l1s':
         return masked_mse(out, batch['score'])
     if task == 'l1p':
@@ -113,7 +128,7 @@ def save_ckpt(path, model, opt, sampler, step, args, rng_torch):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--task', required=True, choices=['l1r', 'l1s', 'l1p'])
+    ap.add_argument('--task', required=True, choices=['l1r', 'l1rs', 'l1s', 'l1p'])
     ap.add_argument('--arch', required=True, choices=['deepset', 'transformer', 'pointer'])
     ap.add_argument('--size', default='small', choices=['small', 'medium'])
     ap.add_argument('--f64-head', action='store_true')
@@ -154,6 +169,8 @@ def main():
     n_all = full['seed'].shape[0]
     headers = full.pop('headers')
     inp = ds.build_inputs(full)
+    if 'catches' in full:
+        inp['catches'] = full['catches']; inp['boot'] = full['boot']
     tr = {k: v[tr_sel] for k, v in inp.items()}
     va = {k: v[va_sel] for k, v in inp.items()}
     dev = torch.device(args.device)
@@ -166,7 +183,8 @@ def main():
           % (run, n_all, tr_t['bi'].shape[0], va_t['bi'].shape[0], len(headers),
              pack_secs, n_all / pack_secs), flush=True)
 
-    model = build_model(args.arch, args.size, args.f64_head).to(dev)
+    model = build_model(args.arch, args.size, args.f64_head,
+                        head_out=(CATCH_CLASSES + 1) if args.task == 'l1rs' else 1).to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     sampler = ds.BatchSampler(tr_t, args.bs, seed=args.seed + 1)
     step0 = 0

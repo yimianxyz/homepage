@@ -42,18 +42,21 @@ def masked_pool(h, mask):
 
 
 class Head(nn.Module):
-    """Per-candidate scalar head; optionally float64."""
-    def __init__(self, d, f64):
+    """Per-candidate head; out=1 → (B,K) scalar (l1r/l1s/l1p); out>1 → (B,K,out)
+    (l1r-split: 14 catches logits + 1 boot). Optionally float64."""
+    def __init__(self, d, f64, out=1):
         super().__init__()
         self.f64 = f64
-        self.lin = nn.Linear(d, 1)
+        self.out = out
+        self.lin = nn.Linear(d, out)
         if f64:
             self.lin.double()
 
-    def forward(self, h):                      # (B,K,d) -> (B,K)
+    def forward(self, h):                      # (B,K,d) -> (B,K) or (B,K,out)
         if self.f64:
             h = h.double()
-        return self.lin(h).squeeze(-1)
+        y = self.lin(h)
+        return y.squeeze(-1) if self.out == 1 else y
 
 
 class BoidEncoder(nn.Module):
@@ -69,11 +72,11 @@ class BoidEncoder(nn.Module):
 
 
 class DeepSet(nn.Module):
-    def __init__(self, d=64, f64_head=False):
+    def __init__(self, d=64, f64_head=False, head_out=1):
         super().__init__()
         self.enc = BoidEncoder(d)
         self.cand = mlp([CAND_DIM + d, d, d, d])
-        self.head = Head(d, f64_head)
+        self.head = Head(d, f64_head, head_out)
 
     def forward(self, b):
         g = self.enc(b['boid_tok'], b['bmask'], b['glob'])     # (B,d)
@@ -84,7 +87,7 @@ class DeepSet(nn.Module):
 
 
 class CandTransformer(nn.Module):
-    def __init__(self, d=64, nlayers=2, nheads=4, f64_head=False):
+    def __init__(self, d=64, nlayers=2, nheads=4, f64_head=False, head_out=1):
         super().__init__()
         self.enc = BoidEncoder(d)
         self.cproj = mlp([CAND_DIM, d, d])
@@ -92,7 +95,7 @@ class CandTransformer(nn.Module):
             d_model=d, nhead=nheads, dim_feedforward=4 * d, dropout=0.0,
             batch_first=True, norm_first=True, activation='gelu')
         self.tf = nn.TransformerEncoder(layer, num_layers=nlayers)
-        self.head = Head(d, f64_head)
+        self.head = Head(d, f64_head, head_out)
 
     def forward(self, b):
         g = self.enc(b['boid_tok'], b['bmask'], b['glob']).unsqueeze(1)  # (B,1,d)
@@ -104,7 +107,7 @@ class CandTransformer(nn.Module):
 class PointerNet(nn.Module):
     """Set encoder over boids+predator -> candidate queries point over the
     boid memory (cross-attention); per-candidate scalar output."""
-    def __init__(self, d=64, nlayers=1, nheads=4, f64_head=False):
+    def __init__(self, d=64, nlayers=1, nheads=4, f64_head=False, head_out=1):
         super().__init__()
         self.bproj = mlp([4 + GLOB_DIM, d, d])
         layer = nn.TransformerEncoderLayer(
@@ -117,7 +120,7 @@ class PointerNet(nn.Module):
              for _ in range(nlayers)])
         self.ln_q = nn.ModuleList([nn.LayerNorm(d) for _ in range(nlayers)])
         self.ff = nn.ModuleList([mlp([d, 2 * d, d]) for _ in range(nlayers)])
-        self.head = Head(d, f64_head)
+        self.head = Head(d, f64_head, head_out)
 
     def forward(self, b):
         B, N, _ = b['boid_tok'].shape
@@ -141,8 +144,8 @@ SIZES = {
 }
 
 
-def build_model(arch, size, f64_head=False):
-    kw = dict(SIZES[arch][size], f64_head=f64_head)
+def build_model(arch, size, f64_head=False, head_out=1):
+    kw = dict(SIZES[arch][size], f64_head=f64_head, head_out=head_out)
     if arch == 'deepset':
         return DeepSet(**kw)
     if arch == 'transformer':
