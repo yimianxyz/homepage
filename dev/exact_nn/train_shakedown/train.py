@@ -6,6 +6,14 @@
                gathered at pidx and MSE'd against rolled[4]. Agreement metric
                reconstructs the final score vector (exact vprior + student
                rolled scores) and compares the deduped argmax to bi.
+  --task l1rs  split head: catch classification (CE, 24 classes) + boot MSE;
+               deploy score = argmax(catches)+boot.
+  --task l1rs2 side-a v2a, the BOOT-focused student. Same split head, but loss =
+               w_ce·CE(catch) + w_boot·Huber(boot) + w_rank·pairwise-score-margin
+               ranking over the 4 rolled (combined expected_catch+boot, mean-
+               centered → matches prod's decisive score DIFFERENCES). Deploy score
+               = EXPECTED catch + boot. Targets the ~69%-of-decisions boot lever.
+               Tune --w-boot/--w-rank/--w-ce/--huber-delta.
   --task l1s   regress all 16 final scores; MSE over (B,16).
   --task l1p   pointer classification over the 16 candidates. Ties are real
                (E3D-padded duplicate candidates, SPEC section 3): candidates
@@ -33,6 +41,17 @@ from models import build_model, n_params
 
 INPUT_KEYS = ('boid_tok', 'bmask', 'glob', 'cand_tok')
 CATCH_CLASSES = 24   # l1rs catches head: classes 0..23 (max observed 13; slow-predator 90-step rollout won't exceed)
+DEFAULT_W = {'ce': 1.0, 'boot': 5.0, 'rank': 2.0, 'huber_delta': 0.2}  # l1rs2 loss weights
+
+
+def expected_catch(catch_logits):
+    """(B,K,CATCH_CLASSES) -> (B,K) expected catch-count = Σ c·softmax_c. A smooth,
+    differentiable stand-in for argmax(catches) — used as the l1rs2 deploy score AND
+    in the ranking loss, so train and deploy use the SAME catch reduction (no
+    argmax train/deploy mismatch). Confident (peaked) predictions ≈ argmax anyway."""
+    p = catch_logits.float().softmax(-1)
+    cc = torch.arange(CATCH_CLASSES, device=catch_logits.device, dtype=torch.float32)
+    return (p * cc).sum(-1)
 
 
 def class_pool_logits(logits, cls):
@@ -57,6 +76,14 @@ def student_final_score(task, out, batch):
         s = batch['vprior'].clone()
         s.scatter_(1, batch['pidx'], pred)
         return s
+    if task == 'l1rs2':
+        idx = batch['pidx'].unsqueeze(2).expand(-1, -1, out.shape[2])
+        g = out.gather(1, idx)                               # (B,4,CATCH_CLASSES+1)
+        # deploy score = EXPECTED catch + boot (smooth; matches the ranking loss).
+        pred = expected_catch(g[..., :CATCH_CLASSES]).double() + g[..., CATCH_CLASSES].double()
+        s = batch['vprior'].clone()
+        s.scatter_(1, batch['pidx'], pred)
+        return s
     return out.double()
 
 
@@ -75,7 +102,7 @@ def masked_mse(pred, target):
     return (d * d).mean()
 
 
-def task_loss(task, out, batch):
+def task_loss(task, out, batch, wcfg=None):
     if task == 'l1r':
         pred = out.gather(1, batch['pidx'])
         return masked_mse(pred, batch['rolled'])
@@ -86,6 +113,36 @@ def task_loss(task, out, batch):
         assert int(c.max()) < CATCH_CLASSES, 'catches %d >= CATCH_CLASSES %d -- raise it' % (int(c.max()), CATCH_CLASSES)
         ce = F.cross_entropy(g[..., :CATCH_CLASSES].reshape(-1, CATCH_CLASSES).float(), c.reshape(-1))
         return ce + masked_mse(g[..., CATCH_CLASSES], batch['boot'])
+    if task == 'l1rs2':
+        # side-a v2a: ~69% of prod decisions are decided by the BOOT difference
+        # between two equal-catch rolled candidates (median margin 0.019), so boot
+        # precision is the dominant lever. Loss = catch CE + heavily-weighted boot
+        # Huber (robust to the rare high-boot tail) + a pairwise score-margin
+        # RANKING loss on the combined (expected_catch + boot) among the 4 rolled,
+        # which directly trains the deduped-argmax + margin the deploy commits on
+        # (relative ordering, mean-removed → matches prod's score DIFFERENCES, the
+        # thing the margin gate reads). The boot Huber anchors the absolute level
+        # (needed for rolled-vs-vprior / vprior-top decisions, ~19%).
+        w = wcfg or DEFAULT_W
+        idx = batch['pidx'].unsqueeze(2).expand(-1, -1, out.shape[2])
+        g = out.gather(1, idx)                               # (B,4,CATCH_CLASSES+1)
+        c = batch['catches']
+        assert int(c.max()) < CATCH_CLASSES, 'catches %d >= CATCH_CLASSES %d -- raise it' % (int(c.max()), CATCH_CLASSES)
+        ce = F.cross_entropy(g[..., :CATCH_CLASSES].reshape(-1, CATCH_CLASSES).float(), c.reshape(-1))
+        boot_pred = g[..., CATCH_CLASSES].float()
+        boot_tgt = batch['boot'].float()
+        bm = torch.isfinite(boot_tgt)
+        boot_h = F.huber_loss(boot_pred[bm], boot_tgt[bm], delta=w['huber_delta']) if bool(bm.any()) else boot_pred.sum() * 0.0
+        # pairwise score-margin ranking over the 4 rolled (mean-centered MSE ==
+        # all-pairs squared-diff loss up to a constant): match prod's score gaps.
+        pred_s = expected_catch(g[..., :CATCH_CLASSES]) + boot_pred           # (B,4)
+        true_s = c.float() + torch.where(bm, boot_tgt, torch.zeros_like(boot_tgt))
+        valid = bm.float()                                                    # exclude -inf-boot rolled from the mean
+        vc = valid.sum(1, keepdim=True).clamp(min=1.0)
+        pred_c = pred_s - (pred_s * valid).sum(1, keepdim=True) / vc
+        true_c = true_s - (true_s * valid).sum(1, keepdim=True) / vc
+        rank = (((pred_c - true_c) ** 2) * valid).sum() / valid.sum().clamp(min=1.0)
+        return w['ce'] * ce + w['boot'] * boot_h + w['rank'] * rank
     if task == 'l1s':
         return masked_mse(out, batch['score'])
     if task == 'l1p':
@@ -95,14 +152,14 @@ def task_loss(task, out, batch):
 
 
 @torch.no_grad()
-def evaluate(model, task, val, bs, device):
+def evaluate(model, task, val, bs, device, wcfg=None):
     model.eval()
     n = val['bi'].shape[0]
     tot_loss, agree_d, agree_raw, cnt = 0.0, 0, 0, 0
     for lo in range(0, n, bs):
         batch = {k: v[lo:lo + bs] for k, v in val.items()}
         out = model({k: batch[k] for k in INPUT_KEYS})
-        loss = task_loss(task, out, batch)
+        loss = task_loss(task, out, batch, wcfg)
         b = batch['bi'].shape[0]
         tot_loss += loss.item() * b
         if task == 'l1p':
@@ -128,8 +185,12 @@ def save_ckpt(path, model, opt, sampler, step, args, rng_torch):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--task', required=True, choices=['l1r', 'l1rs', 'l1s', 'l1p'])
+    ap.add_argument('--task', required=True, choices=['l1r', 'l1rs', 'l1rs2', 'l1s', 'l1p'])
     ap.add_argument('--arch', required=True, choices=['deepset', 'transformer', 'pointer'])
+    ap.add_argument('--w-ce', type=float, default=DEFAULT_W['ce'], help='l1rs2 catch-CE weight')
+    ap.add_argument('--w-boot', type=float, default=DEFAULT_W['boot'], help='l1rs2 boot-Huber weight')
+    ap.add_argument('--w-rank', type=float, default=DEFAULT_W['rank'], help='l1rs2 score-margin ranking weight')
+    ap.add_argument('--huber-delta', type=float, default=DEFAULT_W['huber_delta'], help='l1rs2 boot Huber delta')
     ap.add_argument('--size', default='small', choices=['small', 'medium'])
     ap.add_argument('--f64-head', action='store_true')
     ap.add_argument('--data', required=True)
@@ -152,6 +213,10 @@ def main():
     ap.add_argument('--max-records', type=int, default=None)
     ap.add_argument('--loader', default='synth', choices=['synth', 'oracle'],
                     help='synth=ds.load_packed (throwaway); oracle=pack_oracle.load_packed (real shards)')
+    ap.add_argument('--prepacked', default=None,
+                    help='npz cache of the packed dataset: load it if it exists (skips the ~8min '
+                         'JSONL pack), else pack from --data then write it here. Reused across runs '
+                         '(weight sweeps, arch sweeps, v2b) for the SAME --data.')
     args = ap.parse_args()
 
     run = '%s_%s_%s%s' % (args.task, args.arch, args.size, '_f64' if args.f64_head else '')
@@ -162,8 +227,17 @@ def main():
 
     # ---- data: split by seed (game id) range, val = tail of the range ----
     t0 = time.time()
-    loader = pack_oracle if args.loader == 'oracle' else ds
-    full = loader.load_packed(args.data, max_records=args.max_records)
+    if args.prepacked and os.path.exists(args.prepacked):
+        z = np.load(args.prepacked)
+        full = {k: z[k] for k in z.files}
+        full['headers'] = []
+        print('[%s] loaded prepacked npz %s' % (run, args.prepacked), flush=True)
+    else:
+        loader = pack_oracle if args.loader == 'oracle' else ds
+        full = loader.load_packed(args.data, max_records=args.max_records)
+        if args.prepacked:
+            np.savez_compressed(args.prepacked, **{k: v for k, v in full.items() if k != 'headers'})
+            print('[%s] wrote prepacked npz %s' % (run, args.prepacked), flush=True)
     if args.val_mode == 'percell':
         cellkey = full['seed'] // 10000          # device_matrix seedBase blocks
         va_sel = np.zeros(full['seed'].shape[0], dtype=bool)
@@ -195,8 +269,9 @@ def main():
           % (run, n_all, tr_t['bi'].shape[0], va_t['bi'].shape[0], len(headers),
              pack_secs, n_all / pack_secs), flush=True)
 
+    wcfg = {'ce': args.w_ce, 'boot': args.w_boot, 'rank': args.w_rank, 'huber_delta': args.huber_delta}
     model = build_model(args.arch, args.size, args.f64_head,
-                        head_out=(CATCH_CLASSES + 1) if args.task == 'l1rs' else 1).to(dev)
+                        head_out=(CATCH_CLASSES + 1) if args.task in ('l1rs', 'l1rs2') else 1).to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
     sampler = ds.BatchSampler(tr_t, args.bs, seed=args.seed + 1)
     step0 = 0
@@ -217,7 +292,7 @@ def main():
     for step in range(step0, args.steps):
         batch = sampler.next()
         out = model({k: batch[k] for k in INPUT_KEYS})
-        loss = task_loss(args.task, out, batch)
+        loss = task_loss(args.task, out, batch, wcfg)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         opt.step()
@@ -233,7 +308,7 @@ def main():
         if bench_t0 is not None:
             bench_n += 1
         if (step + 1) % args.val_every == 0 or step + 1 == args.steps:
-            vl, ad, ar = evaluate(model, args.task, va_t, 2048, dev)
+            vl, ad, ar = evaluate(model, args.task, va_t, 2048, dev, wcfg)
             print('[%s] step %4d  train_loss %.5f  val_loss %.5f  '
                   'agree_dedup %.4f  agree_raw %.4f'
                   % (run, step + 1, l, vl, ad, ar), flush=True)
@@ -244,14 +319,14 @@ def main():
         torch.cuda.synchronize()
     bench_secs = time.time() - bench_t0 if bench_t0 else None
     sps = bench_n * args.bs / bench_secs if bench_secs else None
-    vl, ad, ar = evaluate(model, args.task, va_t, 2048, dev)
+    vl, ad, ar = evaluate(model, args.task, va_t, 2048, dev, wcfg)
     # per-cell S_dec (agree_dedup) on the val split — cell = seed//10000 block.
     percell = {}
     ck = (va_t['seed'] // 10000).cpu().numpy()
     for c in np.unique(ck):
         sel = np.where(ck == c)[0]
         sub = {k: v[sel] for k, v in va_t.items()}
-        _, cad, _ = evaluate(model, args.task, sub, 2048, dev)
+        _, cad, _ = evaluate(model, args.task, sub, 2048, dev, wcfg)
         percell[int(c)] = round(cad, 4)
     print('[%s] per-cell S_dec(val): %s' % (run, json.dumps(percell)), flush=True)
     res = {'run': run, 'task': args.task, 'arch': args.arch, 'size': args.size,

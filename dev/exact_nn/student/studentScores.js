@@ -64,8 +64,28 @@ function lin(W, b, x) {                 // W (out×in), b (out), x (in) -> (out)
 function geluVec(v) { const o = new Array(v.length); for (let i = 0; i < v.length; i++) o[i] = gelu(v[i]); return o; }
 
 function loadStudent(weightsPath) {
-    const W = JSON.parse(fs.readFileSync(weightsPath, 'utf8')).weights;
+    const J = JSON.parse(fs.readFileSync(weightsPath, 'utf8'));
+    const W = J.weights;
+    const TASK = (J.args && J.args.task) || 'l1rs';   // l1rs: argmax(catch)+boot; l1rs2: E[catch]+boot
     const CATCH_CLASSES = 24;
+
+    // catch reduction → the deploy combined score per rolled candidate is
+    // catchReduce(logits) + boot. l1rs uses the integer argmax; l1rs2 (side-a v2a)
+    // uses the EXPECTED catch (Σ c·softmax_c, float64) — smooth, matches the
+    // ranking-loss training target, and makes the score-margin a cleaner gate.
+    function catchReduce(row) {
+        if (TASK === 'l1rs2') {
+            let mx = -Infinity;
+            for (let c = 0; c < CATCH_CLASSES; c++) if (row[c] > mx) mx = row[c];
+            let Z = 0; const e = new Array(CATCH_CLASSES);
+            for (let c = 0; c < CATCH_CLASSES; c++) { e[c] = Math.exp(row[c] - mx); Z += e[c]; }
+            let ec = 0; for (let c = 0; c < CATCH_CLASSES; c++) ec += c * e[c];
+            return ec / Z;
+        }
+        let bc = 0, bb = -Infinity;
+        for (let c = 0; c < CATCH_CLASSES; c++) if (row[c] > bb) { bb = row[c]; bc = c; }
+        return bc;
+    }
 
     function deepset(boidTok, glob, candTok) {
         // boidTok: [n][4]; glob: [11]; candTok: [16][25]
@@ -134,9 +154,7 @@ function loadStudent(weightsPath) {
         // final scores: vprior everywhere, NN-predicted on the 4 rolled
         const score = vprior.slice();
         for (const k of rolled) {
-            let bc = 0, bb = -Infinity;
-            for (let c = 0; c < CATCH_CLASSES; c++) if (out[k][c] > bb) { bb = out[k][c]; bc = c; }
-            score[k] = bc + out[k][CATCH_CLASSES];                     // argmax(catches) + boot
+            score[k] = catchReduce(out[k]) + out[k][CATCH_CLASSES];    // catch + boot
         }
         return score;
     }
