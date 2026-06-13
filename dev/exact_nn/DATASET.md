@@ -36,7 +36,7 @@ allocation past whatever exists.
 
 Every shard's `.meta.json` carries `oracleSha` + `certRunId`; `oracle_logger`
 refuses to farm unless `CERT.json.ok` and its `oracleSha` matches the live
-`oracle_policy.js`. Current: `oracleSha=f2b99385…`, `certRunId=(TBD)`.
+`oracle_policy.js`. Current: `oracleSha=f2b99385…`, `certRunId=6f946c4619e1ef56`.
 
 ## Schema
 
@@ -103,8 +103,23 @@ with egBoid + frozen frame counter alive across), `spam` (48 taps past the cap).
 
 ## Contents (stamped after farm)
 
-| | decisions | games | N 6-14 | N 15+ | −inf scores |
-|---|---|---|---|---|---|
-| total | (TBD) | (TBD) | (TBD) | (TBD) | (TBD) |
+**Deliverable-zero set** (`data/`, none-profile, seeds 100000–160000): 74,748
+decisions, 116 games, 6 cells. Margin CDF: see `DZERO.md`. Used for the first
+L1h student.
 
-Margin CDF: see `DZERO.md` (deliverable zero).
+**1e6 set** (`data_1e6/`, spawnFrac 0.15, seeds 100000–160000+): **1,132,267
+decisions, 1,864 games, 386 shards, 0 farm failures.** −inf scores: **0** (the
+slow predator never exterminates all boids in a 90-step rollout, even in spam).
+
+| split | decisions | games | per-cell (k) | by spawn profile |
+|---|---|---|---|---|
+| deliverable-zero | 74,748 | 116 | ~9–16 each | none only |
+| 1e6 | 1,132,267 | 1,864 | 178–202 each | none 890k / mid 74k / recross 78k / spam 90k |
+
+**Calibration set** (`calib_data/`, seeds [270000,280000), the published
+calibration range): 52,061 decisions, 6 cells × {none, mid, recross} — for
+side-b's τ-freeze (`student/calib_margins.json`). Sealed seeds (≥290000) are
+side-b's, never farmed here.
+
+Certified oracle: `oracleSha=f2b99385…`, `certRunId=6f946c4619e1ef56` (510,991
+frames lockstep, 0 mismatches; `CERT.md`).
