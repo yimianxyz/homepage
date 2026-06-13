@@ -1,0 +1,9 @@
+{
+ "spec": "SPEC §4c — REAL cross-engine value-net check (not the ulp proxy)",
+ "engines": ["node v20.20.2 / V8 11.3.244.8 (fdlibm exp/pow)", "SpiderMonkey jsshell 115.0esr (fdlibm-derived exp/pow)"],
+ "method": "cp_erf/cp_gelu/cp_value copied verbatim from js/cheap_planner.js; run in both engines (dev/exact_nn/verifier/ce_engine_eval.js) on identical harvested plan states; 16 vprior scores compared as raw float64 bit patterns.",
+ "corpus": {"plans": 5459, "cells": ["390x844","1024x768","2560x1440"], "seeds": "calibration 270000+", "scoresCompared": 87344},
+ "result": {"scoresDiffer": 0, "maxUlp": 0, "maxAbsDelta": 0, "vprior_argmax_flips": 0, "committed_target_flips": 0},
+ "finding": "Prod's value-net forward is BIT-IDENTICAL between V8-20 and SpiderMonkey-115 on the realized plan-state distribution — both use fdlibm-derived exp/pow. A V8-calibrated τ transfers exactly to SpiderMonkey (not merely within the ~1e-15 ulp-proxy headroom).",
+ "caveats": ["JSC (Safari) not yet measured — its exp/pow lineage differs; check before any Safari T2 claim.", "Measures the value-net path (Math.exp via erf); the E3D Math.pow cand0-coordinate path expected identical by the same fdlibm mechanism but not separately measured.", "5459 calibration-seed states, not the full input domain; the ulp proxy remains the conservative worst-case bound (0 flips there too)."]
+}

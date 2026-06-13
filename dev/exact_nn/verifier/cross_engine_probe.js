@@ -67,7 +67,7 @@ function captureTransform(filename, code) {
 
 function parseArgs() {
     const a = { seeds: 6, seedStart: 270000, maxFrames: 9000,
-        cells: '390x844,1024x768,1512x982,2560x1440', out: null };
+        cells: '390x844,1024x768,1512x982,2560x1440', out: null, dumpHarvest: null };
     for (let i = 2; i < process.argv.length; i++) {
         const k = process.argv[i];
         if (k === '--seeds') a.seeds = +process.argv[++i];
@@ -75,6 +75,7 @@ function parseArgs() {
         else if (k === '--maxFrames') a.maxFrames = +process.argv[++i];
         else if (k === '--cells') a.cells = process.argv[++i];
         else if (k === '--out') a.out = process.argv[++i];
+        else if (k === '--dumpHarvest') a.dumpHarvest = process.argv[++i];   // write {feat,ctx,score,pidx4,cx,cy}[] for real-engine eval
     }
     if (a.seedStart >= 290000) throw new Error('refusing to probe on sealed range (>=290000)');
     return a;
@@ -93,6 +94,7 @@ async function main() {
     const vpriorUnder = (expFn, rec) => { Math.exp = expFn; try { return cp.cp_value(NET, rec.feat, rec.ctx); } finally { Math.exp = realExp; } };
 
     const dScores = []; let plans = 0, flips = 0; const flipMargins = []; const byCell = {};
+    const harvest = [];
     for (const c of cells) {
         const ckk = c.W + 'x' + c.H; byCell[ckk] = { plans: 0, flips: 0 };
         for (let i = 0; i < args.seeds; i++) {
@@ -101,6 +103,7 @@ async function main() {
             game.win.__ceLog = [];
             while (game.boidCount() > 0 && game.frame() < args.maxFrames) game.stepFrame();
             for (const rec of game.win.__ceLog) {
+                if (args.dumpHarvest) harvest.push({ feat: rec.feat, ctx: rec.ctx, score: rec.score, pidx4: rec.pidx4, cx: rec.cx, cy: rec.cy, cell: ckk });
                 plans++; byCell[ckk].plans++;
                 const base = vpriorUnder(realExp, rec);              // == prod vprior (identity wrapper)
                 const baseKey = pickKey(rec.score, rec.cx, rec.cy);
@@ -141,6 +144,7 @@ async function main() {
     };
     console.log(JSON.stringify(report, null, 1));
     if (args.out) fs.writeFileSync(args.out, JSON.stringify(report, null, 1));
+    if (args.dumpHarvest) { fs.writeFileSync(args.dumpHarvest, JSON.stringify(harvest)); process.stderr.write(`harvest -> ${args.dumpHarvest} (${harvest.length} plans)\n`); }
 }
 
 if (require.main === module) main().catch(e => { console.error(e); process.exit(1); });
