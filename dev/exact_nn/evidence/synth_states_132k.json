@@ -1,0 +1,11 @@
+{
+ "spec": "SPEC §5 synthetic/adversarial-state L0≡prod differential (state-injected, broad 'all situation')",
+ "method": "random LEGAL states (pred + N boids, N∈{0..200} incl. out-of-domain positions) with persistent state {target,frame∈0..16,egBoid index,configured} sampled JOINTLY and injected IDENTICALLY into prod + L0 via __cheapDebug.set; force compared bitwise.",
+ "runs": [
+  {"cell": "1512x982", "seed": 1, "states": 2000, "mismatches": 0},
+  {"cell": "2560x1440", "seed": 7, "states": 100000, "mismatches": 0, "regime": {"N<=5": 35261, "N>5": 64739}},
+  {"cell": "390x844", "seed": 99, "states": 30000, "mismatches": 0, "regime": {"N<=5": 10586, "N>5": 19414}}
+ ],
+ "total_states": 132000, "total_mismatches": 0,
+ "finding": "L0 ≡ prod bitwise on 132k synthetic/adversarial legal states beyond the reachable game manifold (extreme N, boundary positions, adversarial injected persistent state, pre-configure path). Hardens the T1-by-construction claim against the broad 'all situation' reading and validates the §2a state-injection convention end-to-end (the path the student sealed-verdict uses)."
+}
