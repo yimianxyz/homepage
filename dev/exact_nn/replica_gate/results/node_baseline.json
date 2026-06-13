@@ -1,0 +1,3 @@
+{"node":"v20.18.1","W":1512,"H":982,"seed":200000,
+ "N120": {"plans_per_sec_median":16.09,"plan_ms_median":62.163},
+ "N30":  {"plans_per_sec_median":134.43,"plan_ms_median":7.439}}
