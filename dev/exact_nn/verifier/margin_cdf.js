@@ -55,7 +55,7 @@ function dedupMargin(rec) {
 function parseArgs(argv) {
     const a = { seeds: 200, seedStart: 270000, maxFrames: 20000,
         cells: '390x844,820x1180,1024x768,1512x982,1680x1050,2560x1440',
-        out: null };
+        out: null, raw: null };
     for (let i = 2; i < argv.length; i++) {
         const k = argv[i];
         if (k === '--seeds') a.seeds = +argv[++i];
@@ -63,6 +63,7 @@ function parseArgs(argv) {
         else if (k === '--maxFrames') a.maxFrames = +argv[++i];
         else if (k === '--cells') a.cells = argv[++i];
         else if (k === '--out') a.out = argv[++i];
+        else if (k === '--raw') a.raw = argv[++i];   // dump raw {cell:[margins]} + N-bucket tags for sharded merge
         else throw new Error('unknown arg ' + k);
     }
     if (a.seedStart >= 290000) throw new Error('refusing to run margin CDF on sealed range (>=290000)');
@@ -93,6 +94,7 @@ async function main() {
     const cells = opt.cells.split(',').map(s => { const [W, H] = s.split('x').map(Number); return { W, H }; });
     // strat buckets: N in [6,14] (padded plans) vs N>=15 (dense); device
     const all = [], byBucket = { 'N6-14': [], 'N15+': [] }, byCell = {};
+    const rawRecs = [];   // {m,n,cell} for sharded merge (only kept if --raw)
     let totalPlans = 0;
 
     for (const c of cells) {
@@ -107,12 +109,14 @@ async function main() {
                 const { margin, nClasses } = dedupMargin(rec);
                 all.push(margin); byCell[key].push(margin);
                 (rec.n <= 14 ? byBucket['N6-14'] : byBucket['N15+']).push(margin);
+                if (opt.raw) rawRecs.push({ m: Number.isFinite(margin) ? margin : null, n: rec.n, cell: key });
                 totalPlans++;
             }
             game.win.__planLog = null;
         }
         process.stderr.write(`[cell ${key}] plans=${byCell[key].length}\n`);
     }
+    if (opt.raw) { fs.writeFileSync(opt.raw, JSON.stringify(rawRecs)); process.stderr.write(`raw -> ${opt.raw} (${rawRecs.length} plans)\n`); }
 
     const report = {
         spec: 'SPEC §6.3 margin CDF (deduped top1-top2 plan-score margin)',
