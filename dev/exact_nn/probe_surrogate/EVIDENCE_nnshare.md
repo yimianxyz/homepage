@@ -1,5 +1,16 @@
 # Evidence brief — is the L1h NN fast-path share rollout-bound ~0? (side-a task #17)
 
+> **NOTE (post-audit):** This was the INPUT to a 4-lens adversarial audit, which found
+> the original wording OVERSTATED in three ways (catch vs boot attribution; the σ≥0.5
+> "floor" came from a too-cheap surrogate — trained boot head σ≈0.29, `nopredavoid`
+> rollout r²=0.88; a missed exact-bound gate). I chased all three. FINAL, corrected
+> conclusion (see issue #5 + `dev/exact_nn/exact_bound_gate/`): NN fast-path share is
+> ~0 under BOTH a τ-margin gate (v2a 0.0002, now monotone) AND a provably-sound exact
+> cheap-bound gate (0.01%, 0 false certs / 332.5k plans) — **structural** (>99.99% of
+> plans genuinely depend on the rolled scores), not a student-quality or bound artifact.
+> Read this brief as the hypothesis; the gate measurements as the verdict.
+
+
 **Claim under audit:** Under the program's bitwise-exact gate (L1h: trust the student's
 deduped-argmax iff its deduped top-2 margin ≥ τ where τ holds **0 trusted disagreements**
 on calibration), the achievable NN fast-path share is **~0**, because the decisive
