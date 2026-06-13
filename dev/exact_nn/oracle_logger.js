@@ -43,7 +43,18 @@
 // is shortest-round-trip, so parsing returns the identical float64 — except
 // -0 (parses +0). Negative zeros DO occur (counted per shard, meta nNegZero)
 // and are provably causally dead downstream (no 1/x, atan2, Object.is in the
-// policy path). NaN/±Inf in any logged value is a hard error.
+// policy path).
+//
+// Two fields can be non-finite, both serialized by JSON.stringify as `null`
+// with a FIELD-SPECIFIC meaning (each consumer knows its field's domain):
+//   * score[k] / rolled[i][2] (boot): may be -Infinity (extermination path,
+//     see scoreNum) → null means -Inf. These are argmax-losers, masked in
+//     regression, never the label. Counted per shard as nNegInf.
+//   * dmargin: may be +Infinity when the committed coordinate has NO competing
+//     distinct-coordinate group (single-group plan, or all competitors are
+//     -Inf-exterminated) → null means +Inf (maximally safe, never a near-tie).
+// dmargin is always ≥0 (bi is the global argmax). NaN and +Inf anywhere else
+// remain hard errors.
 //
 // Wall-clock: NONE leaks. simNow() is rng.js's VIRTUAL clock (frame*frameMs).
 // The browser uses frameMs=18 (mobile) / 12 (desktop); cells run their
@@ -77,12 +88,33 @@ const { CELLS, HELD_OUT_SEED } = require('./device_matrix.js');
 const _dv = new DataView(new ArrayBuffer(8));
 function f64hex(x) { _dv.setFloat64(0, x, true); return _dv.getBigUint64(0, true).toString(16).padStart(16, '0'); }
 let negZeroCount = 0; // -0 occurrences across logged floats (see header note)
+let negInfCount = 0;  // -Infinity rolled scores (extermination path; see below)
 function assertCleanNum(x, what) {
     if (!Number.isFinite(x)) throw new Error(`non-finite float in ${what}: ${x}`);
     if (x === 0 && 1 / x < 0) negZeroCount++;
     return x;
 }
 function cleanArr(a, what) { for (let i = 0; i < a.length; i++) assertCleanNum(a[i], what); return a; }
+
+// Score-path numbers MAY be -Infinity: prod's bootstrap is
+// `boot=-Infinity; for(j) if(tv[j]>boot) boot=tv[j]` over the terminal value
+// net, and when a rolled candidate's rollout exterminates every boid the
+// terminal features go NaN, every tv[j] is NaN, no `>` fires, and boot stays
+// -Infinity (SPEC §4 "NaN→−Infinity extermination path"). Then
+// score[ci]=catches+(-Inf)=-Inf. This is a LEGITIMATE, load-bearing value, not
+// a bug — so the score path permits -Infinity (counted) but still rejects NaN
+// and +Infinity (those would be real corruption). JSON.stringify maps
+// -Infinity→null; the packer maps null→-inf (these scores are argmax-losers,
+// masked in regression, never the label). The winner's score is always finite
+// (≥12 candidates keep their finite vprior), so bi and the coordinate label are
+// unaffected.
+function scoreNum(x, what) {
+    if (x === -Infinity) { negInfCount++; return x; }
+    if (!Number.isFinite(x)) throw new Error(`+Inf/NaN in ${what}: ${x}`);
+    if (x === 0 && 1 / x < 0) negZeroCount++;
+    return x;
+}
+function scoreArr(a, what) { for (let i = 0; i < a.length; i++) scoreNum(a[i], what); return a; }
 
 // ---- label + dedup margin (coordinate identity = exact f64 bit pairs) ----
 function coordKey(c) { return f64hex(c.x) + f64hex(c.y); }
@@ -204,13 +236,18 @@ async function runGame(opt) {
                 };
                 pending.rolled = [];
             },
-            roll(ci, catches, boot) { pending.rolled.push([ci, catches, assertCleanNum(boot, 'boot')]); },
+            roll(ci, catches, boot) { pending.rolled.push([ci, assertCleanNum(catches, 'catches'), scoreNum(boot, 'boot')]); },
             planEnd(pidx, score, bi) {
                 const rec = pending.plan;
                 rec.pidx = pidx.slice();
                 rec.rolled = pending.rolled;
-                rec.score = cleanArr(score.slice(), 'score');
+                rec.score = scoreArr(score.slice(), 'score');   // -Infinity allowed (extermination)
                 rec.bi = bi;
+                // the winner's score is finite by construction (≥12 candidates
+                // keep their finite vprior; only the ≤4 rolled losers can be
+                // -Inf). If this ever fires, an exterminated candidate became the
+                // label — a real anomaly, not the masked-loser case. Catch it.
+                if (!Number.isFinite(score[bi])) throw new Error(`winner score non-finite: ${score[bi]} (bi=${bi})`);
                 let ru = -Infinity;
                 for (let k = 0; k < score.length; k++) if (k !== bi && score[k] > ru) ru = score[k];
                 rec.margin = score[bi] - ru;
@@ -302,7 +339,7 @@ async function produce(opt) {
         spawn: opt.spawn || 'none',
         seedStart: opt.seedStart, seeds: opt.seeds, maxFrames: opt.maxFrames,
         oracleSha: ci.oracleSha, certRunId: ci.certRunId, node: process.version,
-        games: metas, nDecisions: dec.length, nNegZero: negZeroCount,
+        games: metas, nDecisions: dec.length, nNegZero: negZeroCount, nNegInf: negInfCount,
     }, null, 1));
     console.log(JSON.stringify({ shard: opt.shard, games: opt.seeds, decisions: dec.length }));
 }
@@ -355,6 +392,23 @@ async function selftest() {
         && r1.meta.recrossSpawned;
     report.push(`[${rc.cell.id} seed ${rc.seed}] recross spawn determinism + occurred: ${sdet ? 'PASS' : 'FAIL'} (${r1.meta.spawns.length} taps, ${r1.meta.framesRun} frames)`);
     pass = pass && sdet;
+
+    // 6. non-finite score-path contract (extermination path may not trigger in
+    // the seeds above, so assert the encode/decode invariants directly):
+    //  - scoreNum permits -Infinity (counts it), rejects NaN and +Infinity;
+    //  - JSON.stringify maps -Inf and +Inf to null, and the field-specific
+    //    decode (score: null→-Inf; dmargin: null→+Inf) round-trips the meaning;
+    //  - a winner that is -Inf is a hard error (planEnd guard).
+    let nf = true;
+    try { scoreNum(-Infinity, 't'); } catch { nf = false; }            // -Inf allowed
+    for (const bad of [NaN, Infinity]) { try { scoreNum(bad, 't'); nf = false; } catch {} }  // must throw
+    const rt = JSON.parse(JSON.stringify({ score: [-Infinity, 1.5], dmargin: Infinity }));
+    if (!(rt.score[0] === null && rt.score[1] === 1.5 && rt.dmargin === null)) nf = false;
+    const decScore = rt.score.map(v => v === null ? -Infinity : v);     // packer rule
+    const decDm = rt.dmargin === null ? Infinity : rt.dmargin;          // analyze_margin rule
+    if (!(decScore[0] === -Infinity && decScore[1] === 1.5 && decDm === Infinity)) nf = false;
+    report.push(`non-finite score-path contract (-Inf score / +Inf dmargin round-trip): ${nf ? 'PASS' : 'FAIL'}`);
+    pass = pass && nf;
     console.log(report.join('\n'));
     console.log(pass ? 'SELFTEST: ALL PASS' : 'SELFTEST: FAILURES');
     process.exit(pass ? 0 : 1);
