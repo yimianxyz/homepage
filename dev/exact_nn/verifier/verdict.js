@@ -38,7 +38,7 @@ const DEVICE_MATRIX = [
 function parseArgs(argv) {
     const a = { candidate: path.join(__dirname, '..', 'candidates', 'l0.js'),
         seeds: 256, maxFrames: 30000, cells: null, calibration: false,
-        postExtinct: 60, out: null };
+        postExtinct: 60, out: null, sealOffset: 0 };
     for (let i = 2; i < argv.length; i++) {
         const k = argv[i];
         if (k === '--candidate') a.candidate = argv[++i];
@@ -46,6 +46,7 @@ function parseArgs(argv) {
         else if (k === '--maxFrames') a.maxFrames = +argv[++i];
         else if (k === '--cells') a.cells = argv[++i];
         else if (k === '--calibration') a.calibration = true;
+        else if (k === '--sealOffset') a.sealOffset = +argv[++i];   // slice a fresh sealed range (one-shot discipline)
         else if (k === '--postExtinct') a.postExtinct = +argv[++i];
         else if (k === '--out') a.out = argv[++i];
         else throw new Error('unknown arg: ' + k);
@@ -66,8 +67,8 @@ function seedList(opt) {
         for (let i = 0; i < opt.seeds; i++) out.push(270000 + i);
         return { seeds: out, label: 'calibration[270000,280000)' };
     }
-    const all = seal.sealedSeeds(require('fs').readFileSync(seal.SALT_PATH), Math.max(opt.seeds, 1));
-    return { seeds: all.slice(0, opt.seeds), label: 'SEALED(hidden)' };
+    const all = seal.sealedSeeds(require('fs').readFileSync(seal.SALT_PATH), opt.sealOffset + opt.seeds + 1);
+    return { seeds: all.slice(opt.sealOffset, opt.sealOffset + opt.seeds), label: 'SEALED(hidden)@off' + opt.sealOffset };
 }
 
 async function main() {

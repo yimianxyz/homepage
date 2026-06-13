@@ -65,8 +65,16 @@ function dedup(score, cands) {
 module.exports.create = async function (game, helpers) {
     const policyDir = helpers.policyDir;
     const tau = resolveTau(helpers);
-    const { loadStudent } = require(path.join(__dirname, '..', 'student', 'studentScores.js'));
-    const studentScores = loadStudent(path.join(__dirname, '..', 'student', 'student_weights.json'));
+    // student scorer + weights: env-overridable (EXACTNN_STUDENT / EXACTNN_WEIGHTS)
+    // so the same composition verifies v1, v2a, … without code changes.
+    const studentMod = process.env.EXACTNN_STUDENT
+        ? path.resolve(process.env.EXACTNN_STUDENT)
+        : path.join(__dirname, '..', 'student', 'studentScores.js');
+    const weightsFp = process.env.EXACTNN_WEIGHTS
+        ? path.resolve(process.env.EXACTNN_WEIGHTS)
+        : path.join(__dirname, '..', 'student', 'student_weights.json');
+    const { loadStudent } = require(studentMod);
+    const studentScores = loadStudent(weightsFp);
     // W/Hc from the live sim (canonical stepper sets sim.canvasWidth/Height);
     // PREDATOR_RANGE/NUM_BOIDS from globals (stepper pins PREDATOR_RANGE=80).
     const cfg = { W: game.sim.canvasWidth, Hc: game.sim.canvasHeight,
