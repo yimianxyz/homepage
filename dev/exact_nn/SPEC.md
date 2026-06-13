@@ -46,8 +46,13 @@ force(pred, boids):
   N≤5), `egBoid` (object identity; serialise as index), `configured` latch.
 - derived config, fixed per page load: `cfg.W/Hc` (canvas + 2·BORDER_OFFSET;
   defaults 1680×1680 until the first `force()` with `pred.simulation`),
-  `PREDATOR_RANGE` (60 mobile / 80 desktop via UA regex — iPad 820×1180 is
-  mobile-by-UA), `NUM_BOIDS` (60/120), and the NET weights.
+  `NUM_BOIDS` (60 on UA-mobile incl. iPad 820×1180, else 120) + the matching
+  `frameMs`, and the NET weights. **PREDATOR_RANGE correction (both sides
+  confirmed independently at 6dce76f):** it is **80 on EVERY device** — the
+  mobile-60 branch is dead code because index.html loads boid.js (reads
+  PREDATOR_RANGE at parse) before simulation.js defines `isMobileDevice`, so
+  the guard is `undefined`→falsy. Corpus logs the as-evaluated 80 everywhere;
+  the only real device axis is `NUM_BOIDS`/`frameMs`/canvas, not flee range.
 - **Verified dead in the force path:** `lastFeedTime`/`nowMs` — `feed()`
   updates them but no feature, rollout, or steering term reads them; `simNow`
   is a virtual frame clock, not wall-clock. (One-line proof: grep shows the
