@@ -63,6 +63,15 @@ def class_pool_logits(logits, cls):
     return torch.logsumexp(M, dim=1)
 
 
+def class_pool_max(scores, cls):
+    """(B,16) scores + (B,16) class ids -> (B,16) per-class MAX at the canonical
+    index (−inf where no member maps). The deduped decision is argmax over this
+    (SPEC §3). Used by the l1rs2 confident-wrong hinge."""
+    B, K = scores.shape
+    M = torch.full((B, K), float('-inf'), device=scores.device, dtype=scores.dtype)
+    return M.scatter_reduce(1, cls, scores, reduce='amax', include_self=True)
+
+
 def student_final_score(task, out, batch):
     """The student's implied 16-score vector (float64) for argmax agreement."""
     if task == 'l1r':
@@ -142,7 +151,22 @@ def task_loss(task, out, batch, wcfg=None):
         pred_c = pred_s - (pred_s * valid).sum(1, keepdim=True) / vc
         true_c = true_s - (true_s * valid).sum(1, keepdim=True) / vc
         rank = (((pred_c - true_c) ** 2) * valid).sum() / valid.sum().clamp(min=1.0)
-        return w['ce'] * ce + w['boot'] * boot_h + w['rank'] * rank
+        loss = w['ce'] * ce + w['boot'] * boot_h + w['rank'] * rank
+        # confident-wrong hinge (--w-clean): the deduped decision is argmax over
+        # per-class-max student scores; penalize any wrong-coord class outscoring
+        # prod's true-winner class. Pushes the student to NOT spread scores (large
+        # margin) unless the winner is genuinely on top → cleaner high-confidence
+        # band (the lever for a non-zero 0-mismatch NN-share). 0 by default.
+        if w.get('clean', 0.0) > 0.0:
+            full_s = batch['vprior'].float().clone()
+            full_s.scatter_(1, batch['pidx'], pred_s.to(full_s.dtype))
+            cm = class_pool_max(full_s, batch['cls'])                 # (B,16) per-class max
+            bic = batch['bi_cls']
+            win = cm.gather(1, bic.unsqueeze(1)).squeeze(1)           # true-winner class score
+            other = cm.scatter(1, bic.unsqueeze(1), float('-inf')).max(1).values
+            clean = F.relu(other - win).mean()                       # hinge: winner must top all
+            loss = loss + w['clean'] * clean
+        return loss
     if task == 'l1s':
         return masked_mse(out, batch['score'])
     if task == 'l1p':
@@ -190,6 +214,7 @@ def main():
     ap.add_argument('--w-ce', type=float, default=DEFAULT_W['ce'], help='l1rs2 catch-CE weight')
     ap.add_argument('--w-boot', type=float, default=DEFAULT_W['boot'], help='l1rs2 boot-Huber weight')
     ap.add_argument('--w-rank', type=float, default=DEFAULT_W['rank'], help='l1rs2 score-margin ranking weight')
+    ap.add_argument('--w-clean', type=float, default=0.0, help='l1rs2 confident-wrong hinge weight (0=off)')
     ap.add_argument('--huber-delta', type=float, default=DEFAULT_W['huber_delta'], help='l1rs2 boot Huber delta')
     ap.add_argument('--size', default='small', choices=['small', 'medium'])
     ap.add_argument('--f64-head', action='store_true')
@@ -261,6 +286,11 @@ def main():
     va = {k: v[va_sel] for k, v in inp.items()}
     dev = torch.device(args.device)
     tr_t, va_t = ds.to_torch(tr, dev), ds.to_torch(va, dev)
+    # free the host-side float64 pack + float32 copies once tensors are on the GPU
+    # (VM2 has only ~15 GB RAM; full + inp + tr + va held simultaneously OOMs).
+    import gc
+    del full, inp, tr, va
+    gc.collect()
     # label-side sanity: argmax(score) class must equal bi's class everywhere
     lab_am = tr_t['score'].argmax(dim=1)
     lab_cls = tr_t['cls'].gather(1, lab_am.unsqueeze(1)).squeeze(1)
@@ -269,7 +299,8 @@ def main():
           % (run, n_all, tr_t['bi'].shape[0], va_t['bi'].shape[0], len(headers),
              pack_secs, n_all / pack_secs), flush=True)
 
-    wcfg = {'ce': args.w_ce, 'boot': args.w_boot, 'rank': args.w_rank, 'huber_delta': args.huber_delta}
+    wcfg = {'ce': args.w_ce, 'boot': args.w_boot, 'rank': args.w_rank,
+            'clean': args.w_clean, 'huber_delta': args.huber_delta}
     model = build_model(args.arch, args.size, args.f64_head,
                         head_out=(CATCH_CLASSES + 1) if args.task in ('l1rs', 'l1rs2') else 1).to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
