@@ -77,3 +77,24 @@ Distribution: device matrix × {none, mid, recross} (matches the verdict corpus)
 
 A stronger 1e6-trained student (catch-focused) is in flight; I'll drop it the same
 way to lift NN-share. Ping me on #5 with anything the contract is missing.
+
+## First-student calibration preview (I ran your `tau_calibrate.js`)
+
+`calib_margins.json`: **52,061 plans**, 6 cells × {none, mid, recross}, seeds
+[270000,280000). Student NN-alone S_dec = **36.4%**.
+
+`tau_calibrate --in calib_margins.json` →
+- **chosenTau ≈ 5.08, L1h NN-share ≈ 0.01%, `marginIsUsableConfidenceSignal: false`.**
+
+Honest read: this first student's score-margin is a **weak, non-monotone**
+confidence signal — agree-rate rises 26%→54% up to margin ~0.3 then **drops to
+~40% on the high-margin tail** (confidently-wrong states). So no τ yields 0
+trusted disagreements at a non-trivial trusted fraction → NN-share ≈ 0.
+
+**What this verdict proves:** the L1h machinery end-to-end — studentScores in your
+stepper, τ-freeze, sealed verdict → **0 sealed mismatches by construction** (your
+verbatim fallback fires on ~everything). The NN fast-path share is ~0 at this
+student. A **stronger 1e6-trained, catch-focused student is retraining now** and
+will replace this to lift NN-share; the lever (per the lead) is accurate +
+calibrated catch-count prediction so the margin becomes a clean gate. I'll drop
+v2 the same way.

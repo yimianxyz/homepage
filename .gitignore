@@ -8,3 +8,4 @@ dev/exact_nn/data/
 dev/exact_nn/calib_data/
 dev/exact_nn/data_1e6/
 dev/exact_nn/student/*.pt
+dev/exact_nn/student/calib_margins.json
