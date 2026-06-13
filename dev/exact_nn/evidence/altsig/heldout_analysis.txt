@@ -1,0 +1,33 @@
+=== combined plans=27445 disagrees=16448 agree=0.4007 ===
+cells: {'1024x768': 12445, '2560x1440': 15000}
+margin>=1 band: n=284 disagreeRate=0.1831
+
+[1D IN-SAMPLE NN-share, 0 disagree, frac of ALL]:
+  margin          (higher) NN-share=0.001166
+  bootMargin      (higher) NN-share=0.000547
+  winSoftmaxProb  (higher) NN-share=0.000036
+  winEntropy      (lower ) NN-share=0.000036
+  ecArgmaxGap     (lower ) NN-share=0.000000
+  scoreVsBoot     (higher) NN-share=0.000000
+
+[2D IN-SAMPLE margin&altsig NN-share (subsampled grid)]:
+  margin&winSoftmaxProb   NN-share=0.001020 cfg=(0.5957, 0.994, 28)
+  margin&winEntropy       NN-share=0.001020 cfg=(0.5957, 0.0401, 28)
+  margin&ecArgmaxGap      NN-share=0.000656 cfg=(0.5957, 0.0041, 18)
+  margin&bootMargin       NN-share=0.000547 cfg=(0.0, 1.0805, 15)
+  margin&scoreVsBoot      NN-share=0.000146 cfg=(0.1324, 5.2119, 4)
+
+[HELD-OUT: threshold from calib half, eval on test half. disagree>0 => overfit]
+  1D margin          (higher): {'thr': 1.9577, 'test_frac': 0.00102, 'test_n': 14, 'test_disagree': 0}
+  1D winSoftmaxProb  (higher): {'thr': 0.9999, 'test_frac': 0.0, 'test_n': 0, 'test_disagree': 0}
+  1D winEntropy      (lower ): {'thr': 0.0006, 'test_frac': 0.0, 'test_n': 0, 'test_disagree': 0}
+  1D ecArgmaxGap     (lower ): {'thr': 0.0, 'test_frac': 0.0, 'test_n': 0, 'test_disagree': 0}
+  1D bootMargin      (higher): {'thr': 1.0805, 'test_frac': 0.000656, 'test_n': 9, 'test_disagree': 0}
+  1D scoreVsBoot     (higher): {'thr': 7.2577, 'test_frac': 0.0, 'test_n': 0, 'test_disagree': 0}
+  2D margin&winSoftmaxProb  (higher) calibFloor=0.621: {'thr': 0.993, 'test_frac': 0.00102, 'test_n': 14, 'test_disagree': 1}
+  2D margin&winEntropy      (lower ) calibFloor=0.621: {'thr': 0.0449, 'test_frac': 0.00102, 'test_n': 14, 'test_disagree': 1}
+  2D margin&bootMargin      (higher) calibFloor=1.267e-07: {'thr': 1.0805, 'test_frac': 0.000656, 'test_n': 9, 'test_disagree': 0}
+
+[MULTI-SIGNAL held-out: max calib coverage at 0 calib-disagree, eval on test]
+  calib_frac=0.00036(n=5) thr={'margin': 0.2704, 'bootMargin': -1e+18, 'prob': -1e+18, 'entropy': 0.0039, 'ecGap': 0.0005}
+  -> TEST frac=0.00007(n=1) TEST_disagree=1  <<OVERFIT
