@@ -223,10 +223,43 @@ harness on the §5 on-distribution corpus, per candidate:
 - **S_traj** — trajectory-fork divergence: median first-divergence frame and
   fraction of full games identical to extinction.
 
-The goal gate is **S_dec > 95% AND S_frame > 95%** for a system whose plan
-decision is made by the NN alone (no rollout fallback) — L0 passing trivially
-(100% by construction) does NOT count toward the gate; it is the floor, not
-the goal. L1h reports the same metrics with its trusted fraction noted.
+**GATE RECONCILED (2026-06-13, lead ruling — see #5 rollout-bound finding).**
+The original v2 gate ("S_dec>95% AND S_frame>95% for an NN-*alone* decision,
+no fallback") was stricter than the user actually asked and is **rollout-bound
+/ physically out of reach**: on the 74,748-plan deliverable-zero set, prod's own
+value-net prior *alone* agrees only **26%**; the rollout overrides the prior on
+**74%** of plans; the committed target is decided by per-candidate catch-count
+over the 90-step rollout (catch-oracle ceiling **87%** = winner-is-rolled rate;
+full-oracle 100%). Best trained NN-alone student ≈37%. A feed-forward net cannot
+reach 95% alone without out-approximating the chaotic rollout prod's designers
+explicitly chose to run instead of trusting the net.
+
+The user's literal ask is **"exactly the same output in all situation, hybrid
+(part rollout, part NN), NN necessary"** — i.e. **L1h** (+ **L1e** for N≤5). So
+the **success gate is**:
+
+> A single NN-based hybrid policy (L1h for D1, L1e for D4, verbatim gate/steer)
+> whose force output is **bitwise-exact to prod** on the sealed corpus
+> (S_frame = S_dec = **100%** by construction — τ-gated, exact rollout fallback;
+> ≫ the user's 95% similarity floor), with the **NN load-bearing in every plan**
+> (the fast path on trusted plans AND the value net inside every fallback
+> rollout), and the **NN-share quantified and maximized**.
+
+This *exceeds* the user's 95%-output-similarity floor (it targets ~100% exact)
+while honestly reporting that "NN decides alone" is bounded by physics. Two
+numbers are reported, never conflated:
+
+- **NN-share** (L1h trusted fraction at the τ that holds 0 sealed disagreements)
+  — the headline "how NN-centric" number; maximized via catch-prediction
+  quality (side-a path-forward #2), not raw score regression.
+- **NN-alone S_dec** — transparency metric (how often the bare net matches prod
+  with no fallback); measured, found rollout-bounded (~37% now, ~87% ceiling).
+
+S_dec/S_frame/S_traj defined as above are still the instruments. L0 remains the
+T1 exact floor that ships regardless; it is not the goal (its NN role is only
+today's value net). The anti-goodhart machinery is unchanged: HMAC-sealed seeds
+(≥290000), τ frozen one-shot on the calibration split [270000,280000), rule-of-
+three residual bound, student-attack adversarial search.
 
 ### 4c. τ calibration & residual-risk protocol (anti-circularity)
 
