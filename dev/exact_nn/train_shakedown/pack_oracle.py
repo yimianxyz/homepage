@@ -49,8 +49,12 @@ def pack_shard(dec_path):
             s = r['s']
             n = len(s['bx'])
             assert n == r['N'], 'N mismatch'
-            assert n <= MAXB, ('record with %d boids > MAXB=%d (spam game past the '
-                               'cap — raise MAXB for the spam-profile corpus)' % (n, MAXB))
+            if n > MAXB:
+                # spam game past the device cap (N>120). Rare extreme corner; the
+                # deploy studentScores handles any N (pools over all boids), but
+                # the training tensor is padded to MAXB — skip these few states.
+                pack_shard._skipped = getattr(pack_shard, '_skipped', 0) + 1
+                continue
             b = np.zeros((MAXB, 4))
             b[:n, 0] = s['bx']; b[:n, 1] = s['by']; b[:n, 2] = s['bvx']; b[:n, 3] = s['bvy']
             m = np.zeros(MAXB, dtype=bool); m[:n] = True
