@@ -1,0 +1,48 @@
+{
+ "spec": "SPEC §4c — cross-engine exp/pow ±1,2 ulp score-perturbation bound on PROD scoring",
+ "note": "exp/pow are the ONLY engine-divergent ops (spike). vprior recomputed under worst-case ulp wrappers on Math.exp (gelu/erf path); rolled scores held (rollout is sqrt-only, engine-invariant). A flip = prod's committed target COORD changes.",
+ "cells": [
+  "390x844",
+  "820x1180",
+  "1024x768",
+  "1512x982",
+  "1680x1050",
+  "2560x1440"
+ ],
+ "plans": 9159,
+ "dVprior_maxAbs": {
+  "max": 1.3322676295501878e-15,
+  "p99": 8.881784197001252e-16,
+  "p50": 3.3306690738754696e-16
+ },
+ "argmax_flips": 0,
+ "flip_rate": 0,
+ "flip_margins_max": null,
+ "byCell": {
+  "390x844": {
+   "plans": 735,
+   "flips": 0
+  },
+  "820x1180": {
+   "plans": 1689,
+   "flips": 0
+  },
+  "1024x768": {
+   "plans": 1668,
+   "flips": 0
+  },
+  "1512x982": {
+   "plans": 1689,
+   "flips": 0
+  },
+  "1680x1050": {
+   "plans": 1689,
+   "flips": 0
+  },
+  "2560x1440": {
+   "plans": 1689,
+   "flips": 0
+  }
+ },
+ "interpretation": "flip_rate = fraction of plans where a worst-case ±2-ulp exp/pow divergence flips PROD's own committed target across engines — the engine-portability tax on prod, and the floor under any T2 student's cross-engine S_dec. flip_margins_max ≪ τ is the §4c safety condition; flip_rate≈0 means the NN scoring is engine-robust at the decision level despite per-score drift."
+}
