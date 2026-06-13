@@ -97,8 +97,14 @@ def pack_shard(dec_path):
     return header, out
 
 
-def iter_shard_paths(data_dir):
-    return sorted(glob.glob(os.path.join(data_dir, '*.decisions.jsonl.gz')))
+def iter_shard_paths(data_dir, shuffle=False):
+    paths = sorted(glob.glob(os.path.join(data_dir, '*.decisions.jsonl.gz')))
+    if shuffle:
+        # deterministic interleave so a max_records subset is REPRESENTATIVE
+        # across cells/profiles (shard names sort by cell → first-N is one cell).
+        import random
+        random.Random(1234).shuffle(paths)
+    return paths
 
 
 def load_packed(data_dir, seed_min=None, seed_max=None, max_records=None):
@@ -106,7 +112,9 @@ def load_packed(data_dir, seed_min=None, seed_max=None, max_records=None):
     range so all plans of a game land on one side (train/calib/sealed
     discipline, SPEC §4c)."""
     parts, headers, total = [], [], 0
-    for path in iter_shard_paths(data_dir):
+    # shuffle shard order only when capping (max_records) so the subset spans all
+    # cells/profiles; full loads stay in stable order.
+    for path in iter_shard_paths(data_dir, shuffle=(max_records is not None)):
         hdr, arr = pack_shard(path)
         sel = np.ones(arr['seed'].shape[0], dtype=bool)
         if seed_min is not None:
