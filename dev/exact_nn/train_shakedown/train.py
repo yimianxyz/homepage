@@ -134,7 +134,10 @@ def main():
     ap.add_argument('--f64-head', action='store_true')
     ap.add_argument('--data', required=True)
     ap.add_argument('--val-frac', type=float, default=0.1,
-                    help='fraction of GAMES (seed range tail) held out for val')
+                    help='fraction of GAMES held out for val')
+    ap.add_argument('--val-mode', default='seedtail', choices=['seedtail', 'percell'],
+                    help='seedtail=top val-frac seeds overall (one cell); percell=top '
+                         'val-frac seeds WITHIN each cell-block (seed//10000) — all cells in val')
     ap.add_argument('--steps', type=int, default=400)
     ap.add_argument('--bs', type=int, default=512)
     ap.add_argument('--lr', type=float, default=3e-4)
@@ -161,10 +164,19 @@ def main():
     t0 = time.time()
     loader = pack_oracle if args.loader == 'oracle' else ds
     full = loader.load_packed(args.data, max_records=args.max_records)
-    seeds = np.unique(full['seed'])
-    split_seed = seeds[int(len(seeds) * (1.0 - args.val_frac))]
-    tr_sel = full['seed'] < split_seed
-    va_sel = ~tr_sel
+    if args.val_mode == 'percell':
+        cellkey = full['seed'] // 10000          # device_matrix seedBase blocks
+        va_sel = np.zeros(full['seed'].shape[0], dtype=bool)
+        for ck in np.unique(cellkey):
+            cs = np.unique(full['seed'][cellkey == ck])
+            thr = cs[int(len(cs) * (1.0 - args.val_frac))]
+            va_sel |= (cellkey == ck) & (full['seed'] >= thr)
+        tr_sel = ~va_sel
+    else:
+        seeds = np.unique(full['seed'])
+        split_seed = seeds[int(len(seeds) * (1.0 - args.val_frac))]
+        tr_sel = full['seed'] < split_seed
+        va_sel = ~tr_sel
     pack_secs = time.time() - t0
     n_all = full['seed'].shape[0]
     headers = full.pop('headers')
@@ -233,13 +245,23 @@ def main():
     bench_secs = time.time() - bench_t0 if bench_t0 else None
     sps = bench_n * args.bs / bench_secs if bench_secs else None
     vl, ad, ar = evaluate(model, args.task, va_t, 2048, dev)
+    # per-cell S_dec (agree_dedup) on the val split — cell = seed//10000 block.
+    percell = {}
+    ck = (va_t['seed'] // 10000).cpu().numpy()
+    for c in np.unique(ck):
+        sel = np.where(ck == c)[0]
+        sub = {k: v[sel] for k, v in va_t.items()}
+        _, cad, _ = evaluate(model, args.task, sub, 2048, dev)
+        percell[int(c)] = round(cad, 4)
+    print('[%s] per-cell S_dec(val): %s' % (run, json.dumps(percell)), flush=True)
     res = {'run': run, 'task': args.task, 'arch': args.arch, 'size': args.size,
            'f64_head': args.f64_head, 'params': n_params(model), 'bs': args.bs,
            'steps': args.steps, 'resumed_from': step0,
            'samples_per_sec': round(sps, 1) if sps else None,
            'pack_records_per_sec': round(n_all / pack_secs, 1),
            'first_train_loss': first_loss, 'final_train_loss': last_loss,
-           'val_loss': vl, 'val_agree_dedup': ad, 'val_agree_raw': ar,
+           'val_loss': vl, 'val_agree_dedup': ad, 'val_agree_raw': ar, 'val_mode': args.val_mode,
+           'percell_sdec': percell,
            'loss_decreased': bool(last_loss is not None and first_loss is not None
                                   and last_loss < first_loss),
            'device': str(dev), 'epoch_secs_1e6': round(1e6 / sps, 1) if sps else None,
