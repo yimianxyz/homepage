@@ -60,6 +60,8 @@ def main():
     ap.add_argument('--bs', type=int, default=4096)
     ap.add_argument('--lr', type=float, default=2e-3)
     ap.add_argument('--h', type=int, default=64)
+    ap.add_argument('--w-ce', type=float, default=0.0, help='argmin cross-entropy weight (decision/margin)')
+    ap.add_argument('--ce-scale', type=float, default=2.0, help='softmin sharpness for argmin CE (units of /100 scan-t)')
     ap.add_argument('--val-frac', type=float, default=0.1)
     ap.add_argument('--seed', type=int, default=0)
     ap.add_argument('--device', default='cuda' if torch.cuda.is_available() else 'cpu')
@@ -85,12 +87,19 @@ def main():
     ntr = ftr.shape[0]
     g = torch.Generator(device='cpu').manual_seed(args.seed + 1)
     t0 = time.time()
+    etr_full = T(egIdx[tr])
     for step in range(args.steps):
         idx = torch.randint(0, ntr, (args.bs,), generator=g).to(dev)
         f, l, m = ftr[idx], ltr[idx], mtr[idx]
+        eg = etr_full[idx]
         p = model(f)
         d = (p - l) * m
-        loss = (d * d).sum() / m.sum().clamp(min=1)
+        mse = (d * d).sum() / m.sum().clamp(min=1)
+        # argmin cross-entropy (softmin over -scan_t): directly optimize the egBoid
+        # DECISION + margin calibration. masked boids -> logit -inf (prob 0).
+        logits = (-p * args.ce_scale).masked_fill(m < 0.5, float('-inf'))
+        ce = F.cross_entropy(logits, eg)
+        loss = mse + args.w_ce * ce
         opt.zero_grad(set_to_none=True); loss.backward(); opt.step()
         if (step + 1) % 1000 == 0 or step + 1 == args.steps:
             va_ag, va_mse = agree(model, fva, lva, mva, eva)

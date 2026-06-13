@@ -1,0 +1,5 @@
+data_eg/
+calib_eg/
+data_eg2/
+packed_eg*.json.gz
+*.log

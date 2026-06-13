@@ -30,6 +30,20 @@ function analyticT(rwx, rwy, bvx, bvy) {
     return Number.isFinite(best) ? best : null;
 }
 
+// Wrap-AWARE analytic intercept time: min over the 9 nearest torus images of the
+// boid's straight-line intercept time. This is a near-exact scan-t prior — argmin
+// over it matches prod's egBoid 99.1% standalone (vs 89.3% for the no-wrap version)
+// because intercept()'s scan re-wraps every frame and the torus shortcut is the
+// slow predator's only edge. THE dominant feature; the NN refines it.
+function wrapAwareT(rwx, rwy, bvx, bvy, PX, PY) {
+    let best = Infinity, second = Infinity;
+    for (let ix = -1; ix <= 1; ix++) for (let iy = -1; iy <= 1; iy++) {
+        const t = analyticT(rwx + ix * PX, rwy + iy * PY, bvx, bvy);
+        if (t != null && t >= 0) { if (t < best) { second = best; best = t; } else if (t < second) second = t; }
+    }
+    return [best, second];   // best image time, 2nd-best image time (both Infinity if none)
+}
+
 // Returns a fixed-length feature array for one boid relative to the predator.
 function egBoidFeatures(px, py, bx, by, bvx, bvy, W, Hc) {
     const PX = W + 2 * BORDER_OFFSET, PY = Hc + 2 * BORDER_OFFSET;
@@ -40,19 +54,26 @@ function egBoidFeatures(px, py, bx, by, bvx, bvy, W, Hc) {
     const radial = (rwx * bvx + rwy * bvy) / dsafe;             // + = boid receding
     const tangent = (rwx * bvy - rwy * bvx) / dsafe;            // signed cross / dist
     const bspeed = Math.sqrt(bvx * bvx + bvy * bvy);
-    const at = analyticT(rwx, rwy, bvx, bvy);                   // no-wrap intercept time (THE feature)
+    const at = analyticT(rwx, rwy, bvx, bvy);                   // no-wrap intercept time
     const atClip = at == null ? TMAX : Math.min(at, TMAX);
+    const wa = wrapAwareT(rwx, rwy, bvx, bvy, PX, PY);          // wrap-aware (THE feature)
+    const wa0 = wa[0] === Infinity ? TMAX : Math.min(wa[0], TMAX);
+    const wa1 = wa[1] === Infinity ? TMAX : Math.min(wa[1], TMAX);
     return [
         rwx / POS_S, rwy / POS_S,
         dist0 / POS_S,
         rawx / POS_S, rawy / POS_S,                            // raw vs wrapped → signals wrap-relevance
         bvx / BMAX, bvy / BMAX, bspeed / BMAX,
         radial / BMAX, tangent / BMAX,
-        atClip / 100.0,                                        // analytic intercept time (~scan-t prior)
+        atClip / 100.0,                                        // no-wrap analytic intercept time
         at == null ? 1.0 : 0.0,                                // no-wrap-unreachable flag
+        wa0 / 100.0,                                           // WRAP-AWARE intercept time (~scan-t)
+        wa1 / 100.0,                                           // 2nd-best image time (near-tie signal)
+        (atClip - wa0) / 100.0,                                // wrap gain (how much the torus helps)
+        wa[0] === Infinity ? 1.0 : 0.0,                        // wrap-aware-unreachable flag
         W / 2560.0, Hc / 1440.0,                               // cell identity (torus period)
     ];
 }
-const EG_NFEAT = 14;
+const EG_NFEAT = 18;
 
 module.exports = { egBoidFeatures, analyticT, wrap, EG_NFEAT, SM, BORDER_OFFSET, BMAX, POS_S, TMAX };
