@@ -62,11 +62,11 @@ def pack_shard(dec_path):
             pidx = np.asarray(r['pidx'][:4], dtype=np.int64)
             tri = r['rolled']                         # [[ci, catches, boot]...]
             rolled = np.empty(len(tri)); catches = np.empty(len(tri), dtype=np.int64); boot = np.empty(len(tri))
-            for i, (ci, c, b) in enumerate(tri):
-                assert ci == pidx[i], 'rolled ci %d != pidx[%d]=%d (roll order broke)' % (ci, i, pidx[i])
-                catches[i] = c                        # integer rollout catch-count (split-head label)
-                boot[i] = _f(b)                        # terminal value-net bootstrap (−inf if exterminated)
-                rolled[i] = c + _f(b)                  # combined rolled score (single-head label)
+            for i, (rci, rcatch, rboot) in enumerate(tri):   # NOT c/b — c is r['cfg'] above
+                assert rci == pidx[i], 'rolled ci %d != pidx[%d]=%d (roll order broke)' % (rci, i, pidx[i])
+                catches[i] = rcatch                    # integer rollout catch-count (split-head label)
+                boot[i] = _f(rboot)                    # terminal value-net bootstrap (−inf if exterminated)
+                rolled[i] = rcatch + _f(rboot)         # combined rolled score (single-head label)
             kind = np.empty(K, dtype=np.int64); kind[0] = 0
             for j in range(1, K):
                 kind[j] = 1 if j <= n else 2          # boid vs E3D pad (candidates())
