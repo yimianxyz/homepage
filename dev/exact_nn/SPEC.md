@@ -158,11 +158,19 @@ of the spec'd behavior and must be reproduced regardless).
   restructuring downgrades the claim to "T1 pending op-order audit".
   T1-exact by construction; differentially verified anyway. **L0 is the
   labeled floor, not the program's winner.**
-- **L1r — rolled-scores student (new; dominates L1s/L1p on risk).** Keep
-  `cp_features` + `vprior` exactly as prod (12 of 16 final scores are then
-  exact for free); the NN learns only the 4 rolled scores (rollout + bootstrap
-  replacement). A plan can mismatch only when the argmax depends on a rolled
-  score. Margin gate applies to student-score vs exact-vprior margins.
+- **L1r — rolled-scores student (new; train first).** Keep `cp_features` +
+  `vprior` exactly as prod; the NN learns only the 4 rolled scores (rollout +
+  bootstrap replacement). A plan can mismatch only when the argmax depends on a
+  rolled score. **Risk framing corrected (side-a deliverable-zero, #5):** L1r
+  does NOT broadly "dominate L1s/L1p on risk" — on the ~87% of plans whose
+  winner is a rolled candidate it has the *same* decision-flip exposure as L1s.
+  Its real edges are (a) exactness-by-construction on the ~13% of plans that
+  commit a non-rolled vprior candidate, and (b) a smaller, lower-variance
+  learning target (4 outputs vs 16). Plans decided purely by non-rolled scores
+  and immune to any rolled perturbation ("exact-for-free") are only ~0.01% —
+  so the gate exposure is real and L1r must still be measured, not assumed
+  exact. Recommended first because it covers every decision with the smallest
+  target; margin gate applies to student-score vs exact-vprior margins.
 - **L1s — score student.** NN regresses all 16 final scores from (state,
   cands); argmax downstream. Richer signal than pointer, margin for free.
 - **L1p — pointer student.** Set encoder over boids+predator → pointer over
