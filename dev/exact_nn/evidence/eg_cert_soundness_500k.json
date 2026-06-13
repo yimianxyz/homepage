@@ -1,0 +1,11 @@
+{
+ "states": 500000,
+ "commits": 500000,
+ "falseCertifications": 0,
+ "certified": 134957,
+ "certifiedFrac": 0.2699,
+ "certifiedFrac_ofReachable": 0.2699,
+ "reachableCommits": 500000,
+ "verdict": "SOUND — 0 false certifications over 500000 commits",
+ "falseCertExamples": []
+}
