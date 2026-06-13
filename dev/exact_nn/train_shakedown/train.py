@@ -28,6 +28,7 @@ import torch
 import torch.nn.functional as F
 
 import ds
+import pack_oracle
 from models import build_model, n_params
 
 INPUT_KEYS = ('boid_tok', 'bmask', 'glob', 'cand_tok')
@@ -131,6 +132,8 @@ def main():
     ap.add_argument('--warmup-steps', type=int, default=20, help='excluded from bench timing')
     ap.add_argument('--results', default=None, help='append JSON result line here')
     ap.add_argument('--max-records', type=int, default=None)
+    ap.add_argument('--loader', default='synth', choices=['synth', 'oracle'],
+                    help='synth=ds.load_packed (throwaway); oracle=pack_oracle.load_packed (real shards)')
     args = ap.parse_args()
 
     run = '%s_%s_%s%s' % (args.task, args.arch, args.size, '_f64' if args.f64_head else '')
@@ -141,7 +144,8 @@ def main():
 
     # ---- data: split by seed (game id) range, val = tail of the range ----
     t0 = time.time()
-    full = ds.load_packed(args.data, max_records=args.max_records)
+    loader = pack_oracle if args.loader == 'oracle' else ds
+    full = loader.load_packed(args.data, max_records=args.max_records)
     seeds = np.unique(full['seed'])
     split_seed = seeds[int(len(seeds) * (1.0 - args.val_frac))]
     tr_sel = full['seed'] < split_seed
