@@ -1,7 +1,6 @@
 # L0 — unified-exact policy: verification report (#6)
 
-**Status: DRAFT (matrix in flight).** Final pooled totals filled on completion;
-structural sections (construction, harness, methodology) are final.
+**Status: FINAL.** 84-cell matrix complete — 12,894,083 frames, **0 mismatches**.
 
 L0 is the program's **T1 floor** (SPEC §4): one policy module, one entry point
 covering all N, output **bitwise-identical to frozen prod** (`main@6dce76f`) by
@@ -90,35 +89,46 @@ Device configs: `390×844` (mobile UA→N=60), `820×1180` (desktop N=120 + a re
 (`PREDATOR_RANGE=80` on **all** cells — the load-order bake; see the #6 finding
 and `range_bake_probe.js`. The `uaMobile` cells flip only NUM_BOIDS→60.)
 
-**Result (pooled, FINAL pending):**
+**Result (pooled, FINAL — `runs/full/matrix_summary.json`):**
 
 | metric | value |
 |---|---|
-| cells | _84_ |
-| frames bitwise-checked | _<FILL>_ |
-| force-vector mismatches | _<FILL — expect 0>_ |
-| plan decisions | _<FILL>_ |
-| plan-target disagreements (deduped) | _<FILL — expect 0>_ |
-| egBoid commits / disagreements | _<FILL>_ / _<FILL — expect 0>_ |
-| games / cleared | _<FILL>_ |
+| cells | **84** (0 bad) |
+| frames bitwise-checked | **12,894,083** (planner 5,431,941 · intercept 7,112,969 · zero 349,173) |
+| **force-vector mismatches** | **0** |
+| plan decisions | 319,826 |
+| **plan-target disagreements** (deduped) | **0** |
+| egBoid commits / disagreements | 19,762 / **0** |
+| games / cleared | 5,820 / **5,820** |
+| wall (4 cores) | 104.2 min |
 
-Partial (27/84 cells at draft time): **2,828,000 frames, 0 force mismatches,
-0/37,006 plan-target disagreements, 0/6,627 egBoid disagreements, 0 bad cells.**
+**Acceptance met:** 0 bit mismatches over **>1e7 frames** across the full device
+matrix, both regimes, gate-crossing + spawn games, held-out seeds ≥272000. Every
+game reached extinction; post-extinction N==0 frames exercised in every game.
 
 ## 4. Throughput (honest, per-regime)
 
-Measured `framesPerMinPerCore` from the matrix; the SPEC's ≥1e6 frames/min/core
-target is regime-dependent and reported as such — **not** claimed uniformly:
+Measured `framesPerMinPerCore` from the matrix, by cell class. The SPEC's
+≥1e6 frames/min/core target is **regime-dependent** and is reported as such —
+**not** claimed uniformly, and **not fully reached**:
 
-- **Endgame regime (N≤5, intercept):** ~2–4e5 … _<FILL exact range>_ — the scan
-  loop dominates; well above 1e6 only is **not** reached at N≤5 either; reported
-  honestly per cell.
-- **Planner regime (N>5, dense flock):** ~1–4e4 frames/min/core — the 4×90-step
-  flock rollouts + 80 net forwards per plan are the cost; the ≥1e6 target does
-  **not** hold here and was never going to (this is prod's expensive path).
+| cell class | fpm/core (min–median–max) | n cells |
+|---|---|---|
+| **endgame** (N≤5 scattered) | 181k – **439k** – 920k | 35 |
+| **spawn** (mixed, tap-to-spawn) | 38k – 96k – 152k | 14 |
+| **gate** (N=6–8 → endgame) | 32k – 47k – 117k | 21 |
+| **full game** (dense planner, to extinction) | 5.5k – **9.0k** – 14.4k | 7 |
 
-The verification corpus reaches ≥1e7 frames by breadth (84 cells × held-out
-seeds), not by single-core speed. _<FILL: total wall, aggregate frames/min.>_
+- **Endgame** approaches but does **not** reach 1e6 fpm/core (peak 920k); the
+  per-frame `intercept()` torus scan dominates.
+- **Planner** (N>5) is ~9k fpm/core — the 4×90-step flock rollouts + ~80 net
+  forwards per plan are the cost; the ≥1e6 target does not hold here and never
+  could (this is prod's expensive path, the same one the GPU gate measured).
+
+The corpus reaches >1e7 frames by **breadth** (84 cells × held-out seeds across
+4 cores), not single-core speed: **104.2 min wall, 123,735 frames/min aggregate**.
+(Full-game fpm/core rises with screen size — mob390 8.9k → desk2560 14.4k — as
+larger toruses thin the flock and cheapen the grid neighborhood queries.)
 
 ## 5. Reproduce
 

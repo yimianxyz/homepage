@@ -1,0 +1,758 @@
+[
+ {
+  "tag": "mob390:end1",
+  "frames": 35208,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 274320,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:end2",
+  "frames": 57272,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 355005,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:end3",
+  "frames": 79904,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 406569,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:end4",
+  "frames": 97298,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 332069,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:end5",
+  "frames": 119622,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 334783,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:gate6",
+  "frames": 84079,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 46741,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:gate7",
+  "frames": 98442,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 45876,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:gate8",
+  "frames": 116086,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 46823,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:spawnB",
+  "frames": 98249,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 151135,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:spawnA",
+  "frames": 110542,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 79303,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:end1",
+  "frames": 48910,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 508485,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:end2",
+  "frames": 84342,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 601984,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:end3",
+  "frames": 110595,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 552551,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:pristine-full",
+  "frames": 20578,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 17639,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:end4",
+  "frames": 136444,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 395420,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:end5",
+  "frames": 163813,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 318559,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:gate6",
+  "frames": 136309,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 40699,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:gate7",
+  "frames": 157078,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 34752,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:gate8",
+  "frames": 169242,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 32011,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:spawnA",
+  "frames": 172219,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 37993,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:spawnB",
+  "frames": 138661,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 62103,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:pristine-full",
+  "frames": 50569,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 3962,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:end1",
+  "frames": 47889,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 181420,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:end2",
+  "frames": 83828,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 301863,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:end3",
+  "frames": 116076,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 330999,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:end4",
+  "frames": 135505,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 323107,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:end5",
+  "frames": 159240,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 315462,
+  "exit": 0
+ },
+ {
+  "tag": "mob390:full",
+  "frames": 260863,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 8952,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:gate6",
+  "frames": 129976,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 41448,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:gate7",
+  "frames": 150118,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 35412,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:gate8",
+  "frames": 173040,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 34766,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:spawnA",
+  "frames": 163177,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 48818,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:spawnB",
+  "frames": 140334,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 109573,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:pristine-full",
+  "frames": 32431,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 19247,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:end1",
+  "frames": 48408,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 384872,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:end2",
+  "frames": 79000,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 472864,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:end3",
+  "frames": 104430,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 449895,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:end4",
+  "frames": 135356,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 435752,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:end5",
+  "frames": 149635,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 448753,
+  "exit": 0
+ },
+ {
+  "tag": "ipad820:full",
+  "frames": 255791,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 10141,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:gate6",
+  "frames": 120143,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 57933,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:gate7",
+  "frames": 138792,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 44296,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:gate8",
+  "frames": 134675,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 40222,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:spawnB",
+  "frames": 119135,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 79209,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:spawnA",
+  "frames": 151195,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 47528,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:pristine-full",
+  "frames": 43956,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 7208,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:end1",
+  "frames": 58804,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 340604,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:end2",
+  "frames": 97459,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 430333,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:end3",
+  "frames": 138435,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 457822,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:end4",
+  "frames": 165939,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 439193,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:end5",
+  "frames": 195625,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 371014,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:gate6",
+  "frames": 172240,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 57703,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:gate7",
+  "frames": 186282,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 52076,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:gate8",
+  "frames": 207263,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 50623,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:spawnA",
+  "frames": 192554,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 98462,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:spawnB",
+  "frames": 161120,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 152143,
+  "exit": 0
+ },
+ {
+  "tag": "desk820:full",
+  "frames": 357940,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 5494,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:pristine-full",
+  "frames": 55561,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 10987,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:end1",
+  "frames": 62543,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 484972,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:end2",
+  "frames": 105062,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 580959,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:end3",
+  "frames": 140510,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 523623,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:end4",
+  "frames": 180552,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 492682,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:end5",
+  "frames": 200284,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 562365,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:gate6",
+  "frames": 168779,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 58415,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:gate7",
+  "frames": 197428,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 85856,
+  "exit": 0
+ },
+ {
+  "tag": "desk1024:full",
+  "frames": 329924,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 7472,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:gate8",
+  "frames": 236576,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 95744,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:spawnB",
+  "frames": 181104,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 128296,
+  "exit": 0
+ },
+ {
+  "tag": "desk1512:full",
+  "frames": 308111,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 8230,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:spawnA",
+  "frames": 224360,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 96229,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:end1",
+  "frames": 82807,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 617625,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:end2",
+  "frames": 149983,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 873064,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:end3",
+  "frames": 206790,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 910406,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:end4",
+  "frames": 259936,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 920198,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:end5",
+  "frames": 300363,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 637672,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:gate6",
+  "frames": 246575,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 117338,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:pristine-full",
+  "frames": 66225,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 10425,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:gate7",
+  "frames": 302976,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 105934,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:gate8",
+  "frames": 310974,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 74893,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:spawnA",
+  "frames": 310662,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 83270,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:spawnB",
+  "frames": 250264,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 113138,
+  "exit": 0
+ },
+ {
+  "tag": "desk1680:full",
+  "frames": 332968,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 10984,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:pristine-full",
+  "frames": 99983,
+  "mm": 0,
+  "planD": null,
+  "egD": null,
+  "fpmCore": 17307,
+  "exit": 0
+ },
+ {
+  "tag": "desk2560:full",
+  "frames": 290667,
+  "mm": 0,
+  "planD": 0,
+  "egD": 0,
+  "fpmCore": 14436,
+  "exit": 0
+ }
+]

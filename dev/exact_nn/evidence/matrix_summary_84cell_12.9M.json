@@ -1,0 +1,21 @@
+{
+  "cells": 84,
+  "games": 5820,
+  "cleared": 5820,
+  "frames": 12894083,
+  "framesByRegime": {
+    "planner": 5431941,
+    "intercept": 7112969,
+    "zero": 349173
+  },
+  "forceMismatches": 0,
+  "decisions": {
+    "plans": 319826,
+    "planDisagree": 0,
+    "egCommits": 19762,
+    "egDisagree": 0
+  },
+  "wallMin": 104.2,
+  "framesPerMin": 123735,
+  "bad": []
+}
