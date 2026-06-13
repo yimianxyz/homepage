@@ -1,0 +1,811 @@
+{
+ "ok": true,
+ "oracleSha": "f2b993857302a576031759e230b798781c665453d9b8b24a0404c4d6699cd578",
+ "srcSha": "a706d6640bdfbde3a0a614471210b34c7f420aa79b083a00a4b7204482ee5421",
+ "certRunId": "6f946c4619e1ef56",
+ "date": "2026-06-13T06:43:14.239Z",
+ "node": "v20.20.2",
+ "certSeedBase": 271200,
+ "totals": {
+  "runs": 36,
+  "frames": 510991,
+  "plans": 29561,
+  "mismatches": 0,
+  "hookProblems": 0
+ },
+ "runs": [
+  {
+   "cell": "iphone_390x844",
+   "tag": "full+gate",
+   "seed": 271200,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 4461,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 3864,
+    "intercept": 597
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 242,
+    "roll": 968,
+    "planEnd": 242,
+    "frameEnd": 4461
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "iphone_390x844",
+   "tag": "full+gate",
+   "seed": 271201,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 8033,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 7144,
+    "intercept": 889
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 447,
+    "roll": 1788,
+    "planEnd": 447,
+    "frameEnd": 8033
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "iphone_390x844",
+   "tag": "fork-traj",
+   "seed": 271202,
+   "mode": "fork",
+   "spawns": 0,
+   "frames": 3857,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 3029,
+    "intercept": 828
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 190,
+    "roll": 760,
+    "planEnd": 190,
+    "frameEnd": 3857
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "iphone_390x844",
+   "tag": "spawn-mid",
+   "seed": 271203,
+   "mode": "lockstep",
+   "spawns": 5,
+   "frames": 6276,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 5600,
+    "intercept": 676
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 350,
+    "roll": 1400,
+    "planEnd": 350,
+    "frameEnd": 6276
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "iphone_390x844",
+   "tag": "spawn-recross",
+   "seed": 271204,
+   "mode": "lockstep",
+   "spawns": 3,
+   "frames": 5685,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 4991,
+    "intercept": 694
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 312,
+    "roll": 1248,
+    "planEnd": 312,
+    "frameEnd": 5685
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "iphone_390x844",
+   "tag": "spawn-spam",
+   "seed": 271205,
+   "mode": "lockstep",
+   "spawns": 48,
+   "frames": 7673,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 6747,
+    "intercept": 926
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 422,
+    "roll": 1688,
+    "planEnd": 422,
+    "frameEnd": 7673
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "ipad_820x1180",
+   "tag": "full+gate",
+   "seed": 271200,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 9054,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 8337,
+    "intercept": 717
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 522,
+    "roll": 2088,
+    "planEnd": 522,
+    "frameEnd": 9054
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "ipad_820x1180",
+   "tag": "full+gate",
+   "seed": 271201,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 8031,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 7231,
+    "intercept": 800
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 452,
+    "roll": 1808,
+    "planEnd": 452,
+    "frameEnd": 8031
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "ipad_820x1180",
+   "tag": "fork-traj",
+   "seed": 271202,
+   "mode": "fork",
+   "spawns": 0,
+   "frames": 7962,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 6846,
+    "intercept": 1116
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 428,
+    "roll": 1712,
+    "planEnd": 428,
+    "frameEnd": 7962
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "ipad_820x1180",
+   "tag": "spawn-mid",
+   "seed": 271203,
+   "mode": "lockstep",
+   "spawns": 5,
+   "frames": 8201,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 7089,
+    "intercept": 1112
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 444,
+    "roll": 1776,
+    "planEnd": 444,
+    "frameEnd": 8201
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "ipad_820x1180",
+   "tag": "spawn-recross",
+   "seed": 271204,
+   "mode": "lockstep",
+   "spawns": 3,
+   "frames": 7345,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 6620,
+    "intercept": 725
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 414,
+    "roll": 1656,
+    "planEnd": 414,
+    "frameEnd": 7345
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "ipad_820x1180",
+   "tag": "spawn-spam",
+   "seed": 271205,
+   "mode": "lockstep",
+   "spawns": 48,
+   "frames": 9186,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 8803,
+    "intercept": 383
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 551,
+    "roll": 2204,
+    "planEnd": 551,
+    "frameEnd": 9186
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1024x768",
+   "tag": "full+gate",
+   "seed": 271200,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 8906,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 8269,
+    "intercept": 637
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 517,
+    "roll": 2068,
+    "planEnd": 517,
+    "frameEnd": 8906
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1024x768",
+   "tag": "full+gate",
+   "seed": 271201,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 10011,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 9409,
+    "intercept": 602
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 589,
+    "roll": 2356,
+    "planEnd": 589,
+    "frameEnd": 10011
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1024x768",
+   "tag": "fork-traj",
+   "seed": 271202,
+   "mode": "fork",
+   "spawns": 0,
+   "frames": 9852,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 8581,
+    "intercept": 1271
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 537,
+    "roll": 2148,
+    "planEnd": 537,
+    "frameEnd": 9852
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1024x768",
+   "tag": "spawn-mid",
+   "seed": 271203,
+   "mode": "lockstep",
+   "spawns": 5,
+   "frames": 11602,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 10737,
+    "intercept": 865
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 672,
+    "roll": 2688,
+    "planEnd": 672,
+    "frameEnd": 11602
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1024x768",
+   "tag": "spawn-recross",
+   "seed": 271204,
+   "mode": "lockstep",
+   "spawns": 3,
+   "frames": 12192,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 11505,
+    "intercept": 687
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 720,
+    "roll": 2880,
+    "planEnd": 720,
+    "frameEnd": 12192
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1024x768",
+   "tag": "spawn-spam",
+   "seed": 271205,
+   "mode": "lockstep",
+   "spawns": 48,
+   "frames": 11778,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 11055,
+    "intercept": 723
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 691,
+    "roll": 2764,
+    "planEnd": 691,
+    "frameEnd": 11778
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1512x982",
+   "tag": "full+gate",
+   "seed": 271200,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 15859,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 14699,
+    "intercept": 1160
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 919,
+    "roll": 3676,
+    "planEnd": 919,
+    "frameEnd": 15859
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1512x982",
+   "tag": "full+gate",
+   "seed": 271201,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 12643,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 11919,
+    "intercept": 724
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 745,
+    "roll": 2980,
+    "planEnd": 745,
+    "frameEnd": 12643
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1512x982",
+   "tag": "fork-traj",
+   "seed": 271202,
+   "mode": "fork",
+   "spawns": 0,
+   "frames": 12592,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 10640,
+    "intercept": 1952
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 665,
+    "roll": 2660,
+    "planEnd": 665,
+    "frameEnd": 12592
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1512x982",
+   "tag": "spawn-mid",
+   "seed": 271203,
+   "mode": "lockstep",
+   "spawns": 5,
+   "frames": 15133,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 14188,
+    "intercept": 945
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 887,
+    "roll": 3548,
+    "planEnd": 887,
+    "frameEnd": 15133
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1512x982",
+   "tag": "spawn-recross",
+   "seed": 271204,
+   "mode": "lockstep",
+   "spawns": 3,
+   "frames": 18136,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 17528,
+    "intercept": 608
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1096,
+    "roll": 4384,
+    "planEnd": 1096,
+    "frameEnd": 18136
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1512x982",
+   "tag": "spawn-spam",
+   "seed": 271205,
+   "mode": "lockstep",
+   "spawns": 48,
+   "frames": 22573,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 20968,
+    "intercept": 1605
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1311,
+    "roll": 5244,
+    "planEnd": 1311,
+    "frameEnd": 22573
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1680x1050",
+   "tag": "full+gate",
+   "seed": 271200,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 17151,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 15504,
+    "intercept": 1647
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 969,
+    "roll": 3876,
+    "planEnd": 969,
+    "frameEnd": 17151
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1680x1050",
+   "tag": "full+gate",
+   "seed": 271201,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 17064,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 15573,
+    "intercept": 1491
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 974,
+    "roll": 3896,
+    "planEnd": 974,
+    "frameEnd": 17064
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1680x1050",
+   "tag": "fork-traj",
+   "seed": 271202,
+   "mode": "fork",
+   "spawns": 0,
+   "frames": 16495,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 15406,
+    "intercept": 1089
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 963,
+    "roll": 3852,
+    "planEnd": 963,
+    "frameEnd": 16495
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1680x1050",
+   "tag": "spawn-mid",
+   "seed": 271203,
+   "mode": "lockstep",
+   "spawns": 5,
+   "frames": 16853,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 15807,
+    "intercept": 1046
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 988,
+    "roll": 3952,
+    "planEnd": 988,
+    "frameEnd": 16853
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1680x1050",
+   "tag": "spawn-recross",
+   "seed": 271204,
+   "mode": "lockstep",
+   "spawns": 3,
+   "frames": 15676,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 14616,
+    "intercept": 1060
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 914,
+    "roll": 3656,
+    "planEnd": 914,
+    "frameEnd": 15676
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_1680x1050",
+   "tag": "spawn-spam",
+   "seed": 271205,
+   "mode": "lockstep",
+   "spawns": 48,
+   "frames": 21396,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 20352,
+    "intercept": 1044
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1272,
+    "roll": 5088,
+    "planEnd": 1272,
+    "frameEnd": 21396
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_2560x1440",
+   "tag": "full+gate",
+   "seed": 271200,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 25772,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 24066,
+    "intercept": 1706
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1505,
+    "roll": 6020,
+    "planEnd": 1505,
+    "frameEnd": 25772
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_2560x1440",
+   "tag": "full+gate",
+   "seed": 271201,
+   "mode": "lockstep",
+   "spawns": 0,
+   "frames": 24244,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 23065,
+    "intercept": 1179
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1442,
+    "roll": 5768,
+    "planEnd": 1442,
+    "frameEnd": 24244
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_2560x1440",
+   "tag": "fork-traj",
+   "seed": 271202,
+   "mode": "fork",
+   "spawns": 0,
+   "frames": 26271,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 24418,
+    "intercept": 1853
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1527,
+    "roll": 6108,
+    "planEnd": 1527,
+    "frameEnd": 26271
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_2560x1440",
+   "tag": "spawn-mid",
+   "seed": 271203,
+   "mode": "lockstep",
+   "spawns": 5,
+   "frames": 21734,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 20209,
+    "intercept": 1525
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1264,
+    "roll": 5056,
+    "planEnd": 1264,
+    "frameEnd": 21734
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_2560x1440",
+   "tag": "spawn-recross",
+   "seed": 271204,
+   "mode": "lockstep",
+   "spawns": 3,
+   "frames": 30238,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 28521,
+    "intercept": 1717
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1783,
+    "roll": 7132,
+    "planEnd": 1783,
+    "frameEnd": 30238
+   },
+   "hookProblems": []
+  },
+  {
+   "cell": "desk_2560x1440",
+   "tag": "spawn-spam",
+   "seed": 271205,
+   "mode": "lockstep",
+   "spawns": 48,
+   "frames": 31056,
+   "cleared": true,
+   "framesByRegime": {
+    "planner": 29387,
+    "intercept": 1669
+   },
+   "mismatches": 0,
+   "firstMismatchFrame": -1,
+   "hookCounts": {
+    "planStart": 1837,
+    "roll": 7348,
+    "planEnd": 1837,
+    "frameEnd": 31056
+   },
+   "hookProblems": []
+  }
+ ],
+ "mismatchSamples": []
+}
