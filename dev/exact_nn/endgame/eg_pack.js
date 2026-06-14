@@ -30,11 +30,14 @@ function parseArgs() {
 
 function main() {
     const a = parseArgs();
-    const files = fs.readdirSync(a.data).filter(f => f.endsWith('.commits.jsonl.gz')).sort();
-    const feat = [], label = [], mask = [], egIdx = [], margin = [], ncol = [], cell = [], seed = [];
+    const dirs = a.data.split(',');   // multi-dir: tag each commit with its source index
+    const feat = [], label = [], mask = [], egIdx = [], margin = [], ncol = [], cell = [], seed = [], src = [];
     let skipped = 0, egDerivedMismatch = 0;
-    for (const f of files) {
-        for (const line of zlib.gunzipSync(fs.readFileSync(path.join(a.data, f))).toString().split('\n')) {
+    for (let di = 0; di < dirs.length; di++) {
+      const dir = dirs[di];
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.commits.jsonl.gz')).sort();
+      for (const f of files) {
+        for (const line of zlib.gunzipSync(fs.readFileSync(path.join(dir, f))).toString().split('\n')) {
             if (!line) continue;
             const r = JSON.parse(line);
             const n = r.boids.length;
@@ -55,11 +58,12 @@ function main() {
             const reach = r.boids.map(b => b.t).filter(t => t != null).sort((x, y) => x - y);
             const mg = reach.length >= 2 ? reach[1] - reach[0] : null;
             feat.push(fr); label.push(lb); mask.push(mk); egIdx.push(r.egIdx);
-            margin.push(mg); ncol.push(n); cell.push(r.cell); seed.push(r.seed);
+            margin.push(mg); ncol.push(n); cell.push(r.cell); seed.push(r.seed); src.push(di);
         }
+      }
     }
     const out = { nfeat: EG_NFEAT, maxeg: MAXEG, count: feat.length,
-        feat, label, mask, egIdx, margin, n: ncol, cell, seed,
+        feat, label, mask, egIdx, margin, n: ncol, cell, seed, src, dirs,
         egDerivedMismatch, skipped };
     fs.writeFileSync(a.out, zlib.gzipSync(JSON.stringify(out)));
     process.stderr.write(`packed ${feat.length} commits -> ${a.out}; egDerivedMismatch=${egDerivedMismatch} skipped(N>5 or 0)=${skipped}\n`);
