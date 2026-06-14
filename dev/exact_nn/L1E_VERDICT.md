@@ -78,36 +78,68 @@ large-cell mispredictions to the exact-scan fallback.
 
 ## Results — SEALED verdict @ sealOffset 40 (hidden seeds, never seen before)
 
-| metric | scatter (startBoids 2..5) | natural (full-game) |
+NN-share is reported two ways. **Raw** counts every egBoid commit; **non-trivial** excludes
+n=1 sole-boid commits (~29%), which are trivially exact (one boid is always the argmin) and
+flow entirely into cert+trusted — they say nothing about the NN on contested geometry. The
+**non-trivial figure is the honest "how NN-driven is the endgame" number** (audit angle 4).
+
+| metric | scatter (startBoids 2..5) | natural (full-game, deployable) |
 |---|---|---|
 | games / endgame commits | 4,200 / **13,122** | _pending_ |
 | intercept frames | 5,861,945 | _pending_ |
 | **S_eg** (egBoid agreement) | **100%** (egDisagree 0) | _pending_ |
 | **S_frame** (bitwise force) | **100%** (forceMismatch 0) | _pending_ |
 | **S_traj** (identical to extinction) | **100%** (4200/4200) | _pending_ |
-| **NN-share** = (cert+trusted)/commits | **67.1%** | _pending_ |
-| · cert-share (zero-risk, no τ) | 60.0% (7,879) | _pending_ |
-| · trusted-share (τ-gated) | 7.1% (926) | _pending_ |
-| · fallback-share (exact scan) | 32.9% (4,317) | _pending_ |
+| sole-reachable n=1 (trivial) share | 28.9% | _pending_ |
+| **NN-share (non-trivial, n≥2)** | **53.7%** | _pending_ |
+| · cert (non-trivial, zero-risk) | **48.3%** | _pending_ |
+| · trusted (non-trivial, τ-gated) | 5.4% | _pending_ |
+| NN-share (raw, n=1 included) | 67.1% (cert 60.0% + trusted 7.1%) | _pending_ |
+| fallback-share (exact scan) | 32.9% | _pending_ |
 | residual (rule-of-3 on 926 trusted) | ≤0.32%/commit, ≤1.0%/game | _pending_ |
 
-frozen τ = 95.9 frames · reliability monotone: yes · calib commits 13,201 · egDisagree on
-cert: 0 / forceMismatch on cert: 0.
+frozen τ = 95.9 frames · monotone reliability · calib 13,201 commits · 0 certified disagreements.
+Per-cell non-trivial NN-share 48–64% (rises with cell size); egDisagree 0 in EVERY cell.
 
-## Verdict (scatter — headline)
+## Verdict (scatter)
 
 **L1e is BITWISE-EXACT to prod on the sealed scatter set: 0 force mismatches over 13,122
 egBoid commits / 5.86M intercept frames, all 4,200 endgame trajectories identical to
-extinction.** The frozen τ **generalized** (0 sealed trusted disagreements) — unlike L1h v2a,
-which the same one-shot machinery FAILED (2 disagreements) — because the endgame egBoid is
-**separable scan-t torus geometry**, not a chaotic rollout. The endgame is genuinely NN-driven:
-**NN-share 67.1%** (cert 60.0% provably exact + 7.1% τ-trusted), vs D1's planner fast-path ~0.
-The certificate is the zero-risk backbone (independently SOUND, 0 false certs / 2,000,000);
-the τ-margin adds a further 7.1%, conservatively gated to exclude the NN's rare large-cell
-scan-t mispredictions, with residual ≤0.32% per trusted commit (rule-of-three, 0 observed).
+extinction, uniform across all 6 device cells.** The frozen τ **generalized** (0 sealed
+trusted disagreements) — unlike L1h v2a, which the same one-shot machinery FAILED (2
+disagreements) — because the endgame egBoid is **separable scan-t torus geometry**, not a
+chaotic rollout. The endgame is genuinely NN-driven: **non-trivial NN-share 53.7%** (cert
+48.3% provably exact + 5.4% τ-trusted) on contested (n≥2) commits — vs D1's planner fast-path
+~0. The certificate is the zero-risk backbone (independently SOUND, 0 false certs / 2,000,000
++ ~146M audit samples); the τ-margin adds 5.4% more, conservatively gated (τ=95.9f) to exclude
+the NN's rare large-cell scan-t mispredictions, residual ≤0.32%/trusted commit (0 observed).
 
-This closes the program's two-regime story: **planner (N>5) exact with NN fast-path ~0
-(rollout-dominated, proven); endgame (N≤5) exact with NN-share ~67% (separable, NN-driven);
-the value net necessary throughout.** L0 + L1h + L1e ship bitwise-exact to prod.
+## Adversarial audit (4 independent skeptic agents + synthesis)
 
-_(natural-distribution row + 4-angle adversarial audit synthesis appended below on completion.)_
+`evidence/l1e_adversarial_audit.json`. **Bitwise-exactness / safety SURVIVES all 4 angles:**
+1. **Cert soundness** (none): the U(k)<min L(j) sandwich is provably sound (sound integer
+   lower bound via triangle inequality + verified-reachable upper bound + strict inequality,
+   U≤TMAX guard); ~146M fresh adversarial commits (incl. 2.3M exact-tie geometries), **0 false
+   certs**; published 2M reproduced live; eg_scan oracle bit-identical to prod over 5M.
+2. **egBoid-match ⇒ force-exact** (minor): intercept()'s downstream is verbatim and branch-free
+   on egBoid provenance; the injection is a proven pure-insert; fork no-resync S_traj=100% over
+   28k closed-loop frames proves the held-until-caught state stays identical to extinction; the
+   harness's bitwise (u32, −0/NaN-aware) compare catches a single ulp (broken1ulp self-test).
+3. **τ-generalization** (minor): τ is one-shot, cryptographically chained to the CALIB file
+   (inputSha256); sealed seeds HMAC-fresh, FLOOR 290000, disjoint from calib; salt commitment
+   pre-registered. Independent shadow re-probe of 261,782 sealed commits: 0 disagreements among
+   22,701 genuine n≥2 trusted commits; near-τ band densely tested (1548 within 5f, all agree);
+   worst sealed disagreement 59.6f, a 36f gap below τ. (Caveat: τ on the *calibration* side is
+   pinned by a single outlier at 95.78f — robust on sealed, but a single-point freeze.)
+4. **Measurement integrity** (the headline fix): per-cell exactness all-zero (no pooled mask);
+   harness egCommits == gate commits (no double-count). It CAUGHT that the raw NN-share over-
+   counted n=1 trivials (~29%) — corrected above: the non-trivial figure is now the headline.
+
+## Bottom line
+
+**L0 + L1h + L1e ship BITWISE-EXACT to prod.** The two-regime NN-share story, honestly stated:
+**planner (N>5) exact with NN fast-path ~0** (rollout-dominated, proven 4 ways); **endgame
+(N≤5) exact with a genuinely NN-driven ~54% of contested commits** (separable scan-t geometry;
+cert ~48% provably exact + ~5% τ-trusted; the rest exact-scan fallback); the **value net
+necessary throughout**. The exactness guarantee is distribution-invariant (the fallback absorbs
+every NN-uncertain case). _(natural-distribution row — the deployable number — appended below.)_

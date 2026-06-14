@@ -33,6 +33,14 @@
  "cert_total": 7879,
  "trusted_total": 926,
  "fallback_total": 4317,
+ "soleN1_total": 3793,
+ "soleN1_share": 0.289056546,
+ "nonTrivial_commits": 9329,
+ "NNshare_nonTrivial": 0.537249437,
+ "certShare_nonTrivial": 0.482902776,
+ "trustedShare_nonTrivial": 0.054346661,
+ "certNonTrivial_total": 4505,
+ "trustedNonTrivial_total": 507,
  "residual_risk": {
   "basis": "rule-of-three on TRUSTED (NN-margin) commits only; cert commits are zero-risk (sound).",
   "trusted_commits": 926,
@@ -63,9 +71,14 @@
    "trusted": 119,
    "fallback": 728,
    "interceptFrames": 577336,
+   "soleN1": 589,
+   "certNonTrivial": 720,
+   "trustedNonTrivial": 8,
    "S_eg": 1,
    "S_frame": 1,
-   "NNshare": 0.6440097799511002
+   "NNshare": 0.6440097799511002,
+   "NNshare_nonTrivial": 0.5,
+   "soleN1Share": 0.28801955990220046
   },
   {
    "W": 820,
@@ -83,9 +96,14 @@
    "trusted": 119,
    "fallback": 786,
    "interceptFrames": 842921,
+   "soleN1": 639,
+   "certNonTrivial": 726,
+   "trustedNonTrivial": 45,
    "S_eg": 1,
    "S_frame": 1,
-   "NNshare": 0.6420765027322405
+   "NNshare": 0.6420765027322405,
+   "NNshare_nonTrivial": 0.4951830443159923,
+   "soleN1Share": 0.29098360655737704
   },
   {
    "W": 1024,
@@ -103,9 +121,14 @@
    "trusted": 121,
    "fallback": 799,
    "interceptFrames": 761255,
+   "soleN1": 622,
+   "certNonTrivial": 711,
+   "trustedNonTrivial": 35,
    "S_eg": 1,
    "S_frame": 1,
-   "NNshare": 0.6312874942316566
+   "NNshare": 0.6312874942316566,
+   "NNshare_nonTrivial": 0.48284789644012943,
+   "soleN1Share": 0.2870327641901246
   },
   {
    "W": 1512,
@@ -123,9 +146,14 @@
    "trusted": 152,
    "fallback": 736,
    "interceptFrames": 1013391,
+   "soleN1": 644,
+   "certNonTrivial": 747,
+   "trustedNonTrivial": 93,
    "S_eg": 1,
    "S_frame": 1,
-   "NNshare": 0.6684684684684684
+   "NNshare": 0.6684684684684684,
+   "NNshare_nonTrivial": 0.5329949238578681,
+   "soleN1Share": 0.29009009009009007
   },
   {
    "W": 1680,
@@ -143,9 +171,14 @@
    "trusted": 158,
    "fallback": 689,
    "interceptFrames": 1089469,
+   "soleN1": 646,
+   "certNonTrivial": 772,
+   "trustedNonTrivial": 112,
    "S_eg": 1,
    "S_frame": 1,
-   "NNshare": 0.6894997746732763
+   "NNshare": 0.6894997746732763,
+   "NNshare_nonTrivial": 0.5619834710743802,
+   "soleN1Share": 0.2911221270842722
   },
   {
    "W": 2560,
@@ -163,9 +196,14 @@
    "trusted": 257,
    "fallback": 579,
    "interceptFrames": 1577573,
+   "soleN1": 653,
+   "certNonTrivial": 829,
+   "trustedNonTrivial": 214,
    "S_eg": 1,
    "S_frame": 1,
-   "NNshare": 0.7454945054945055
+   "NNshare": 0.7454945054945055,
+   "NNshare_nonTrivial": 0.6430332922318126,
+   "soleN1Share": 0.28703296703296705
   }
  ]
 }
