@@ -59,7 +59,47 @@ already pulled into my tree). Then:
 6. **Report** `L1E_VERDICT.md` + post NN-share to #6/#5. This is the LAST
    sign-off evidence for the L0+L1h+L1e deliverable.
 
+## STATUS 2026-06-14: PIPELINE BUILT + SELF-VALIDATED — standing by for final weights
+
+The full N≤5 verdict pipeline is committed (dc3b7f0) and mechanically validated.
+side-a is still iterating the student (uncommitted `data_eg_nat/`, `calib_eg_nat/`,
+`eg_weights_big96.json` → natural-distribution retrain + bigger net), so the FINAL
+egboidPick weights are NOT yet handed off. The egboidPick INTERFACE is stable, so the
+pipeline is weights-agnostic — at handoff, point the env at side-a's final files and run.
+
+Self-validated (current weights): τ=∞/cert-off → verbatim fallback BITWISE-EXACT
+(S_eg=S_frame=100%, traj identical); τ=∞/cert-on → cert path ~67% commits all exact;
+τ=0 → harness surfaces NN egDisagree + trajectory cascade; calib_eg eg_scan-disagrees
+== harness prod-egBoid egDisagree (eg_scan≡prod confirmed). FINAL eg_bound (U<=TMAX)
+SOUND at 0 false certs / 2,000,000 commits (`evidence/eg_cert_soundness_2000000.json`).
+
+### THE RUN, at handoff (set the env to side-a's FINAL egboidPick + weights):
+```
+EG=/workspace/.team/wt-exact-nn-oracle/dev/exact_nn/endgame   # or wherever final lands
+export EXACTNN_EG_STUDENT=$EG/egboidPick.js EXACTNN_EG_WEIGHTS=$EG/eg_weights.json
+# 0. re-sync + re-verify the FINAL cert if eg_bound changed:
+diff $EG/eg_bound.js dev/exact_nn/endgame/eg_bound.js || cp $EG/eg_bound.js dev/exact_nn/endgame/
+node verifier/eg_cert_verify.js 1000000 31         # expect 0 false certs
+# 1. CALIBRATION (publish range only) — both distributions:
+node verifier/calib_eg.js --seeds 1500 --scatter --out verifier/calib_eg_scatter.json
+node verifier/calib_eg.js --seeds 1500 --natural --out verifier/calib_eg_natural.json
+# 2. FREEZE τ one-shot (scatter is the high-volume calib; report natural too):
+node verifier/tau_calibrate_eg.js --in verifier/calib_eg_scatter.json --out verifier/frozen_tau_eg.json
+# 3. SEALED verdict @ offset 40 (NEVER seen before) — scatter + natural:
+node verifier/verdict_l1e.js --seeds 1200 --sealOffset 40 --scatter --out evidence/l1e_sealed_scatter.json
+node verifier/verdict_l1e.js --seeds 400  --sealOffset 40 --natural --out evidence/l1e_sealed_natural.json
+# 4. adversarial audit (Workflow): verifier/l1e_audit_workflow.js (4 angles + synth)
+# 5. reveal the sealed salt for the audit trail: node verifier/seal_seeds.js --reveal
+# 6. write L1E_VERDICT.md, post NN-share + exactness to #6.
+```
+Exactness gate: sealed egDisagree==0 AND forceMismatch==0 (else τ didn't generalize → FAIL,
+report honestly). NN-share = (cert+trusted)/commits; report sole-reachable(n=1) share separately
+(trivial); rule-of-three residual on TRUSTED commits only.
+
 ## Pipeline + infra (all committed, ready)
+- **L1e pipeline (NEW, committed dc3b7f0/6cec442): `candidates/l1e.js`,
+  `verifier/{calib_eg,tau_calibrate_eg,verdict_l1e,eg_cert_evidence.sh,handoff_watch.sh,
+  l1e_audit_workflow.js}`.** See THE RUN above.
 
 - Harness/instrument: `verifier/verdict.js` (S_dec/S_frame/S_traj + rule-of-three;
   `--sealOffset` for fresh sealed slice), `verifier/tau_calibrate.js`,
@@ -74,9 +114,9 @@ already pulled into my tree). Then:
   (system python; bundled py broken). Start loop `~/start_vm3.sh` (CSEK key
   `/shared/gcp-ml-forecast/csek.json`). L1e is geometry → JS suffices; GPU not
   needed unless a scale student-attack is wanted.
-- Watcher: `/tmp/student_watch.sh` (gone after /clear; re-make from this doc —
-  poll side-a branch tip / #5 / #6 / `/workspace/.team/` for the egboidPick
-  hand-off). Sealed salt + git are the durable state.
+- Watcher: `verifier/handoff_watch.sh` (committed) — polls side-a branch tip / #5 /
+  #6 / side-a worktree egboidPick+weights and exits on the handoff signal. Sealed
+  salt + git are the durable state.
 
 ## Don'ts
 - Never commit on `/workspace` (lead's checkout) or `main`. Work only in this
