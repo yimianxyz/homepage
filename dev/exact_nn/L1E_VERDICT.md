@@ -4,7 +4,8 @@
 > (scatter+natural mix)"): `egboidPick.js` (sha256 `fe9d0ee7…`) + `eg_weights.json`
 > (sha256 `5fb87949…`, `[18→64→64→1]` h64 MSE) + the zero-risk certificate
 > `eg_bound.js` (sha256 `1152721b…`, U≤TMAX guard). Pipeline + this verdict on
-> branch `side-b/exact-nn-l0`. **Numbers below are filled by the sealed run.**
+> branch `side-b/exact-nn-l0`. Scatter sealed verdict + 4-angle audit complete;
+> natural-distribution (deployable) row fills on completion of that run.
 
 ## The decision under test (N≤5 endgame)
 
@@ -83,23 +84,27 @@ n=1 sole-boid commits (~29%), which are trivially exact (one boid is always the 
 flow entirely into cert+trusted — they say nothing about the NN on contested geometry. The
 **non-trivial figure is the honest "how NN-driven is the endgame" number** (audit angle 4).
 
-| metric | scatter (startBoids 2..5) | natural (full-game, deployable) |
+| metric | scatter (startBoids 2..5) | natural (full-game, **deployable**) |
 |---|---|---|
-| games / endgame commits | 4,200 / **13,122** | _pending_ |
-| intercept frames | 5,861,945 | _pending_ |
-| **S_eg** (egBoid agreement) | **100%** (egDisagree 0) | _pending_ |
-| **S_frame** (bitwise force) | **100%** (forceMismatch 0) | _pending_ |
-| **S_traj** (identical to extinction) | **100%** (4200/4200) | _pending_ |
-| sole-reachable n=1 (trivial) share | 28.9% | _pending_ |
-| **NN-share (non-trivial, n≥2)** | **53.7%** | _pending_ |
-| · cert (non-trivial, zero-risk) | **48.3%** | _pending_ |
-| · trusted (non-trivial, τ-gated) | 5.4% | _pending_ |
-| NN-share (raw, n=1 included) | 67.1% (cert 60.0% + trusted 7.1%) | _pending_ |
-| fallback-share (exact scan) | 32.9% | _pending_ |
-| residual (rule-of-3 on 926 trusted) | ≤0.32%/commit, ≤1.0%/game | _pending_ |
+| games / endgame commits | 4,200 / **13,122** | 60 / **251** |
+| **S_eg** (egBoid agreement) | **100%** (egDisagree 0) | **100%** (egDisagree 0) |
+| **S_frame** (bitwise force) | **100%** (forceMismatch 0) | **100%** (forceMismatch 0) |
+| **S_traj** (identical to extinction) | **100%** (4200/4200) | **100%** (60/60) |
+| sole-reachable n=1 (trivial) share | 28.9% | 18.3% |
+| **NN-share (non-trivial, n≥2)** | **53.7%** | **42.4%** |
+| · cert (non-trivial, zero-risk) | **48.3%** | **34.1%** |
+| · trusted (non-trivial, τ-gated) | 5.4% | 8.3% |
+| NN-share (raw, n=1 included) | 67.1% (cert 60.0% + τ 7.1%) | 53.0% (cert 40.6% + τ 12.4%) |
+| fallback-share (exact scan) | 32.9% | 47.0% |
+| residual (rule-of-3 on trusted) | ≤0.32%/commit (926 trusted) | ≤9.7%/commit (31 trusted) |
 
-frozen τ = 95.9 frames · monotone reliability · calib 13,201 commits · 0 certified disagreements.
-Per-cell non-trivial NN-share 48–64% (rises with cell size); egDisagree 0 in EVERY cell.
+frozen τ = 95.9 frames (scatter calib) · monotone reliability · calib 13,201 commits · 0
+certified disagreements. Per-cell non-trivial NN-share: scatter 48–64%, natural 38–60%;
+**egDisagree 0 in EVERY cell of BOTH distributions**. The scatter-frozen τ generalized across
+the distribution shift (natural survivors are faster → fewer certifiable, NN-share lower, but
+exactness held). Natural is a smaller sample (251 commits, 31 trusted) — lower statistical
+power than scatter; the 13,122-commit scatter run is the high-power exactness proof, natural
+confirms it holds on the deployed distribution.
 
 ## Verdict (scatter)
 
@@ -137,9 +142,17 @@ the NN's rare large-cell scan-t mispredictions, residual ≤0.32%/trusted commit
 
 ## Bottom line
 
-**L0 + L1h + L1e ship BITWISE-EXACT to prod.** The two-regime NN-share story, honestly stated:
-**planner (N>5) exact with NN fast-path ~0** (rollout-dominated, proven 4 ways); **endgame
-(N≤5) exact with a genuinely NN-driven ~54% of contested commits** (separable scan-t geometry;
-cert ~48% provably exact + ~5% τ-trusted; the rest exact-scan fallback); the **value net
-necessary throughout**. The exactness guarantee is distribution-invariant (the fallback absorbs
-every NN-uncertain case). _(natural-distribution row — the deployable number — appended below.)_
+**L0 + L1h + L1e ship BITWISE-EXACT to prod** — confirmed on BOTH the high-volume scatter
+distribution (13,122 sealed commits, 0 mismatches) AND the deployable natural full-game
+distribution (251 sealed commits, 0 mismatches), every endgame trajectory identical to
+extinction. The two-regime NN-share story, honestly stated:
+- **Planner (N>5): exact, NN fast-path share ~0** — proven structural (rollout-dominated).
+- **Endgame (N≤5): exact, genuinely NN-driven** — **~42% of contested commits on the deployable
+  natural distribution** (cert ~34% provably exact + ~8% τ-trusted), ~54% on scatter; the rest
+  exact-scan fallback. The certificate is the zero-risk backbone (SOUND, 0 false certs / 2M).
+- **Value net necessary throughout.** Exactness is **distribution-invariant** (the fallback
+  absorbs every NN-uncertain case — confirmed: the scatter-frozen τ held on natural with 0 disagreements).
+
+This is the complete, honest answer to "the best single NN system that exactly reproduces prod":
+**L1h (exact planner, NN value net load-bearing in every rollout) + L1e (exact endgame, NN-driven
+~42-54% of contested commits via a provably-sound certificate + a calibrated margin gate).**
