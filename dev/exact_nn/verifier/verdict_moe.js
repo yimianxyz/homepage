@@ -85,7 +85,7 @@ function seedList(opt) {
 function newAcc(extra) {
     return Object.assign({ plans: 0, planDisagree: 0, egCommits: 0, egDisagree: 0,
         games: 0, lockstepCleared: 0, forkCleared: 0, trajIdentical: 0, firstDiv: [],
-        gateFlips: 0, gateMalformed: 0,   // candidate self-reported flips (calibration cross-check)
+        gateFlips: 0, gateMalformed: 0, soleN1: 0,   // candidate self-reported flips + n==1 sole-boid commits
         fsLockP: { cos: 0, rel: 0, n: 0 }, fsLockE: { cos: 0, rel: 0, n: 0 },
         fsForkP: { cos: 0, rel: 0, n: 0 }, fsForkE: { cos: 0, rel: 0, n: 0 } }, extra || {});
 }
@@ -105,11 +105,13 @@ async function runCell(opt, c, seeds, base) {
         const cfg = Object.assign({}, base, { W: c.W, H: c.H, startBoids, scatter: !opt.natural });
         // lockstep (resync) — S_dec + S_force texture on prod's trajectory
         const L = await runGame(Object.assign({}, cfg, { mode: 'lockstep', resync: true, forceSim: opt.forceSim }), seed, opt.candidate);
-        const gs = global.__moeStatsLast;   // the candidate's own counters for THIS (lockstep) game
+        // the candidate's own counters for THIS (lockstep) game (moe.js OR egnn.js —
+        // audit caught that egnn sets __egnnStatsLast, so read both prefixes).
+        const gs = global.__egnnStatsLast || global.__moeStatsLast;
         C.games++; if (L.cleared) C.lockstepCleared++;
         if (L.decisions) { C.plans += L.decisions.plans; C.planDisagree += L.decisions.planDisagree;
             C.egCommits += L.decisions.egCommits; C.egDisagree += L.decisions.egDisagree; }
-        if (gs) { C.gateFlips += gs.flips || 0; C.gateMalformed += gs.malformed || 0; }
+        if (gs) { C.gateFlips += gs.flips || 0; C.gateMalformed += gs.malformed || 0; C.soleN1 += gs.soleN1 || 0; }
         if (L.forceSim) { addForceSim(C.fsLockP, L.forceSim.planner); addForceSim(C.fsLockE, L.forceSim.endgame); }
         // fork (no resync, candidate force applied) — S_traj + free-run S_force
         const F = await runGame(Object.assign({}, cfg, { mode: 'fork', resync: false, forceSim: opt.forceSim }), seed, opt.candidate);
@@ -134,12 +136,15 @@ function cellReport(C) {
         S_traj_identical_frac: rnd(C.games ? C.trajIdentical / C.games : null),
         S_traj_median_first_div: median(C.firstDiv),
         forkClearedFrac: rnd(C.games ? C.forkCleared / C.games : null),
-        gateFlips: C.gateFlips, gateMalformed: C.gateMalformed,
+        gateFlips: C.gateFlips, gateMalformed: C.gateMalformed, soleN1: C.soleN1,
+        // n==1 sole-boid commits trivially agree (single boid = the only pick) → report the
+        // non-trivial (contested, n≥2) endgame S_dec too (audit F2: n=1 inflates the denom).
+        S_dec_endgame_nonTrivial: rnd(sdec(C.egDisagree, C.egCommits - C.soleN1)),
         // raw summable counters so per-cell shard reports merge EXACTLY (merge_moe_reports.js)
         _raw: { plans: C.plans, planDisagree: C.planDisagree, egCommits: C.egCommits, egDisagree: C.egDisagree,
             games: C.games, lockstepCleared: C.lockstepCleared, forkCleared: C.forkCleared,
             trajIdentical: C.trajIdentical, firstDiv: C.firstDiv, gateFlips: C.gateFlips, gateMalformed: C.gateMalformed,
-            fsLockP: C.fsLockP, fsLockE: C.fsLockE, fsForkP: C.fsForkP, fsForkE: C.fsForkE },
+            soleN1: C.soleN1, fsLockP: C.fsLockP, fsLockE: C.fsLockE, fsForkP: C.fsForkP, fsForkE: C.fsForkE },
     };
 }
 
@@ -158,7 +163,7 @@ async function runVerdict(opt) {
     const perCell = [];
     for (const c of cs) {
         const C = await runCell(opt, c, seeds, base);
-        for (const k of ['plans', 'planDisagree', 'egCommits', 'egDisagree', 'games', 'lockstepCleared', 'forkCleared', 'trajIdentical', 'gateFlips', 'gateMalformed']) P[k] += C[k];
+        for (const k of ['plans', 'planDisagree', 'egCommits', 'egDisagree', 'games', 'lockstepCleared', 'forkCleared', 'trajIdentical', 'gateFlips', 'gateMalformed', 'soleN1']) P[k] += C[k];
         P.firstDiv.push(...C.firstDiv);
         for (const k of ['fsLockP', 'fsLockE', 'fsForkP', 'fsForkE']) { P[k].cos += C[k].cos; P[k].rel += C[k].rel; P[k].n += C[k].n; }
         const cr = cellReport(C);
@@ -195,6 +200,9 @@ async function runVerdict(opt) {
         // gateMalformed > 0 ⇒ the NN returned out-of-range slots (a model defect,
         // penalized as disagreements — NOT silently corrected to prod). Honesty flag.
         gateMalformed_total: P.gateMalformed, gateFlips_total: P.gateFlips,
+        soleN1_total: P.soleN1, soleN1_frac: rnd(P.egCommits ? P.soleN1 / P.egCommits : null),
+        nonTrivial_egCommits: P.egCommits - P.soleN1,
+        S_dec_endgame_nonTrivial: rnd(sdec(P.egDisagree, P.egCommits - P.soleN1)),
         S_force_lockstep: { planner_cos: rnd(mean(P.fsLockP)), planner_rel: rnd(meanRel(P.fsLockP)),
             endgame_cos: rnd(mean(P.fsLockE)), endgame_rel: rnd(meanRel(P.fsLockE)) },
         S_force_fork: { planner_cos: rnd(mean(P.fsForkP)), planner_rel: rnd(meanRel(P.fsForkP)),
@@ -284,7 +292,7 @@ async function runVerdictWithSeeds(opt, seeds, label) {
     const perCell = [];
     for (const c of cs) {
         const C = await runCell(opt, c, seeds, base);
-        for (const k of ['plans', 'planDisagree', 'egCommits', 'egDisagree', 'games', 'lockstepCleared', 'forkCleared', 'trajIdentical', 'gateFlips', 'gateMalformed']) P[k] += C[k];
+        for (const k of ['plans', 'planDisagree', 'egCommits', 'egDisagree', 'games', 'lockstepCleared', 'forkCleared', 'trajIdentical', 'gateFlips', 'gateMalformed', 'soleN1']) P[k] += C[k];
         P.firstDiv.push(...C.firstDiv);
         for (const k of ['fsLockP', 'fsLockE', 'fsForkP', 'fsForkE']) { P[k].cos += C[k].cos; P[k].rel += C[k].rel; P[k].n += C[k].n; }
         perCell.push(cellReport(C));

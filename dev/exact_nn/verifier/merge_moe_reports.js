@@ -33,12 +33,12 @@ function main() {
     const cells = [...byCell.values()];
 
     const P = { plans: 0, planDisagree: 0, egCommits: 0, egDisagree: 0, games: 0,
-        lockstepCleared: 0, forkCleared: 0, trajIdentical: 0, gateFlips: 0, gateMalformed: 0,
+        lockstepCleared: 0, forkCleared: 0, trajIdentical: 0, gateFlips: 0, gateMalformed: 0, soleN1: 0,
         firstDiv: [], fsLockP: { cos: 0, rel: 0, n: 0 }, fsLockE: { cos: 0, rel: 0, n: 0 },
         fsForkP: { cos: 0, rel: 0, n: 0 }, fsForkE: { cos: 0, rel: 0, n: 0 } };
     for (const c of cells) {
         const r = c._raw;
-        for (const k of ['plans', 'planDisagree', 'egCommits', 'egDisagree', 'games', 'lockstepCleared', 'forkCleared', 'trajIdentical', 'gateFlips', 'gateMalformed']) P[k] += r[k];
+        for (const k of ['plans', 'planDisagree', 'egCommits', 'egDisagree', 'games', 'lockstepCleared', 'forkCleared', 'trajIdentical', 'gateFlips', 'gateMalformed', 'soleN1']) P[k] += (r[k] || 0);
         P.firstDiv.push(...(r.firstDiv || []));
         for (const k of ['fsLockP', 'fsLockE', 'fsForkP', 'fsForkE']) addFS(P[k], r[k]);
     }
@@ -62,6 +62,9 @@ function main() {
         egCommits_total: P.egCommits, egDisagree_total: P.egDisagree,
         decisions_total: P.plans + P.egCommits, disagree_total: P.planDisagree + P.egDisagree,
         gateMalformed_total: P.gateMalformed, gateFlips_total: P.gateFlips,
+        soleN1_total: P.soleN1, soleN1_frac: rnd(P.egCommits ? P.soleN1 / P.egCommits : null),
+        nonTrivial_egCommits: P.egCommits - P.soleN1,
+        S_dec_endgame_nonTrivial: rnd(sdec(P.egDisagree, P.egCommits - P.soleN1)),
         S_force_lockstep: { planner_cos: rnd(mean(P.fsLockP)), planner_rel: rnd(meanRel(P.fsLockP)),
             endgame_cos: rnd(mean(P.fsLockE)), endgame_rel: rnd(meanRel(P.fsLockE)) },
         S_force_fork: { planner_cos: rnd(mean(P.fsForkP)), planner_rel: rnd(meanRel(P.fsForkP)),
