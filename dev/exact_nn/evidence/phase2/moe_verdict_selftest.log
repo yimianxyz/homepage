@@ -1,0 +1,12 @@
+PASS  oracle full-game: S_dec pooled == 100%  (100.000%, 1816 decisions)
+PASS  oracle full-game: planner == 100%  (100.000%, 1805 plans)
+PASS  oracle full-game: endgame == 100%  (100.000%, 11 egCommits)
+PASS  oracle: S_traj fully identical (no divergence, no fallback)  (frac 1)
+PASS  oracle: S_force fork cos≈1 both regimes  (pl 1 eg 1)
+PASS  oracle: gate PASS
+PASS  perturb endgame: harness egDisagree == gate flips (exact calibration)  (egDisagree=15 flips=15 over 118 egCommits)
+PASS  perturb: gate correctly FAILS (<95%)
+PASS  perturb: 0 malformed (clean flip path)
+PASS  perturb full-game: harness disagree == gate flips, both regimes (exact)  (disagree=159 flips=159 over 1756 decisions, S_dec_pl=90.935%)
+MOE-VERDICT SELFTEST: ALL PASS
+EXIT=0

@@ -187,6 +187,10 @@ async function runGame(opt, seed, candidateSpec) {
 
     let mmCount = 0, firstMM = -1, resyncs = 0;
     const mismatches = [];
+    // S_force texture (Phase-2; opt.forceSim, default off → fully inert). Per
+    // force-decision frame (boids.length>0): cosine(rf,cf) + rel-magnitude
+    // min/max, split by regime. Both forces (0,0)→perfect; exactly one zero→0,0.
+    const fsP = { cos: 0, rel: 0, n: 0 }, fsE = { cos: 0, rel: 0, n: 0 };
     let fDigest = fnvInit();
     const regime = { planner: 0, intercept: 0, zero: 0 };
     // decision-level (PRIMARY metric per the #6 spec revision)
@@ -213,6 +217,14 @@ async function runGame(opt, seed, candidateSpec) {
         fDigest = fnvWord(fnvWord(fDigest, _u32[2]), _u32[3]);
         if (boids.length === 0) regime.zero++;
         else if (boids.length <= 5) regime.intercept++; else regime.planner++;
+        if (opt.forceSim && cand && boids.length > 0) {
+            const mr = Math.sqrt(rf.x * rf.x + rf.y * rf.y), mc = Math.sqrt(cf.x * cf.x + cf.y * cf.y);
+            const acc = boids.length <= 5 ? fsE : fsP;
+            if (mr === 0 && mc === 0) { acc.cos += 1; acc.rel += 1; }
+            else if (mr !== 0 && mc !== 0) { acc.cos += (rf.x * cf.x + rf.y * cf.y) / (mr * mc); acc.rel += Math.min(mr, mc) / Math.max(mr, mc); }
+            // exactly one zero → cos+=0, rel+=0 (worst)
+            acc.n++;
+        }
 
         let decBad = false;
         if (decisions) {
@@ -293,6 +305,7 @@ async function runGame(opt, seed, candidateSpec) {
         mismatchCount: mmCount, firstMismatchFrame: firstMM,
         decisions: decisions ? dec : null, resyncs,
         mismatches, framesByRegime: regime,
+        forceSim: opt.forceSim ? { planner: fsP, endgame: fsE } : null,
         forceDigest: fDigest.toString(16), trajDigest: tDigest.toString(16),
         candName: cand ? cand.name : null,
         perturbedCalls: cand && cand.perturbedCalls ? cand.perturbedCalls.slice() : undefined,
@@ -326,6 +339,7 @@ async function selftest(opt) {
         const P  = await runGame(Object.assign({}, base, { decisions: false }), c.seed, null);  // PRISTINE load (no transform)
         const NR = await runGame(Object.assign({}, base, { fastRender: false }), c.seed, null);
         const I  = await runGame(base, c.seed, 'identity');              // identity candidate
+        const IF = await runGame(Object.assign({}, base, { forceSim: true }), c.seed, 'identity'); // S_force accumulator
         const B  = await runGame(base, c.seed, 'broken1ulp');            // lockstep, perturbed
         const F  = await runGame(Object.assign({}, base, { mode: 'fork' }), c.seed, 'broken1ulp');
 
@@ -335,6 +349,18 @@ async function selftest(opt) {
             P.trajDigest === A.trajDigest && P.forceDigest === A.forceDigest);
         check(c.tag + ': fastRender bitwise-identical', NR.trajDigest === A.trajDigest);
         check(c.tag + ': candidate eval does not disturb sim', I.trajDigest === A.trajDigest);
+        check(c.tag + ': forceSim flag is inert to all other metrics',
+            IF.trajDigest === A.trajDigest && IF.forceDigest === I.forceDigest && IF.mismatchCount === 0);
+        // identity forces are bitwise-equal every frame → cos≈1 (within fp ε of the
+        // two-sqrt normalization), rel-magnitude == 1 exactly (min/max of equals).
+        {
+            const fsN = IF.forceSim.planner.n + IF.forceSim.endgame.n;
+            const cos = (IF.forceSim.planner.cos + IF.forceSim.endgame.cos) / fsN;
+            const rel = (IF.forceSim.planner.rel + IF.forceSim.endgame.rel) / fsN;
+            check(c.tag + ': S_force(identity) cos≈1 & rel==1',
+                fsN > 0 && cos > 1 - 1e-9 && cos <= 1 + 1e-12 && rel === 1,
+                '(cos=' + cos.toFixed(12) + ' rel=' + rel + ' n=' + fsN + ')');
+        }
         check(c.tag + ': identity candidate -> 0 mismatches',
             I.mismatchCount === 0, '(' + I.frames + ' frames)');
         check(c.tag + ': N==0 post-extinction frames exercised',
