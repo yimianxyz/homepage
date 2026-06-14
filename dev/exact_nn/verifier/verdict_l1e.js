@@ -76,13 +76,15 @@ async function main() {
 
     const P = { egCommits: 0, egDisagree: 0, forceFrames: 0, forceMismatch: 0,
         games: 0, cleared: 0, trajIdentical: 0, firstDiv: [],
-        commits: 0, cert: 0, trusted: 0, fallback: 0, interceptFrames: 0 };
+        commits: 0, cert: 0, trusted: 0, fallback: 0, interceptFrames: 0,
+        soleN1: 0, certNonTrivial: 0, trustedNonTrivial: 0 };
     const perCell = [];
 
     for (const c of cs) {
         const C = { W: c.W, H: c.H, egCommits: 0, egDisagree: 0, forceFrames: 0,
             forceMismatch: 0, games: 0, cleared: 0, trajIdentical: 0, firstDiv: [],
-            commits: 0, cert: 0, trusted: 0, fallback: 0, interceptFrames: 0 };
+            commits: 0, cert: 0, trusted: 0, fallback: 0, interceptFrames: 0,
+            soleN1: 0, certNonTrivial: 0, trustedNonTrivial: 0 };
         for (let si = 0; si < seeds.length; si++) {
             const seed = seeds[si];
             const startBoids = opt.natural ? 0 : (2 + (si % 4));   // 2..5
@@ -91,23 +93,29 @@ async function main() {
             // lockstep: S_eg, S_frame, gate NN-share
             global.__l1eStatsLast = null;
             const L = await runGame(Object.assign({}, cfg, { mode: 'lockstep', resync: true }), seed, opt.candidate);
-            const gs = global.__l1eStatsLast || { commits: 0, cert: 0, trusted: 0, fallback: 0 };
+            const gs = global.__l1eStatsLast || { commits: 0, cert: 0, trusted: 0, fallback: 0, soleN1: 0, certNonTrivial: 0, trustedNonTrivial: 0 };
             C.games++; if (L.cleared) C.cleared++;
             C.interceptFrames += L.framesByRegime.intercept;
             C.forceFrames += L.framesByRegime.planner + L.framesByRegime.intercept + L.framesByRegime.zero;
             C.forceMismatch += L.mismatchCount;
             if (L.decisions) { C.egCommits += L.decisions.egCommits; C.egDisagree += L.decisions.egDisagree; }
             C.commits += gs.commits; C.cert += gs.cert; C.trusted += gs.trusted; C.fallback += gs.fallback;
+            C.soleN1 += gs.soleN1 || 0; C.certNonTrivial += gs.certNonTrivial || 0; C.trustedNonTrivial += gs.trustedNonTrivial || 0;
             // fork: S_traj (no resync → a wrong commit cascades through the endgame)
             const F = await runGame(Object.assign({}, cfg, { mode: 'fork', resync: false }), seed, opt.candidate);
             if (F.firstMismatchFrame < 0) C.trajIdentical++; else C.firstDiv.push(F.firstMismatchFrame);
         }
         for (const k of ['egCommits', 'egDisagree', 'forceFrames', 'forceMismatch', 'games', 'cleared',
-            'trajIdentical', 'commits', 'cert', 'trusted', 'fallback', 'interceptFrames']) P[k] += C[k];
+            'trajIdentical', 'commits', 'cert', 'trusted', 'fallback', 'interceptFrames',
+            'soleN1', 'certNonTrivial', 'trustedNonTrivial']) P[k] += C[k];
         P.firstDiv.push(...C.firstDiv);
         C.S_eg = C.egCommits ? 1 - C.egDisagree / C.egCommits : null;
         C.S_frame = C.forceFrames ? 1 - C.forceMismatch / C.forceFrames : null;
         C.NNshare = C.commits ? (C.cert + C.trusted) / C.commits : null;
+        // non-trivial = contested (n≥2) commits only; n=1 sole-boid commits are trivially exact
+        const cNT = C.commits - C.soleN1;
+        C.NNshare_nonTrivial = cNT ? (C.certNonTrivial + C.trustedNonTrivial) / cNT : null;
+        C.soleN1Share = C.commits ? C.soleN1 / C.commits : null;
         perCell.push(C);
         console.error(`[cell ${c.W}x${c.H}] S_eg=${fmt(C.S_eg)} S_frame=${fmt(C.S_frame)} `
             + `NN-share=${fmt(C.NNshare)} (cert=${fmt(C.commits ? C.cert / C.commits : null)}) `
@@ -136,6 +144,15 @@ async function main() {
         trustedShare: rnd(P.commits ? P.trusted / P.commits : null),
         fallbackShare: rnd(P.commits ? P.fallback / P.commits : null),
         commits_total: P.commits, cert_total: P.cert, trusted_total: P.trusted, fallback_total: P.fallback,
+        // NON-TRIVIAL breakdown (audit fix): n=1 sole-boid commits are trivially exact (one boid
+        // is always the argmin) and flow entirely into cert+trusted — they inflate the raw NN-share.
+        // The HEADLINE deployable figure is NNshare_nonTrivial over the contested (n≥2) commits.
+        soleN1_total: P.soleN1, soleN1_share: rnd(P.commits ? P.soleN1 / P.commits : null),
+        nonTrivial_commits: P.commits - P.soleN1,
+        NNshare_nonTrivial: rnd((P.commits - P.soleN1) ? (P.certNonTrivial + P.trustedNonTrivial) / (P.commits - P.soleN1) : null),
+        certShare_nonTrivial: rnd((P.commits - P.soleN1) ? P.certNonTrivial / (P.commits - P.soleN1) : null),
+        trustedShare_nonTrivial: rnd((P.commits - P.soleN1) ? P.trustedNonTrivial / (P.commits - P.soleN1) : null),
+        certNonTrivial_total: P.certNonTrivial, trustedNonTrivial_total: P.trustedNonTrivial,
         residual_risk: {
             basis: 'rule-of-three on TRUSTED (NN-margin) commits only; cert commits are zero-risk (sound).',
             trusted_commits: nTrusted, per_trusted_commit_upper95: rnd(ruleOf3),

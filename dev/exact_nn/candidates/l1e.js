@@ -33,7 +33,9 @@
 //   EXACTNN_EG_WEIGHTS  → eg_weights.json (default ../endgame/eg_weights.json)
 //   EXACTNN_EG_USECERT  → '0' disables the certificate path (pure τ-margin gate)
 // τ source (priority): opts.tau → EXACTNN_EG_TAU → verifier/frozen_tau_eg.json:chosenTau.
-//   τ=+Inf & USECERT=0 ⇒ pure prod (gate always abstains; 0 mismatches self-test).
+//   τ=+Inf & USECERT=0 ⇒ gate abstains on all CONTESTED commits → prod's exact scan
+//     (n=1 sole-boid commits still commit as 'trusted' since margin=Infinity≥τ, but those
+//     are trivially exact — one boid is always the argmin; 0 mismatches in the self-test).
 //   τ=+Inf & USECERT=1 ⇒ cert-only fast path (all commits provably exact).
 //   τ=0               ⇒ trust the NN whenever cert misses (NN-alone egBoid agreement).
 'use strict';
