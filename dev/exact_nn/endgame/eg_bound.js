@@ -14,7 +14,7 @@
 // moot. Sound by construction → zero residual risk, no τ.
 'use strict';
 const { analyticT, wrap } = require('./eg_features.js');
-const SM = 2.5, BORDER_OFFSET = 10, PROBE = 12;
+const SM = 2.5, BORDER_OFFSET = 10, PROBE = 12, TMAX = 1400;   // TMAX mirrors intercept()'s scan horizon
 
 function soundLowerT(px, py, bx, by, bvx, bvy, W, Hc) {
     const PX = W + 2 * BORDER_OFFSET, PY = Hc + 2 * BORDER_OFFSET;
@@ -25,16 +25,21 @@ function soundLowerT(px, py, bx, by, bvx, bvy, W, Hc) {
 }
 
 // verified reachable integer t (sound upper bound on scan-t), probing near analytic-t.
+// Mirrors prod's scan horizon EXACTLY: only integers t in [0,TMAX] count as reachable
+// (prod returns null for scan-t>TMAX). The explicit t<=TMAX guard makes U match prod's
+// reachability DEFINITION — so the certificate's soundness no longer rests on the
+// implicit numeric coincidence maxL(593)<TMAX(1400) (L1e audit, soundness lens).
 function soundUpperT(px, py, bx, by, bvx, bvy, W, Hc) {
     const PX = W + 2 * BORDER_OFFSET, PY = Hc + 2 * BORDER_OFFSET;
     const rwx = wrap(bx - px, PX), rwy = wrap(by - py, PY);
     const at = analyticT(rwx, rwy, bvx, bvy);
     const start = at == null ? 0 : Math.max(0, Math.floor(at));
-    for (let t = start; t <= start + PROBE; t++) {
+    if (start > TMAX) return null;                     // beyond prod's scan horizon
+    for (let t = start; t <= start + PROBE && t <= TMAX; t++) {
         const ddx = wrap(bx + bvx * t - px, PX), ddy = wrap(by + bvy * t - py, PY);
         if (Math.sqrt(ddx * ddx + ddy * ddy) <= SM * t) return t;
     }
-    return null;       // could not cheaply verify reachability near analytic-t
+    return null;       // could not cheaply verify reachability within [start, start+PROBE]∩[0,TMAX]
 }
 
 // certify proposed egIdx k (boids: [{x,y,vx,vy}]). Returns true iff PROVABLY argmin.
