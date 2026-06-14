@@ -12,17 +12,18 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
-const { egBoidFeatures, EG_NFEAT, TMAX } = require('./eg_features.js');
+const { TMAX } = require('./eg_features.js');
 const { egPick } = require('./eg_scan.js');
 
 const MAXEG = 5;
 
 function parseArgs() {
-    const a = { data: path.join(__dirname, 'data_eg'), out: path.join(__dirname, 'packed_eg.json.gz') };
+    const a = { data: path.join(__dirname, 'data_eg'), out: path.join(__dirname, 'packed_eg.json.gz'), raw: false };
     for (let i = 2; i < process.argv.length; i++) {
         const k = process.argv[i];
         if (k === '--data') a.data = process.argv[++i];
         else if (k === '--out') a.out = process.argv[++i];
+        else if (k === '--raw') a.raw = true;   // use eg_features_raw (NO closed-form reach-time) — genuineness ablation
         else throw new Error('unknown arg ' + k);
     }
     return a;
@@ -30,6 +31,11 @@ function parseArgs() {
 
 function main() {
     const a = parseArgs();
+    const FEAT = a.raw ? require('./eg_features_raw.js') : require('./eg_features.js');
+    const egBoidFeatures = FEAT.egBoidFeatures, EG_NFEAT = FEAT.EG_NFEAT;
+    const featOf = a.raw
+        ? (r, b) => egBoidFeatures(r.px, r.py, r.pvx, r.pvy, r.psize, b.x, b.y, b.vx, b.vy, r.W, r.Hc)
+        : (r, b) => egBoidFeatures(r.px, r.py, b.x, b.y, b.vx, b.vy, r.W, r.Hc);
     const dirs = a.data.split(',');   // multi-dir: tag each commit with its source index
     const feat = [], label = [], mask = [], egIdx = [], margin = [], ncol = [], cell = [], seed = [], src = [];
     let skipped = 0, egDerivedMismatch = 0;
@@ -49,7 +55,7 @@ function main() {
             for (let i = 0; i < MAXEG; i++) {
                 if (i < n) {
                     const b = r.boids[i];
-                    fr.push(egBoidFeatures(r.px, r.py, b.x, b.y, b.vx, b.vy, r.W, r.Hc));
+                    fr.push(featOf(r, b));
                     lb.push((b.t == null ? TMAX : b.t) / 100.0);
                     mk.push(1);
                 } else { fr.push(new Array(EG_NFEAT).fill(0)); lb.push(TMAX / 100.0); mk.push(0); }
