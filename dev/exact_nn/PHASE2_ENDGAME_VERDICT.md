@@ -11,9 +11,9 @@
 | metric | distribution | S_dec | n | gate |
 |---|---|---|---|---|
 | **ENDGAME egBoid** (high-power) | sealed scatter, 6 cells | **99.418%** | 9,615 commits (56 dis) | ✅ |
-| FULL-POLICY pooled | sealed natural | {NAT_POOLED} | {NAT_DEC} | ✅ |
-| PLANNER (prod, unchanged) | sealed natural | {NAT_PL} | {NAT_PLANS} | ✅ |
-| ENDGAME egBoid | sealed natural | {NAT_EG} | {NAT_EGC} | ✅ |
+| FULL-POLICY pooled | sealed natural (4 cells) | **99.983%** | 29,232 decisions | ✅ |
+| PLANNER (prod, unchanged) | sealed natural | **100.000%** | 29,030 plans (0 dis) | ✅ |
+| ENDGAME egBoid | sealed natural | 97.525% | 202 commits | ✅ |
 
 Gate **S_dec ≥ 95%**, per-cell all ≥95% (table below). **0 malformed** (the pure NN
 always emitted a valid in-range egBoid — no hidden fallback exercised). `eg_weights.json`
@@ -88,7 +88,12 @@ clear of 95%; consistent ≥98.9% across all cells.
   no fallback, still clears the board in essentially every game.
 - **S_traj fully-identical = 98.21%** (endgame scatter): fraction of free-run games whose
   trajectory stays bitwise-identical to prod to extinction (a single egBoid flip cascades;
-  98% identical reflects the ~0.6% per-commit disagreement). {TRAJ_NAT}
+  98% identical reflects the ~0.6% per-commit disagreement).
+- **Full-policy (prod planner + endgame NN) natural, 4 cells:** planner S_dec **100.000%**
+  (0 disagreement over 29,030 plans — planner is verbatim prod, confirmed), pooled
+  **99.983%**, **forkClearedFrac = 100%** (the full policy clears every game), S_traj
+  fully-identical 89.6%. (2 largest cells omitted — full natural games there run hours;
+  the 9,615-commit scatter run is the high-power endgame proof.)
 
 ## Independent 4-angle adversarial audit
 {AUDIT}

@@ -1,0 +1,485 @@
+{
+ "phase": 2,
+ "merged_from": "6 shard reports",
+ "mode": "nn",
+ "weights": "eg_weights.json",
+ "weights_sha256": "f84abae26a9f75d328c07bbad526226d81830946752cf7ee64bf21c4be81f608",
+ "seedSet": "SEALED(hidden)@off0",
+ "seedCount": 512,
+ "sealOffset": 0,
+ "commitment_sha256_salt": "bac52d5149038958bf39748a602fe64edf74be462256951e95bff31a57b9fd8e",
+ "distribution": "scatter(endgame, startBoids 2..5)",
+ "cells": 6,
+ "devicematrix": [
+  "1024x768",
+  "1512x982",
+  "1680x1050",
+  "2560x1440",
+  "390x844",
+  "820x1180"
+ ],
+ "games": 3072,
+ "S_dec_pooled": 0.994175767,
+ "S_dec_planner": null,
+ "S_dec_endgame": 0.994175767,
+ "plans_total": 0,
+ "planDisagree_total": 0,
+ "egCommits_total": 9615,
+ "egDisagree_total": 56,
+ "decisions_total": 9615,
+ "disagree_total": 56,
+ "gateMalformed_total": 0,
+ "gateFlips_total": 0,
+ "S_force_lockstep": {
+  "planner_cos": null,
+  "planner_rel": null,
+  "endgame_cos": 0.999993605,
+  "endgame_rel": 0.999999542
+ },
+ "S_force_fork": {
+  "planner_cos": null,
+  "planner_rel": null,
+  "endgame_cos": 0.995468868,
+  "endgame_rel": 0.998682223
+ },
+ "S_traj_identical_frac": 0.982096354,
+ "S_traj_median_first_div": 699,
+ "forkClearedFrac": 0.998697917,
+ "lockstepClearedFrac": 0.998697917,
+ "gate": {
+  "threshold": 0.95,
+  "pooled_pass": true,
+  "planner_pass": true,
+  "endgame_pass": true,
+  "PASS": true
+ },
+ "perCell": [
+  {
+   "cell": "1024x768",
+   "games": 512,
+   "S_dec_pooled": 0.994949495,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.994949495,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 1584,
+   "egDisagree": 8,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999995036,
+    "endgame_rel": 0.999999776
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.995342036,
+    "endgame_rel": 0.998519368
+   },
+   "S_traj_identical_frac": 0.984375,
+   "S_traj_median_first_div": 767,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 1584,
+    "egDisagree": 8,
+    "games": 512,
+    "lockstepCleared": 512,
+    "forkCleared": 512,
+    "trajIdentical": 504,
+    "firstDiv": [
+     827,
+     767,
+     699,
+     1313,
+     0,
+     649,
+     1105,
+     727
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 564522.1974644545,
+     "rel": 564524.8738226434,
+     "n": 564525
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 561429.6427199374,
+     "rel": 563221.8390656458,
+     "n": 564057
+    }
+   }
+  },
+  {
+   "cell": "1512x982",
+   "games": 512,
+   "S_dec_pooled": 0.998159509,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.998159509,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 1630,
+   "egDisagree": 3,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999997928,
+    "endgame_rel": 0.999999927
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.997939893,
+    "endgame_rel": 0.999462339
+   },
+   "S_traj_identical_frac": 0.994140625,
+   "S_traj_median_first_div": 1470,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 1630,
+    "egDisagree": 3,
+    "games": 512,
+    "lockstepCleared": 512,
+    "forkCleared": 512,
+    "trajIdentical": 509,
+    "firstDiv": [
+     872,
+     1915,
+     1470
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 747701.45069275,
+     "rel": 747702.9456763677,
+     "n": 747703
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 746222.5282920026,
+     "rel": 747360.957312854,
+     "n": 747763
+    }
+   }
+  },
+  {
+   "cell": "1680x1050",
+   "games": 512,
+   "S_dec_pooled": 0.991458206,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.991458206,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 1639,
+   "egDisagree": 14,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999996616,
+    "endgame_rel": 0.999999741
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.992366692,
+    "endgame_rel": 0.996915729
+   },
+   "S_traj_identical_frac": 0.974609375,
+   "S_traj_median_first_div": 591,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 1639,
+    "egDisagree": 14,
+    "games": 512,
+    "lockstepCleared": 512,
+    "forkCleared": 512,
+    "trajIdentical": 499,
+    "firstDiv": [
+     1201,
+     591,
+     940,
+     0,
+     248,
+     0,
+     895,
+     2190,
+     825,
+     735,
+     0,
+     419,
+     255
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 804672.2768790319,
+     "rel": 804674.7919656754,
+     "n": 804675
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 798015.6447185896,
+     "rel": 801673.7712728886,
+     "n": 804154
+    }
+   }
+  },
+  {
+   "cell": "2560x1440",
+   "games": 512,
+   "S_dec_pooled": 0.996381182,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.996381182,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 1658,
+   "egDisagree": 6,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999996276,
+    "endgame_rel": 0.999999864
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.997784098,
+    "endgame_rel": 0.999664916
+   },
+   "S_traj_identical_frac": 0.98828125,
+   "S_traj_median_first_div": 754,
+   "forkClearedFrac": 0.9921875,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 1658,
+    "egDisagree": 6,
+    "games": 512,
+    "lockstepCleared": 508,
+    "forkCleared": 508,
+    "trajIdentical": 506,
+    "firstDiv": [
+     1136,
+     1045,
+     754,
+     584,
+     604,
+     725
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 1142979.7437178264,
+     "rel": 1142983.844180506,
+     "n": 1142984
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 1139676.978460497,
+     "rel": 1141825.2640124008,
+     "n": 1142208
+    }
+   }
+  },
+  {
+   "cell": "390x844",
+   "games": 512,
+   "S_dec_pooled": 0.989290495,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.989290495,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 1494,
+   "egDisagree": 16,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999964881,
+    "endgame_rel": 0.999996983
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.989401263,
+    "endgame_rel": 0.997400597
+   },
+   "S_traj_identical_frac": 0.96875,
+   "S_traj_median_first_div": 326,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 1494,
+    "egDisagree": 16,
+    "games": 512,
+    "lockstepCleared": 512,
+    "forkCleared": 512,
+    "trajIdentical": 496,
+    "firstDiv": [
+     235,
+     0,
+     429,
+     1348,
+     403,
+     778,
+     196,
+     326,
+     0,
+     439,
+     0,
+     0,
+     256,
+     928,
+     302,
+     339
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 423639.1215345966,
+     "rel": 423652.72186170693,
+     "n": 423654
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 418479.1370316764,
+     "rel": 421862.55110481166,
+     "n": 422962
+    }
+   }
+  },
+  {
+   "cell": "820x1180",
+   "games": 512,
+   "S_dec_pooled": 0.994409938,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.994409938,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 1610,
+   "egDisagree": 9,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999997918,
+    "endgame_rel": 0.999999766
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.996510816,
+    "endgame_rel": 0.999249621
+   },
+   "S_traj_identical_frac": 0.982421875,
+   "S_traj_median_first_div": 937,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 1610,
+    "egDisagree": 9,
+    "games": 512,
+    "lockstepCleared": 512,
+    "forkCleared": 512,
+    "trajIdentical": 503,
+    "firstDiv": [
+     1283,
+     1358,
+     937,
+     401,
+     626,
+     754,
+     1009,
+     1065,
+     647
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 614993.7194757988,
+     "rel": 614994.8558326145,
+     "n": 614995
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 612397.7500176504,
+     "rel": 614080.8605760217,
+     "n": 614542
+    }
+   }
+  }
+ ]
+}
