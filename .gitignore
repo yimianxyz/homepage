@@ -11,3 +11,8 @@ dev/exact_nn/student_v2a/student_weights.json
 dev/exact_nn/student_v2a/calib_margins_indep.json
 dev/exact_nn/evidence/altsig/*.gz
 dev/exact_nn/evidence/altsig/*recs*
+
+# Phase-2: large derived/ablation weight variants (reproducible via moe_ablate_weights.js)
+dev/exact_nn/evidence/phase2/moe_weights_noskip.json
+dev/exact_nn/evidence/phase2/moe_weights_nohead.json
+dev/exact_nn/evidence/phase2/shards/

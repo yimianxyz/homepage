@@ -134,6 +134,12 @@ function cellReport(C) {
         S_traj_identical_frac: rnd(C.games ? C.trajIdentical / C.games : null),
         S_traj_median_first_div: median(C.firstDiv),
         forkClearedFrac: rnd(C.games ? C.forkCleared / C.games : null),
+        gateFlips: C.gateFlips, gateMalformed: C.gateMalformed,
+        // raw summable counters so per-cell shard reports merge EXACTLY (merge_moe_reports.js)
+        _raw: { plans: C.plans, planDisagree: C.planDisagree, egCommits: C.egCommits, egDisagree: C.egDisagree,
+            games: C.games, lockstepCleared: C.lockstepCleared, forkCleared: C.forkCleared,
+            trajIdentical: C.trajIdentical, firstDiv: C.firstDiv, gateFlips: C.gateFlips, gateMalformed: C.gateMalformed,
+            fsLockP: C.fsLockP, fsLockE: C.fsLockE, fsForkP: C.fsForkP, fsForkE: C.fsForkE },
     };
 }
 
