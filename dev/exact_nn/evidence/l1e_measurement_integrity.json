@@ -1,0 +1,82 @@
+{
+ "check": "L1e sealed-scatter measurement integrity (independent re-aggregation; audit angle 4)",
+ "perCellExactness_allZero": true,
+ "perCell": [
+  {
+   "cell": "390xundefined",
+   "egCommits": 2045,
+   "egDisagree": 0,
+   "forceMismatch": 0,
+   "S_eg": 1,
+   "NNshare": 0.644,
+   "certShare": 0.5858,
+   "trustedShare": 0.0582
+  },
+  {
+   "cell": "820xundefined",
+   "egCommits": 2196,
+   "egDisagree": 0,
+   "forceMismatch": 0,
+   "S_eg": 1,
+   "NNshare": 0.6421,
+   "certShare": 0.5879,
+   "trustedShare": 0.0542
+  },
+  {
+   "cell": "1024xundefined",
+   "egCommits": 2167,
+   "egDisagree": 0,
+   "forceMismatch": 0,
+   "S_eg": 1,
+   "NNshare": 0.6313,
+   "certShare": 0.5754,
+   "trustedShare": 0.0558
+  },
+  {
+   "cell": "1512xundefined",
+   "egCommits": 2220,
+   "egDisagree": 0,
+   "forceMismatch": 0,
+   "S_eg": 1,
+   "NNshare": 0.6685,
+   "certShare": 0.6,
+   "trustedShare": 0.0685
+  },
+  {
+   "cell": "1680xundefined",
+   "egCommits": 2219,
+   "egDisagree": 0,
+   "forceMismatch": 0,
+   "S_eg": 1,
+   "NNshare": 0.6895,
+   "certShare": 0.6183,
+   "trustedShare": 0.0712
+  },
+  {
+   "cell": "2560xundefined",
+   "egCommits": 2275,
+   "egDisagree": 0,
+   "forceMismatch": 0,
+   "S_eg": 1,
+   "NNshare": 0.7455,
+   "certShare": 0.6325,
+   "trustedShare": 0.113
+  }
+ ],
+ "reaggregation": {
+  "egDisagree_sumCells": 0,
+  "egDisagree_report": 0,
+  "match": true,
+  "forceMismatch_sumCells": 0,
+  "forceMismatch_report": 0,
+  "NNshare_recompute": 0.671011,
+  "NNshare_report": 0.671010517,
+  "decomposition_cert_trusted_fallback": 13122,
+  "commits_total": 13122,
+  "decomp_ok": true,
+  "harness_egCommits": 13122,
+  "gate_commits": 13122,
+  "egCommits_eq_gateCommits": true
+ },
+ "note": "harness egCommits==gate commits ⇒ no double-count, perfect lockstep resync alignment; exactness uniform across all 6 cells (no pooled masking)."
+}

@@ -19,7 +19,7 @@ const A = (typeof args === 'object' && args) ? args : {}
 const ctx = `
 EXACT-NN L1e endgame verdict under audit. Repo worktree: /workspace/.team/wt-exact-nn.
 Key files (READ them — do not trust this summary):
-- dev/exact_nn/candidates/l1e.js       (the composition: cert→NN-if-margin≥τ→exact-scan fallback, injected at intercept()'s `if (!egBoid)` block)
+- dev/exact_nn/candidates/l1e.js       (the composition: cert→NN-if-margin≥τ→exact-scan fallback, injected at intercept()'s 'if (!egBoid)' block)
 - dev/exact_nn/endgame/eg_bound.js      (the zero-risk certificate, U<=TMAX guard)
 - dev/exact_nn/endgame/eg_scan.js       (exact reimpl of prod intercept() scan/argmin — the egBoid ground truth)
 - dev/exact_nn/endgame/eg_features.js   (per-boid scan-t features; shared packer+deploy)
@@ -60,7 +60,7 @@ identity makes the force bitwise-identical. Read predator_cheap.js intercept() (
 candidates/l1e.js. Check: (a) is intercept()'s downstream (scan(egBoid), aim, desired,
 iFastSetMagnitude, subtract, iFastLimit, return) truly VERBATIM and reached identically whether
 egBoid came from the gate or prod's argmin? (b) the gate injection — does setting egBoid before
-the `if (!egBoid)` block leave prod's block byte-identical and correctly SKIPPED on a gate commit?
+the 'if (!egBoid)' block leave prod's block byte-identical and correctly SKIPPED on a gate commit?
 (c) egBoid is module-level held-until-caught state — does a matching identity at commit guarantee
 identical FUTURE frames too, or can divergence sneak in via the stateful hold / resync? (d) any
 path where egBoid matches but force differs (NaN, -0, tie-break, Vector mutation)? Refute or confirm.` },
@@ -75,14 +75,20 @@ Could a higher-margin disagreement exist just past the sealed sample? Recompute 
 and residual from the raw reports. Refute or confirm the claimed bitwise-exactness at the frozen τ.` },
   { key: 'measurement-distribution', prompt: `${ctx}
 ANGLE 4 — MEASUREMENT INTEGRITY & DISTRIBUTION REALISM. Hunt for a bug or distribution artifact
-inflating NN-share or hiding disagreements. Check: (a) NN-share denominator = ALL commits
-(cert+trusted+fallback)? sole-reachable n=1 commits counted honestly (they're trivially exact —
-are they inflating NN-share)? (b) does the SCATTER distribution (startBoids 2..5) match the
-NATURAL full-game endgame distribution the deployed policy faces? Run/inspect both --scatter and
---natural verdict_l1e numbers — does NN-share + exactness hold on natural? (c) is the calib_eg
-shadow `agree` (eg_scan) truly == the harness's prod-real egBoid egDisagree (the cross-check)? (d)
-any double-counting, global-state leak across games (global.__l1eStatsLast), or seed reuse between
-calibration and sealed? Read verdict_l1e.js + calib_eg.js. Refute or confirm the measurement.` },
+inflating NN-share or hiding disagreements. Work from the COMMITTED evidence (do NOT launch full
+verdict_l1e runs — a ~2h natural verdict is already running and would contend; only ≤8-seed spot
+checks are OK). Check: (a) NN-share denominator = ALL commits (cert+trusted+fallback)? sole-
+reachable n=1 commits counted honestly (read evidence/l1e_measurement_integrity.json + verdict_l1e.js
+— are n=1 trivials inflating NN-share, and is that disclosed)? (b) per-cell exactness — does
+egDisagree==0/forceMismatch==0 hold in EVERY cell of evidence/l1e_sealed_scatter.json (not just
+pooled)? Is harness egCommits == gate commits (no double-count)? (c) is the calib_eg shadow 'agree'
+(eg_scan) truly == the harness's prod-real egBoid egDisagree (the cross-check — verify the logic in
+calib_eg.js + l1e.js)? (d) any global-state leak across games (global.__l1eStatsLast), or seed reuse
+between calibration [270000,280000) and sealed (≥290000, offset 40)? (e) DISTRIBUTION REALISM: the
+SCATTER headline uses startBoids 2..5; the deployed policy faces NATURAL full-game endgames. Inspect
+/tmp/sealed_natural.log + evidence/l1e_sealed_natural.json IF PRESENT (a natural sealed run is in
+flight); reason about whether the scatter-frozen τ=95.9 and NN-share should hold on natural. Refute
+or confirm the measurement.` },
 ]
 
 phase('Audit')
