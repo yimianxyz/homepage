@@ -1,0 +1,143 @@
+{
+ "angles": [
+  {
+   "survives": true,
+   "angle": "no-hidden-fallback",
+   "claim": "The committed decision is purely the unified NN's argmax (single forward pass logit=H(e)+w_skip*dec); NO fallback to prod's argmax/argmin, the gate is learned (not a hardcoded N>5 if), and a malformed NN slot is penalized as a disagreement.",
+   "severity": "medium",
+   "findings": [
+    {
+     "issue": "No conditional/hidden fallback in the nn decision path. moePolicy.js imports only loadMoE, moe_features, scanT (the feature); NOT egPick (prod argmin) or argmaxScore (prod planner argmax). chooseTarget/chooseEgBoid each return argmax(logit) from one moe.forward. candidates/moe.js nn-branch sets target solely from r.slot (L156) and egBoid solely from r.egIdx (L186); prodBi/prodIdx feed only diagnostics and the malformed path, never the returned value. oracle/raw_prior/perturb branches are mode-gated and unreachable in nn mode.",
+     "severity": "low",
+     "evidence": "grep shows moePolicy.js does not import egPick; candidates/moe.js L156/L186 return r.slot/r.egIdx; mode==='nn' guard isolates other branches."
+    },
+    {
+     "issue": "Gate is genuinely learned, not a hardcoded if. 4->32->1 MLP through sigmoid, all 4 inputs weighted (col L1 norms 61.3/51.8/53.9/25.0). g over N=1..120 is a sharp-but-continuous step at N=5/6: at N=6 g=0.0138/0.960/0.9997 for psize 0/8/15 -- continuous in a non-N input, impossible for a hardcoded N>5.",
+     "severity": "low",
+     "evidence": "node probe on real moe_weights.json (sha 096660ed matches sealed verdict); gate crosses 0.5 between N=5 and N=6, psize-dependent."
+    },
+    {
+     "issue": "Malformed NN slot is penalized as a guaranteed disagreement, never silently mapped to prod. Planner malformed -> altSlotByCoords (coords differ from prod); endgame malformed -> (prodIdx+1)%n (different boid). gateMalformed_total=0 in both sealed runs; selftest confirms 0 malformed and harness disagree==gate flips.",
+     "severity": "low",
+     "evidence": "candidates/moe.js L159,189,206-212; sealed merged JSONs gateMalformed_total=0; selftest PASS on clean flip path."
+    },
+    {
+     "issue": "SUBSTANTIVE HOLE: prod's deterministic decisive score leaks into EVERY committed decision via the always-on w_skip*dec residual (structural pass-through, not a conditional fallback). w_skip=0.99998 and dec=g*cheapScore+(1-g)*(-scan_t), cheapScore documented as prod's EXACT committed-decision score. Side-a's own committed ablations prove the dec term, not the trained head, decides: nohead (H.out zeroed) = 100.000% > full nn 99.547%/99.682%; noskip (dec zeroed, pure head) collapses planner to 68.4%/endgame 91.8%. argmax(logit)~=argmax(dec)=prod argmax/argmin to ~1e-4 (|H(emb)| median 2.7e-5 vs top-2 dec gap ~1.2). Deployed formula H(...)+w_skip*dec also deviates from SPEC sec.3 literal logits=H(...). Not a hidden conditional fallback (disclosed in side-a audit), but the connotation that prod's pick does not leak into the committed decision is false in substance.",
+     "severity": "medium",
+     "evidence": "abl_nohead_nat.json=100.000% vs abl_nn_nat.json=99.547%; abl_noskip_nat.json planner=68.220%; moe_weights_nohead.json is same weights with only H.out zeroed; SPEC_PHASE2_MOE.md sec.3 has no skip; EVIDENCE_moe_audit.md flags w_skip as a documented deviation."
+    }
+   ],
+   "probes_run": [
+    "Read moeForward.js, candidates/moe.js, moe_model.py, moePolicy.js, moe_features.js, eg_scan.js, verdict_moe.js, SPEC sec.3, side-a EVIDENCE_moe_audit.md",
+    "Verified weights sha256 096660ed matches both sealed merged verdicts and the live model dir",
+    "Dumped sealed merged JSONs: mode=nn, gateMalformed_total=0, gateFlips_total=0",
+    "grep model files for prod-pick leak -> moePolicy imports only scanT (feature), not egPick",
+    "node gate probe N=1..120 x psize{0,8,15} -> sharp learned step at N=5/6, continuous in psize",
+    "Inspected gate net shape 4->32->1 and input column norms -> all 4 inputs load-bearing",
+    "node: |H(emb)| median 2.7e-5 vs top-2 dec gap ~1.2 on synthetic blocks",
+    "Compared ablations abl_{nn,nohead,noskip,oracle,rawprior}_{nat,sc}.json (same seeds/cells/games)",
+    "Confirmed moe_weights_nohead.json == nn weights with only H.out zeroed",
+    "Ran verdict_moe.js --selftest: oracle=100%, perturb disagree==flips, 0 malformed"
+   ],
+   "conclusion": "The literal no-hidden-fallback claim SURVIVES. No conditional fallback exists: moePolicy never imports prod's egPick/argmaxScore, the nn-branch sets target/egBoid solely from r.slot/r.egIdx, other modes are unreachable in nn mode, and the decision is a single moe.forward argmax. The gate is genuinely learned (continuous, psize-dependent at N=6 -- not a hardcoded if). Malformed slots are forced to a different slot than prod (guaranteed disagreement); gateMalformed_total=0 in both sealed runs; selftest confirms exact flip-counting and a calibrated metric. ONE medium issue qualifies the spirit: prod's exact decisive score flows into every committed logit via the always-on w_skip*dec residual (w_skip=0.99998), and side-a's own ablations show this term -- not the trained NN head -- determines the decision (nohead=100% > full nn 99.5%; noskip planner=68%). This is a structural pass-through of prod's argmax/argmin and a deviation from SPEC sec.3's literal formula, disclosed in side-a's audit but not the headline. It is NOT a hidden conditional fallback, so the audited claim holds; the connotation that prod's pick never leaks into the committed decision is false in substance."
+  },
+  {
+   "angle": "measurement-integrity",
+   "claim": "The harness measures S_dec faithfully and cannot be fooled: oracle=100% proves correct attribution; coord-dedup/egBoid-identity match prod's committed label; disagreements are counted per-decision (resync) not cascaded; per-cell numbers are real; commit counts aren't double-counted; merge recomputes S_dec exactly from summed raw counts.",
+   "survives": true,
+   "severity": "low",
+   "findings": [
+    {
+     "issue": "Endgame S_dec denominator is inflated by un-flippable n==1 (sole-boid) commits, so the headline 99.730% denominates over decisions that are trivially correct by construction. An instrumented held-out scatter run showed ~31% (27/87) of endgame gate calls have n==1 — exactly one boid to commit to, so the candidate can NEVER disagree, yet each sits in the egCommits denominator. The non-trivial (n>=2) agreement rate is therefore the more honest figure. This is the same property the metric's own comment flags ('n=1 sole-boid commits can’t flip but sit in the denominator'), so it is DISCLOSED, and it does not change the gate: even attributing all 26 sealed disagreements to n>=2 commits (~6637 of 9619), the non-trivial endgame rate ~99.6% still clears 95%.",
+     "severity": "low",
+     "evidence": "Probe (3 cells x10 scatter seeds, instrumenting __moeGateEndgame): endgame gate calls by n = {1:27,2:27,3:16,4:11,5:6}, frac n==1 = 0.3103. Perturb p=1.0 confirms n==1 are un-flippable: egDisagree=26/36 with S_dec=27.778% = the 10/36 un-flippable share. Disclosed at verifier/verdict_moe.js:252."
+    },
+    {
+     "issue": "Headline 'endgame 99.730%' is taken from the SCATTER merged run (9619 egCommits); the NATURAL merged run's endgame S_dec is only 98.333% over a small n=300 sample (5 disagreements). Both are reported, so this is selection of the larger-sample figure, not concealment — the natural endgame number is present in sealed_natural_MERGED.json and still exceeds 95%.",
+     "severity": "low",
+     "evidence": "sealed_scatter_MERGED.json S_dec_endgame=0.997297016 (26/9619); sealed_natural_MERGED.json S_dec_endgame=0.983333333 (5/300). Both verified by summing per-cell _raw counts."
+    }
+   ],
+   "probes_run": [
+    "Re-ran verdict_moe.js --mode oracle --natural --calibration on held-out 1024x768: POOLED/planner/endgame all EXACTLY 100.000%, 0 disagreements (not from cached evidence)",
+    "Re-ran verdict_moe.js --selftest: ALL PASS, incl oracle==100% and perturb egDisagree==gateFlips EXACTLY (15==15, 159==159)",
+    "Ran verdict_moe.js --mode nn --scatter --calibration (8 seeds, 1024x768): 100% S_dec, sanity-confirmed model is strong on held-out",
+    "Perturb p=1.0 endgame: egDisagree=26/36, flips=26 (exact match), S_dec=27.778%=10/36 un-flippable -> resync does NOT hide flips, only prevents cascade",
+    "Instrumented __moeGateEndgame to histogram n: 31% of commits are un-flippable n==1",
+    "Split endgame agreement by n on held-out (72 games, 6 cells): 0 disagree across all n (228 commits, 160 non-trivial) -> NN genuinely near-perfect on held-out, not propped by trivial picks",
+    "Independent prod egBoid transition count (4) == harness dec.egCommits (4): NO double-counting",
+    "Perturb p=0.5: all 25 egBoid flips logged as 'force+decision' bitwise mismatches, 0 'decision'-only -> force-compare corroborates decision-compare; neither metric hides the other's flips",
+    "Verified merge arithmetic: recomputed pooled/planner/endgame from summed _raw counts == reported values (scatter & natural)",
+    "Re-ran merge_moe_reports.js on raw shard files: reproduced committed 0.997297016 / egDisagree=26 bit-for-bit",
+    "Verified merge dedup: 6 distinct cells, no dup-cell double-count, games==seedCount*cells",
+    "Verified seal_commitment salt sha256 MATCH (2f2ee894...) and weights sha256 MATCH (096660ed...) against merged reports"
+   ],
+   "conclusion": "The measurement-integrity claim SURVIVES. I independently re-ran (not trusted prose) the oracle verdict (exactly 100% on held-out), the verdict selftest (ALL PASS), and custom perturb probes. The metric attributes agreement correctly (oracle=100%), is calibrated rather than rigged (perturb egDisagree==independently-counted gateFlips exactly, including a worst-case p=1.0), does not double-count commits (harness egCommits == independent prod-transition count), and the resync prevents cascade WITHOUT suppressing true per-decision disagreements. The bitwise force-compare independently corroborates every decision flip (25/25 perturb flips were force+decision, 0 decision-only), so neither metric can hide what the other shows. The merge recomputes S_dec from summed raw counts (re-merge reproduces 0.997297016/egDisagree=26 exactly), with 6 distinct cells and no duplicate-cell double-counting; commitment and weights hashes both match. The headline numbers are traceable: pooled 99.673% & planner 99.680% (natural merged) and endgame 99.730% (scatter merged). The only caveat is a DISCLOSED transparency nuance: ~31% of endgame commits are un-flippable n==1 sole-boid picks that inflate the denominator, so the true non-trivial endgame rate is somewhat lower than 99.730% \\\\u2014 but even excluding all trivial decisions the gate clears 95% comfortably (~99.6%). No material way to inflate S_dec vs true per-decision agreement was found. Worst issue severity: low."
+  },
+  {
+   "angle": "nn-vs-rawargmax-honesty",
+   "claim": "The >=95% S_dec reflects a genuine single-NN decision (no fallback), and the honesty characterization is fair: logit=H(e)+w_skip*dec carries w_skip≈1.0 on the decisive raw score (planner cheapScore=prod's exact committed score; endgame -scan_t), which the SPEC explicitly allows feeding, and the ablation honestly decomposes NN nonlinear work vs allowed passthrough.",
+   "survives": true,
+   "severity": "low",
+   "findings": [
+    {
+     "issue": "nohead (skip-only, head/expert MLP zeroed) ALREADY reproduces prod at 100% on BOTH regimes; the full NN (99.5/99.7%) is WORSE. So the committed decision is essentially argmax of prod's own committed cheapScore / argmin scan_t, not the MLP's nonlinear reasoning. This is the materially important fact the angle asks about.",
+     "severity": "low",
+     "evidence": "Verified independently. abl_nohead_sc.json S_dec_endgame=1.0 (0/5661 disagree); abl_nohead_nat.json S_dec_planner=1.0 (0/10733); abl_nn_*: planner 99.543% (49 dis), endgame 99.682% (18 dis). Head marginal = -0.457pp planner / -0.318pp endgame (NEGATIVE). moe_ablate_weights.js confirms nohead = H.out.weight/bias=0 (w_skip preserved 0.99998); SHA dca48059... matches abl JSON. Independent forward(): with gate g≈1, nohead logit[k]=w_skip*cheapScore[k], argmax = argmax(cheapScore) = prod pick. SEVERITY LOW because SPEC §1.4/§3/§6 (quoting user verbatim) explicitly allows feeding the rollout/scan score as a feature, and §6 literally predicted 'reduces to learning argmax over visible scores' — so 'argmax of given scores' is by-design, not cheating."
+    },
+    {
+     "issue": "The verdict's framing is HONEST and not overstated — this finding is a confirmation, not a refutation. The writeup discloses the passthrough fully and prominently.",
+     "severity": "low",
+     "evidence": "PHASE2_VERDICT.md publishes the full ablation table (oracle 100 / nn 99.5-99.7 / nohead 100 / noskip 68-95 / raw_prior 25-99) and states verbatim: 'The model meets >=95% PRIMARILY via the w_skip≈1.0 passthrough... not by the expert MLPs nonlinear reasoning' and 'adding the head to the skip slightly degrades it'. The bottom-line 'One honest caveat the reader must know' repeats it. ABLATION_BASELINES.md also says endgame NN 'slightly below the raw analytic — capacity doesn't obviously help'. No place overclaims NN agency."
+    },
+    {
+     "issue": "Cosmetic doc nit: moe_features.js comments say '28-dim' / 'Returns [16][28]' while PLANNER_DIM=29 and cheapScore is at index 28 (29th element). Stale off-by-one comment, zero functional impact.",
+     "severity": "low",
+     "evidence": "moe_features.js line 8/30 vs line 20 (PLANNER_DIM=29) and line 60 (row[28]=...). moe_model.py CHEAP_SCORE_COL=28 and moeForward.js CHEAP_COL=28 both read the correct column; row[28]=rolledMask?(cval+bval):vprior[k] = prod's exact committed score. No effect on S_dec or the honesty claim."
+    }
+   ],
+   "probes_run": [
+    "Read all 10 ablation JSONs (abl_{nn,nohead,noskip,oracle,rawprior}_{sc,nat}); extracted S_dec, disagree counts, weights, gate",
+    "Verified SHA256 of moe_weights.json / moe_weights_nohead.json / moe_weights_noskip.json all match the ablation JSON weights_sha256 fields",
+    "Inspected moe_ablate_weights.js: confirmed nohead=H.out zeroed (w_skip kept), noskip=w_skip=0; inspected nohead/noskip JSON contents to confirm",
+    "Read moeForward.js + moe_model.py: confirmed logit=head(e)+w_skip*dec, dec=g*cheapScore+(1-g)*(-scan_t), w_skip deployed=0.99998",
+    "Ran independent forward() on synthetic block with gate forced to planner: confirmed nohead argmax = argmax(cheapScore) = prod pick (logit[7]=4.99989=w_skip*5.0)",
+    "Read SPEC_PHASE2_MOE.md: confirmed §1.4/§3/§6 explicitly allow feeding rollout/scan score; §6 pre-named the argmax-of-scores question and predicted this outcome",
+    "Recomputed headline sealed numbers from sealed_natural_MERGED.json (pooled 99.673%=192/58740, planner 99.680%=187/58440, endgame nat 98.333%=5/300) and sealed_scatter_MERGED.json (endgame 99.730%=26/9619); all match verdict, malformed=0, sealOffset=60, weights SHA matches",
+    "Quantified head marginal (nn-nohead = -0.457pp planner / -0.318pp endgame) and experts-over-prior (noskip-rawprior = +42.8pp planner)",
+    "Read moe_features.js: confirmed row[28]=catch+boot or vprior = prod committed cheapScore; noted stale '28-dim' comment vs PLANNER_DIM=29",
+    "Scanned PHASE2_VERDICT.md for overclaim language; confirmed disclosure is prominent in both ablation section and bottom-line caveat",
+    "Attempted verdict_moe.js --selftest (perturb calibration) — timed out on full sim (not a failure); metric calibration corroborated by ablation spread 25%-100%"
+   ],
+   "conclusion": "The claim SURVIVES. The technical substance is exactly as stated and I verified it independently end-to-end: the >=95% S_dec is carried by the w_skip≈1.0 passthrough of prod's own committed decisive score (nohead/skip-only = 100% on both regimes; the head/expert MLP adds NEGATIVE marginal accuracy of about -0.3 to -0.5pp). This is not a hidden cheat — the SPEC, quoting the user verbatim, explicitly authorizes feeding the rollout/scan score as a feature (§1.4/§3) and §6 even pre-predicted 'reduces to learning argmax over visible scores'. Crucially for this angle, the verdict DISCLOSES the passthrough honestly and prominently: it publishes the full oracle/nn/nohead/noskip/raw_prior ablation, states the >=95% is 'PRIMARILY via the w_skip≈1.0 passthrough... not the expert MLP nonlinear reasoning', and notes the head slightly degrades the skip. There is no overclaim of NN agency anywhere; if anything the writeup is more candid than required. It is a genuine single forward pass with no fallback (0 malformed, NN's argmax is the committed decision in every boid case) AND it is honest that the decisive agreement comes from the allowed score feature, not the MLP. Only nits: the head/experts do little positive work (low severity, by-design per SPEC) and a stale '28-dim' comment in moe_features.js (cosmetic, no functional impact). Headline numbers and all weight SHAs recompute exactly."
+  },
+  {
+   "survives": false,
+   "severity": "medium",
+   "angle": "sealed-discipline-generalization",
+   "claim": "Sealed result generalizes and offset-60 is disjoint from Phase-1.",
+   "findings": [
+    {
+     "issue": "offset-60 not disjoint from Phase-1 scatter: 512/512 Phase-2 scatter seeds already in Phase-1 off40/700 window",
+     "severity": "medium",
+     "evidence": "p1=slice(40,740) contains p2=slice(60,572); overlap 512/512; l1e_sealed_scatter.json off40 count700"
+    },
+    {
+     "issue": "Phase-1 reveal predates side-a model by 2h; scatter seeds are subset of revealed set; no direct leak found",
+     "severity": "low",
+     "evidence": "reveal mtime 14:45 vs model 16:57; no seed/salt leak in side-a or /shared"
+    }
+   ],
+   "probes_run": [
+    "seal verify MATCH",
+    "4096 seeds >=290000 disjoint from train and calib",
+    "scatter overlap 512/512, natural 0",
+    "overfit clean sealed>=calib",
+    "weights sha match",
+    "float gap disclosed"
+   ],
+   "conclusion": "Does not survive: offset-60 scatter window is a 100% subset of Phase-1 scatter seeds, revealed before side-a finalized. Other sub-claims hold. Medium severity. Recommend re-running scatter at offset>=740."
+  }
+ ],
+ "synthesis": "All facts confirmed. Key nuance for the consolidation: the **pooled/planner headline** (99.673%/99.680%) comes from the *natural* run, which angle 4 found has **0 overlap** with Phase-1 seeds. The **endgame scatter headline** (99.730%) comes from the run with **100% Phase-1 overlap**. So angle 4's blocker hits the endgame-scatter number specifically, not the pooled/planner numbers — but the natural endgame number (98.333%, n=300) is small-sample.\n\nI have independently verified every load-bearing fact across all four verdicts against the actual files. I have what I need to write the consolidated verdict.\n\n---\n\n# CONSOLIDATED PHASE-2 MoE-NN S_dec AUDIT VERDICT\n\n## (1) Does the sign-off survive all 4 angles?\n\n**No — not cleanly. 3 of 4 angles survive; 1 does not.** I independently re-verified the load-bearing facts against the actual evidence files (not the verdict prose), including reading the deployed `moeForward.js` logit formula and recomputing every headline from raw counts.\n\n| Angle | Survives | Worst severity | Independently confirmed |\n|---|---|---|---|\n| no-hidden-fallback | YES (literal claim) | medium | Confirmed: deployed `logit=head(e)+wSkip*dec`, w_skip=0.9999779; nohead=100% both regimes; noskip collapses (planner 68.2%, **scatter 94.86% — below 95%**) |\n| measurement-integrity | YES | low | Confirmed: oracle=100%, sealed numbers recompute exactly, malformed=0 |\n| nn-vs-rawargmax-honesty | YES | low | Confirmed: nohead=100% > full nn 99.5/99.7%; head marginal is NEGATIVE |\n| sealed-discipline-generalization | **NO** | medium | Confirmed: P2 scatter seeds [60,572) ⊂ P1 scatter [40,740); 512/512 overlap |\n\n## (2) Material findings (severity ≥ medium) and classification\n\n**Finding A — The committed decision is the SPEC-unauthorized w_skip residual, not the trained NN head. → DISCLOSED LIMITATION (borderline blocker on the strict reading).**\nThe deployed forward is `logit[k] = head(e) + w_skip·dec` with `w_skip = 0.9999779` and `dec = g·cheapScore + (1−g)·(−scan_t)`, where cheapScore is prod's *exact committed decisive score*. SPEC §3 specifies `logits = H(g·E_p + (1−g)·E_e)` with **no external skip term** — the raw score is authorized only as an expert *input feature* (§59-63), to be internalized by the experts (§6: \"reduces to learning *argmax over visible scores*\"). The deployed code instead routes the raw score *around* H. Ablations prove this term, not the MLP, decides: **nohead (H zeroed) = 100.000% on both regimes**, while the full NN is *worse* (99.5%/99.7%) — the head's marginal contribution is **negative** (≈ −0.3 to −0.5pp). This is not a hidden conditional fallback (no `egPick`/`argmaxScore` import; single forward pass; 0 malformed), and it is disclosed prominently in PHASE2_VERDICT.md. But it is a genuine deviation from the SPEC §3 formula, and the ≥95% is carried by a near-identity passthrough of prod's own argmax/argmin, not by NN reasoning. **Classification:** disclosed limitation. It does NOT make the literal \"single NN, no fallback\" claim false, but a reader who expects the *trained network* to be doing the deciding is being given a structurally true but substantively misleading headline.\n\n**Finding B — Sealed scatter window is a 100% subset of the already-revealed Phase-1 scatter seeds. → BLOCKER for the endgame-scatter headline (99.730%) specifically.**\nP2 sealed scatter = `off60, count512` → seeds [60,572), fully contained in P1 scatter `off40, count700` → [40,740). Phase-1 scatter results were revealed (mtime 14:45) before side-a finalized the model (16:57). The endgame headline (99.730%, 26/9619) therefore is **not** on a seed window disjoint from prior reveals — the central purpose of the seal. No direct seed/salt leak was found, so this is a discipline failure (potential indirect overfit) rather than proven cheating. **Classification:** blocker for the scatter-endgame number until re-run at offset ≥740; **does not** taint the pooled/planner headline.\n\n**Mitigating fact (verified):** The pooled 99.673% and planner 99.680% headlines come from the **natural** sealed run (offset 60, all-N, full-game), which angle 4 found has **0 overlap** with Phase-1 natural seeds. So the primary pooled/planner numbers are NOT compromised by Finding B — only the endgame-scatter figure is.\n\n**Noise / low-severity (not blockers):** ~31% of endgame scatter commits are un-flippable n==1 sole-boid picks inflating the denominator (disclosed; non-trivial rate still ~99.6% > 95%); natural endgame is small-sample (n=300, 98.333%); stale \"28-dim\" comment in moe_features.js (cosmetic).\n\n## (3) The single most important honest caveat a reader must know\n\n**The ≥95% decision-agreement is achieved by passing prod's own exact committed score straight through to the output (w_skip ≈ 1.0), not by the trained NN's reasoning — zeroing the entire MLP head *raises* agreement to 100%.** The claim \"a single unified NN's argmax is the committed decision\" is literally true (one forward pass, no conditional fallback, 0 malformed), and feeding the score as a feature is SPEC-authorized; but the deployed `+w_skip·dec` residual is a SPEC §3 *deviation* that makes the committed decision ≈ argmax of prod's own score, so the network is essentially re-deriving prod's pick from prod's pre-computed score rather than independently predicting it.\n\n## (4) Bottom line\n\n**PASS-WITH-CAVEATS** — the literal \"single NN, no hidden fallback, ≥95% S_dec\" claim holds and the measurement is honest and faithfully reported, but (a) the agreement is carried by a SPEC-deviating w_skip passthrough of prod's own decisive score (the trained head adds negative value), and (b) the endgame-scatter headline (99.730%) sits on seeds 100% overlapping the already-revealed Phase-1 window and must be re-run at offset ≥740 before that specific number is sign-off-grade; the uncompromised pooled/planner natural-run figures (99.673%/99.680%) clear 95% on their own."
+}
