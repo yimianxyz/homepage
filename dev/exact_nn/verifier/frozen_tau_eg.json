@@ -1,0 +1,156 @@
+{
+ "spec": "frozen L1e τ (scan-t margin, frames) from the calibration set",
+ "source": "calib_eg_scatter.json",
+ "label": "L1e final 138b6d8, scatter calib [270000,270700)",
+ "distribution": "scatter(startBoids 2..5)",
+ "seedRange": [
+  270000,
+  270700
+ ],
+ "calibCommits": 13201,
+ "targetTrustedDisagree": 0,
+ "chosenTau": 95.93332505722272,
+ "certShare": 0.619423,
+ "certifiedDisagreements": 0,
+ "nonCertTrustedFracAtTau": 0.066131,
+ "L1e_NNshare_estimate": 0.685554,
+ "marginIsUsableConfidenceSignal": true,
+ "overallNNagree": 0.99341,
+ "riskVsTau": [
+  {
+   "tauFrames": 0,
+   "nonCertTrustedFrac": 0.380577,
+   "trustedDisagreements": 87,
+   "trustedDisagreeRate": 0.01731688
+  },
+  {
+   "tauFrames": 1,
+   "nonCertTrustedFrac": 0.368305,
+   "trustedDisagreements": 34,
+   "trustedDisagreeRate": 0.00699301
+  },
+  {
+   "tauFrames": 2,
+   "nonCertTrustedFrac": 0.357473,
+   "trustedDisagreements": 22,
+   "trustedDisagreeRate": 0.004662
+  },
+  {
+   "tauFrames": 4,
+   "nonCertTrustedFrac": 0.336262,
+   "trustedDisagreements": 17,
+   "trustedDisagreeRate": 0.00382969
+  },
+  {
+   "tauFrames": 8,
+   "nonCertTrustedFrac": 0.294296,
+   "trustedDisagreements": 7,
+   "trustedDisagreeRate": 0.0018018
+  },
+  {
+   "tauFrames": 12,
+   "nonCertTrustedFrac": 0.269146,
+   "trustedDisagreements": 7,
+   "trustedDisagreeRate": 0.00197017
+  },
+  {
+   "tauFrames": 16,
+   "nonCertTrustedFrac": 0.249981,
+   "trustedDisagreements": 4,
+   "trustedDisagreeRate": 0.00121212
+  },
+  {
+   "tauFrames": 24,
+   "nonCertTrustedFrac": 0.213847,
+   "trustedDisagreements": 3,
+   "trustedDisagreeRate": 0.0010627
+  },
+  {
+   "tauFrames": 32,
+   "nonCertTrustedFrac": 0.182638,
+   "trustedDisagreements": 2,
+   "trustedDisagreeRate": 0.00082953
+  },
+  {
+   "tauFrames": 48,
+   "nonCertTrustedFrac": 0.135975,
+   "trustedDisagreements": 1,
+   "trustedDisagreeRate": 0.0005571
+  },
+  {
+   "tauFrames": 64,
+   "nonCertTrustedFrac": 0.102719,
+   "trustedDisagreements": 1,
+   "trustedDisagreeRate": 0.00073746
+  }
+ ],
+ "reliability": [
+  {
+   "marginFramesRange": [
+    0,
+    1
+   ],
+   "n": 162,
+   "disagreeRate": 0.32716
+  },
+  {
+   "marginFramesRange": [
+    1,
+    2
+   ],
+   "n": 143,
+   "disagreeRate": 0.083916
+  },
+  {
+   "marginFramesRange": [
+    2,
+    4
+   ],
+   "n": 280,
+   "disagreeRate": 0.017857
+  },
+  {
+   "marginFramesRange": [
+    4,
+    8
+   ],
+   "n": 554,
+   "disagreeRate": 0.018051
+  },
+  {
+   "marginFramesRange": [
+    8,
+    16
+   ],
+   "n": 585,
+   "disagreeRate": 0.005128
+  },
+  {
+   "marginFramesRange": [
+    16,
+    32
+   ],
+   "n": 889,
+   "disagreeRate": 0.00225
+  },
+  {
+   "marginFramesRange": [
+    32,
+    64
+   ],
+   "n": 1055,
+   "disagreeRate": 0.000948
+  },
+  {
+   "marginFramesRange": [
+    64,
+    null
+   ],
+   "n": 965,
+   "disagreeRate": 0.001036
+  }
+ ],
+ "note": "τ = smallest non-certified scan-t margin (frames) with ≤target trusted disagreements. NN-share = certShare + non-cert trusted fraction. Frozen ONE-SHOT; the sealed verdict checks generalization.",
+ "inputSha256": "cce4e8f2058a44dc69f453c7065613cedae8be8ec2a71f767bab82a1e18cbd2b",
+ "FROZEN": true
+}
