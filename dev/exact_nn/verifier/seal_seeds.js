@@ -31,8 +31,12 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 
-const SALT_PATH = path.join(os.homedir(), '.exactnn_seal_salt');
-const COMMIT_PATH = path.join(__dirname, 'seal_commitment.json');
+// env-overridable so a fresh sealed pool can be minted per phase WITHOUT clobbering
+// a prior phase's committed artifacts (Phase-2 re-seal: the Phase-1 salt was revealed
+// in evidence/seal_reveal_audit_trail.json → no longer secret; a credible one-shot
+// needs a fresh, never-revealed salt).
+const SALT_PATH = process.env.EXACTNN_SALT_PATH || path.join(os.homedir(), '.exactnn_seal_salt');
+const COMMIT_PATH = process.env.EXACTNN_COMMIT_PATH || path.join(__dirname, 'seal_commitment.json');
 const FLOOR = 290000;
 const POOL_HI = 2 ** 31;               // exclusive
 const COUNT = 4096;                    // sealed seeds (sized for rule-of-three margin)

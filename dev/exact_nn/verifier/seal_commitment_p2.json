@@ -1,0 +1,8 @@
+{
+  "sha256_salt": "bac52d5149038958bf39748a602fe64edf74be462256951e95bff31a57b9fd8e",
+  "FLOOR": 290000,
+  "COUNT": 4096,
+  "POOL_HI": 2147483648,
+  "algorithm": "HMAC-SHA256(salt, \"sealed:\"+i) mod (2^31-FLOOR) + FLOOR, dedup, i=0..",
+  "note": "Sealed verification seeds for EXACT-NN (SPEC §4c). Salt is held only by side-b (~/.exactnn_seal_salt, chmod 600). This commitment pre-registers the sealed set without revealing it. At verdict, `seal_seeds.js --reveal` prints the salt; sha256(salt) must equal sha256_salt above."
+}
