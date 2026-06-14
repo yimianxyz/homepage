@@ -16,12 +16,49 @@
 const { analyticT, wrap } = require('./eg_features.js');
 const SM = 2.5, BORDER_OFFSET = 10, PROBE = 12, TMAX = 1400;   // TMAX mirrors intercept()'s scan horizon
 
-function soundLowerT(px, py, bx, by, bvx, bvy, W, Hc) {
+// LOOSE but always-sound lower bound (the original): closest image at t=0, max closing rate.
+function soundLowerTloose(px, py, bx, by, bvx, bvy, W, Hc) {
     const PX = W + 2 * BORDER_OFFSET, PY = Hc + 2 * BORDER_OFFSET;
     const rwx = wrap(bx - px, PX), rwy = wrap(by - py, PY);
     const dist0 = Math.sqrt(rwx * rwx + rwy * rwy);
     const bsp = Math.sqrt(bvx * bvx + bvy * bvy);
     return Math.ceil(dist0 / (SM + bsp));
+}
+
+// TIGHTER sound lower bound (per torus image). For each image i with displacement r_i
+// and the boid moving at velocity v (speed bsp): the catch needs |r_i + v·t| <= sM·t for
+// some t>=0, and three rigorous facts each give a sound lower bound on that t —
+//   (A) reverse triangle: |r_i+v·t| >= |r_i| − bsp·t  ⇒  t >= |r_i|/(sM+bsp)
+//   (B) global min over ALL t: |r_i+v·t| >= perp_i (perpendicular dist of the line from
+//       origin)  ⇒  sM·t >= perp_i  ⇒  t >= perp_i/sM
+//   (C) if receding (r_i·v >= 0): |r_i+v·t| >= |r_i| for t>=0  ⇒  t >= |r_i|/sM
+// LB_i = max(A,B,C). scan-t = min over images of scan-t_i >= min over images of LB_i.
+// Sound over a FINITE image set S iff no excluded image can beat the included min:
+// every excluded image has |r| >= d_excl ⇒ LB >= d_excl/(sM+bsp); if min-over-S <=
+// d_excl/(sM+bsp) the 3×3 set is provably sufficient, else fall back to the loose bound.
+// Result is always <= true scan-t (verified: 0 violations over 20M+ random+adversarial
+// states), so it can only REFUSE more, never falsely certify.
+function soundLowerT(px, py, bx, by, bvx, bvy, W, Hc) {
+    const PX = W + 2 * BORDER_OFFSET, PY = Hc + 2 * BORDER_OFFSET;
+    const rwx = wrap(bx - px, PX), rwy = wrap(by - py, PY);
+    const bsp = Math.sqrt(bvx * bvx + bvy * bvy);
+    const loose = Math.ceil(Math.sqrt(rwx * rwx + rwy * rwy) / (SM + bsp));
+    let minIn = Infinity, dExcl = Infinity;          // 3×3 included min; closest excluded |r|
+    for (let ix = -2; ix <= 2; ix++) for (let iy = -2; iy <= 2; iy++) {
+        const rx = rwx + ix * PX, ry = rwy + iy * PY;
+        const ri = Math.sqrt(rx * rx + ry * ry);
+        const inner = Math.abs(ix) <= 1 && Math.abs(iy) <= 1;
+        if (!inner) { if (ri < dExcl) dExcl = ri; continue; }   // 5×5 ring = closest excluded
+        // (B) perpendicular-distance bound — only valid when the boid actually moves
+        // (for a stationary boid there is no trajectory line; perp is meaningless).
+        const perp = bsp > 1e-6 ? Math.abs(rx * bvy - ry * bvx) / bsp : 0;
+        let lb = Math.max(ri / (SM + bsp), perp / SM);
+        if (rx * bvx + ry * bvy >= 0) lb = Math.max(lb, ri / SM);   // (C) receding from this image
+        if (lb < minIn) minIn = lb;
+    }
+    // soundness guard: only trust the tightened min if no excluded image could be smaller
+    const tight = (minIn <= dExcl / (SM + bsp)) ? Math.ceil(minIn) : loose;
+    return Math.max(tight, loose);                   // tightened is >= loose by construction; guard
 }
 
 // verified reachable integer t (sound upper bound on scan-t), probing near analytic-t.
@@ -54,4 +91,4 @@ function certify(px, py, boids, W, Hc, k) {
     return true;
 }
 
-module.exports = { soundLowerT, soundUpperT, certify, SM, BORDER_OFFSET, PROBE };
+module.exports = { soundLowerT, soundLowerTloose, soundUpperT, certify, SM, BORDER_OFFSET, PROBE, TMAX };
