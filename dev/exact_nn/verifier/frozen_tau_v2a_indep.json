@@ -1,0 +1,153 @@
+{
+ "spec": "SPEC §4c — frozen L1h τ from the calibration set",
+ "source": "calib_margins_indep.json",
+ "label": "v2a_indep_sideB",
+ "calibPlans": 76644,
+ "targetTrustedDisagree": 0,
+ "chosenTau": 2.4471233815938493,
+ "L1h_NNshare_estimate": 0.000326,
+ "marginIsUsableConfidenceSignal": true,
+ "overallStudentAgree": 0.394564,
+ "totalDisagreements": 46403,
+ "riskVsTau": [
+  {
+   "tau": 0,
+   "trustedFrac": 1,
+   "trustedDisagreements": 46403,
+   "trustedDisagreeRate": 0.60543552
+  },
+  {
+   "tau": 0.000001,
+   "trustedFrac": 0.999922,
+   "trustedDisagreements": 46399,
+   "trustedDisagreeRate": 0.60543073
+  },
+  {
+   "tau": 0.0001,
+   "trustedFrac": 0.996516,
+   "trustedDisagreements": 46218,
+   "trustedDisagreeRate": 0.60512982
+  },
+  {
+   "tau": 0.001,
+   "trustedFrac": 0.967225,
+   "trustedDisagreements": 44561,
+   "trustedDisagreeRate": 0.60110344
+  },
+  {
+   "tau": 0.003,
+   "trustedFrac": 0.909895,
+   "trustedDisagreements": 41409,
+   "trustedDisagreeRate": 0.59377957
+  },
+  {
+   "tau": 0.01,
+   "trustedFrac": 0.76627,
+   "trustedDisagreements": 33840,
+   "trustedDisagreeRate": 0.57619615
+  },
+  {
+   "tau": 0.03,
+   "trustedFrac": 0.548797,
+   "trustedDisagreements": 22901,
+   "trustedDisagreeRate": 0.54445818
+  },
+  {
+   "tau": 0.1,
+   "trustedFrac": 0.268436,
+   "trustedDisagreements": 9652,
+   "trustedDisagreeRate": 0.4691358
+  },
+  {
+   "tau": 0.3,
+   "trustedFrac": 0.081911,
+   "trustedDisagreements": 2200,
+   "trustedDisagreeRate": 0.35043007
+  }
+ ],
+ "reliability": [
+  {
+   "marginRange": [
+    0,
+    0.000001
+   ],
+   "n": 6,
+   "disagreeRate": 0.666667
+  },
+  {
+   "marginRange": [
+    0.000001,
+    0.0001
+   ],
+   "n": 261,
+   "disagreeRate": 0.693487
+  },
+  {
+   "marginRange": [
+    0.0001,
+    0.001
+   ],
+   "n": 2245,
+   "disagreeRate": 0.738085
+  },
+  {
+   "marginRange": [
+    0.001,
+    0.003
+   ],
+   "n": 4394,
+   "disagreeRate": 0.717342
+  },
+  {
+   "marginRange": [
+    0.003,
+    0.01
+   ],
+   "n": 11008,
+   "disagreeRate": 0.687591
+  },
+  {
+   "marginRange": [
+    0.01,
+    0.03
+   ],
+   "n": 16668,
+   "disagreeRate": 0.656287
+  },
+  {
+   "marginRange": [
+    0.03,
+    0.1
+   ],
+   "n": 21488,
+   "disagreeRate": 0.616577
+  },
+  {
+   "marginRange": [
+    0.1,
+    0.3
+   ],
+   "n": 14296,
+   "disagreeRate": 0.521265
+  },
+  {
+   "marginRange": [
+    0.3,
+    1
+   ],
+   "n": 5404,
+   "disagreeRate": 0.378423
+  },
+  {
+   "marginRange": [
+    1,
+    null
+   ],
+   "n": 874,
+   "disagreeRate": 0.177346
+  }
+ ],
+ "note": "τ = smallest calibration margin with ≤ target trusted disagreements; trustedFrac = L1h NN-share estimate. Frozen for the one-shot sealed verdict; rule-of-three on the sealed trusted decisions bounds residual risk.",
+ "inputSha256": "99ffa3b68ab01156c9265e796db528fcd14534b11a36135c59ec206d1380def3",
+ "FROZEN": true
+}

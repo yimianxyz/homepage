@@ -1,0 +1,153 @@
+{
+ "spec": "SPEC §4c — frozen L1h τ from the calibration set",
+ "source": "calib_margins.json",
+ "label": "l1rs_deepset_small_f64",
+ "calibPlans": 95556,
+ "targetTrustedDisagree": 0,
+ "chosenTau": null,
+ "L1h_NNshare_estimate": 0,
+ "marginIsUsableConfidenceSignal": false,
+ "overallStudentAgree": 0.36026,
+ "totalDisagreements": 61131,
+ "riskVsTau": [
+  {
+   "tau": 0,
+   "trustedFrac": 1,
+   "trustedDisagreements": 61131,
+   "trustedDisagreeRate": 0.63974005
+  },
+  {
+   "tau": 0.000001,
+   "trustedFrac": 0.999969,
+   "trustedDisagreements": 61128,
+   "trustedDisagreeRate": 0.63972874
+  },
+  {
+   "tau": 0.0001,
+   "trustedFrac": 0.994956,
+   "trustedDisagreements": 60773,
+   "trustedDisagreeRate": 0.63921787
+  },
+  {
+   "tau": 0.001,
+   "trustedFrac": 0.950029,
+   "trustedDisagreements": 57600,
+   "trustedDisagreeRate": 0.634494
+  },
+  {
+   "tau": 0.003,
+   "trustedFrac": 0.865942,
+   "trustedDisagreements": 51736,
+   "trustedDisagreeRate": 0.62523868
+  },
+  {
+   "tau": 0.01,
+   "trustedFrac": 0.670539,
+   "trustedDisagreements": 38376,
+   "trustedDisagreeRate": 0.59893248
+  },
+  {
+   "tau": 0.03,
+   "trustedFrac": 0.425415,
+   "trustedDisagreements": 22592,
+   "trustedDisagreeRate": 0.55575509
+  },
+  {
+   "tau": 0.1,
+   "trustedFrac": 0.200249,
+   "trustedDisagreements": 9919,
+   "trustedDisagreeRate": 0.51836948
+  },
+  {
+   "tau": 0.3,
+   "trustedFrac": 0.104577,
+   "trustedDisagreements": 5699,
+   "trustedDisagreeRate": 0.57029921
+  }
+ ],
+ "reliability": [
+  {
+   "marginRange": [
+    0,
+    0.000001
+   ],
+   "n": 3,
+   "disagreeRate": 1
+  },
+  {
+   "marginRange": [
+    0.000001,
+    0.0001
+   ],
+   "n": 479,
+   "disagreeRate": 0.741127
+  },
+  {
+   "marginRange": [
+    0.0001,
+    0.001
+   ],
+   "n": 4293,
+   "disagreeRate": 0.73911
+  },
+  {
+   "marginRange": [
+    0.001,
+    0.003
+   ],
+   "n": 8035,
+   "disagreeRate": 0.729807
+  },
+  {
+   "marginRange": [
+    0.003,
+    0.01
+   ],
+   "n": 18672,
+   "disagreeRate": 0.71551
+  },
+  {
+   "marginRange": [
+    0.01,
+    0.03
+   ],
+   "n": 23423,
+   "disagreeRate": 0.673868
+  },
+  {
+   "marginRange": [
+    0.03,
+    0.1
+   ],
+   "n": 21516,
+   "disagreeRate": 0.589004
+  },
+  {
+   "marginRange": [
+    0.1,
+    0.3
+   ],
+   "n": 9142,
+   "disagreeRate": 0.461606
+  },
+  {
+   "marginRange": [
+    0.3,
+    1
+   ],
+   "n": 5682,
+   "disagreeRate": 0.571806
+  },
+  {
+   "marginRange": [
+    1,
+    null
+   ],
+   "n": 4311,
+   "disagreeRate": 0.568314
+  }
+ ],
+ "note": "NO τ achieves the trusted-disagreement target on calibration — even the highest-margin plans disagree. τ-gating cannot deliver; report L1h NN-share ≈ 0 and rely on L0.",
+ "inputSha256": "c9e9b4620777721984786223725804a68ad517dabe6218cda222eb6443145061",
+ "FROZEN": true
+}

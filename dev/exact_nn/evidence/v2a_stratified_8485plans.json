@@ -1,0 +1,394 @@
+{
+ "spec": "side-b INDEPENDENT v2a verification — disagreement stratified by student-winner-type & prod decision-type",
+ "plans": 8485,
+ "overallAgree": 0.3923,
+ "overall": {
+  "n": 8485,
+  "agree": 0.3923,
+  "highMarginDisagree_ge1": 0.1719,
+  "reliability": [
+   {
+    "range": [
+     0,
+     0.001
+    ],
+    "n": 247,
+    "disagree": 0.7247
+   },
+   {
+    "range": [
+     0.001,
+     0.01
+    ],
+    "n": 1716,
+    "disagree": 0.6894
+   },
+   {
+    "range": [
+     0.01,
+     0.03
+    ],
+    "n": 1808,
+    "disagree": 0.6449
+   },
+   {
+    "range": [
+     0.03,
+     0.1
+    ],
+    "n": 2360,
+    "disagree": 0.6292
+   },
+   {
+    "range": [
+     0.1,
+     0.3
+    ],
+    "n": 1607,
+    "disagree": 0.5445
+   },
+   {
+    "range": [
+     0.3,
+     1
+    ],
+    "n": 619,
+    "disagree": 0.3974
+   },
+   {
+    "range": [
+     1,
+     null
+    ],
+    "n": 128,
+    "disagree": 0.1719
+   }
+  ]
+ },
+ "byStudentWinner": {
+  "nonRolled_vprior": {
+   "n": 242,
+   "agree": 0.6446,
+   "highMarginDisagree_ge1": null,
+   "reliability": [
+    {
+     "range": [
+      0,
+      0.001
+     ],
+     "n": 5,
+     "disagree": 0.2
+    },
+    {
+     "range": [
+      0.001,
+      0.01
+     ],
+     "n": 41,
+     "disagree": 0.3902
+    },
+    {
+     "range": [
+      0.01,
+      0.03
+     ],
+     "n": 59,
+     "disagree": 0.2712
+    },
+    {
+     "range": [
+      0.03,
+      0.1
+     ],
+     "n": 80,
+     "disagree": 0.4
+    },
+    {
+     "range": [
+      0.1,
+      0.3
+     ],
+     "n": 52,
+     "disagree": 0.3846
+    },
+    {
+     "range": [
+      0.3,
+      1
+     ],
+     "n": 5,
+     "disagree": 0.2
+    }
+   ]
+  },
+  "rolled": {
+   "n": 8243,
+   "agree": 0.3849,
+   "highMarginDisagree_ge1": 0.1719,
+   "reliability": [
+    {
+     "range": [
+      0,
+      0.001
+     ],
+     "n": 242,
+     "disagree": 0.7355
+    },
+    {
+     "range": [
+      0.001,
+      0.01
+     ],
+     "n": 1675,
+     "disagree": 0.6967
+    },
+    {
+     "range": [
+      0.01,
+      0.03
+     ],
+     "n": 1749,
+     "disagree": 0.6575
+    },
+    {
+     "range": [
+      0.03,
+      0.1
+     ],
+     "n": 2280,
+     "disagree": 0.6373
+    },
+    {
+     "range": [
+      0.1,
+      0.3
+     ],
+     "n": 1555,
+     "disagree": 0.5498
+    },
+    {
+     "range": [
+      0.3,
+      1
+     ],
+     "n": 614,
+     "disagree": 0.399
+    },
+    {
+     "range": [
+      1,
+      null
+     ],
+     "n": 128,
+     "disagree": 0.1719
+    }
+   ]
+  }
+ },
+ "byProdDecisionType": {
+  "vprior_top": {
+   "n": 886,
+   "agree": 0.2032,
+   "highMarginDisagree_ge1": 1,
+   "reliability": [
+    {
+     "range": [
+      0,
+      0.001
+     ],
+     "n": 30,
+     "disagree": 0.8667
+    },
+    {
+     "range": [
+      0.001,
+      0.01
+     ],
+     "n": 225,
+     "disagree": 0.8311
+    },
+    {
+     "range": [
+      0.01,
+      0.03
+     ],
+     "n": 195,
+     "disagree": 0.7641
+    },
+    {
+     "range": [
+      0.03,
+      0.1
+     ],
+     "n": 243,
+     "disagree": 0.7819
+    },
+    {
+     "range": [
+      0.1,
+      0.3
+     ],
+     "n": 152,
+     "disagree": 0.7697
+    },
+    {
+     "range": [
+      0.3,
+      1
+     ],
+     "n": 40,
+     "disagree": 0.9
+    },
+    {
+     "range": [
+      1,
+      null
+     ],
+     "n": 1,
+     "disagree": 1
+    }
+   ]
+  },
+  "rolled_both": {
+   "n": 7134,
+   "agree": 0.4026,
+   "highMarginDisagree_ge1": 0.1842,
+   "reliability": [
+    {
+     "range": [
+      0,
+      0.001
+     ],
+     "n": 211,
+     "disagree": 0.7014
+    },
+    {
+     "range": [
+      0.001,
+      0.01
+     ],
+     "n": 1416,
+     "disagree": 0.6667
+    },
+    {
+     "range": [
+      0.01,
+      0.03
+     ],
+     "n": 1540,
+     "disagree": 0.6357
+    },
+    {
+     "range": [
+      0.03,
+      0.1
+     ],
+     "n": 1994,
+     "disagree": 0.6239
+    },
+    {
+     "range": [
+      0.1,
+      0.3
+     ],
+     "n": 1337,
+     "disagree": 0.543
+    },
+    {
+     "range": [
+      0.3,
+      1
+     ],
+     "n": 522,
+     "disagree": 0.3831
+    },
+    {
+     "range": [
+      1,
+      null
+     ],
+     "n": 114,
+     "disagree": 0.1842
+    }
+   ]
+  },
+  "rolled_vs_vprior": {
+   "n": 465,
+   "agree": 0.5957,
+   "highMarginDisagree_ge1": 0,
+   "reliability": [
+    {
+     "range": [
+      0,
+      0.001
+     ],
+     "n": 6,
+     "disagree": 0.8333
+    },
+    {
+     "range": [
+      0.001,
+      0.01
+     ],
+     "n": 75,
+     "disagree": 0.6933
+    },
+    {
+     "range": [
+      0.01,
+      0.03
+     ],
+     "n": 73,
+     "disagree": 0.5205
+    },
+    {
+     "range": [
+      0.03,
+      0.1
+     ],
+     "n": 123,
+     "disagree": 0.4146
+    },
+    {
+     "range": [
+      0.1,
+      0.3
+     ],
+     "n": 118,
+     "disagree": 0.2712
+    },
+    {
+     "range": [
+      0.3,
+      1
+     ],
+     "n": 57,
+     "disagree": 0.1754
+    },
+    {
+     "range": [
+      1,
+      null
+     ],
+     "n": 13,
+     "disagree": 0
+    }
+   ]
+  }
+ },
+ "crux_studentNonRolled_highMargin": {
+  "n": 5,
+  "agree": 0.8,
+  "highMarginDisagree_ge1": null,
+  "reliability": [
+   {
+    "range": [
+     0.3,
+     1
+    ],
+    "n": 5,
+    "disagree": 0.2
+   }
+  ]
+ }
+}

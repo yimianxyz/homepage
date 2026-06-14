@@ -1,0 +1,136 @@
+{
+ "spec": "side-b ALT-SIGNAL v2a verification — exactness sweep over confidence signals beyond score-margin",
+ "plans": 12445,
+ "disagrees": 7614,
+ "overallAgree": 0.388188,
+ "cells": "1024x768",
+ "seeds": 20,
+ "seedStart": 270000,
+ "hiBand_margin_ge1": {
+  "n": 198,
+  "disagreeRate": 0.1919
+ },
+ "baseline_marginOnly": {
+  "tau": 1.957735743688339,
+  "trustedFrac": 0.0020891924467657695,
+  "trustedN": 26,
+  "trustedDisagree": 0
+ },
+ "altsig_1D_alone": {
+  "winSoftmaxProb": {
+   "thr": 0.9997028906890196,
+   "dir": "higher",
+   "trustedFrac": 0.00016070711128967456,
+   "trustedN": 2,
+   "trustedDisagree": 0
+  },
+  "winEntropy": {
+   "thr": 0.0028010961736751067,
+   "dir": "lower",
+   "trustedFrac": 0.00016070711128967456,
+   "trustedN": 2,
+   "trustedDisagree": 0
+  },
+  "ecArgmaxGap": {
+   "thr": 0.00006948398463801908,
+   "dir": "lower",
+   "trustedFrac": 0,
+   "trustedN": 0,
+   "trustedDisagree": 0
+  },
+  "bootMargin": {
+   "thr": 0.6207035885210419,
+   "dir": "higher",
+   "trustedFrac": 0.0015267175572519084,
+   "trustedN": 19,
+   "trustedDisagree": 0
+  },
+  "scoreVsBoot": {
+   "thr": 7.257688307095467,
+   "dir": "higher",
+   "trustedFrac": 0,
+   "trustedN": 0,
+   "trustedDisagree": 0
+  }
+ },
+ "altsig_2D_marginAND": {
+  "winSoftmaxProb": {
+   "trustedFrac": 0.0008035355564483728,
+   "trustedN": 10,
+   "marginFloor": 0.048430552041365704,
+   "sigThr": 0.9980437062921831,
+   "dir": "higher",
+   "trustedDisagree": 0
+  },
+  "winEntropy": {
+   "trustedFrac": 0.0008035355564483728,
+   "trustedN": 10,
+   "marginFloor": 0.048430552041365704,
+   "sigThr": 0.015139951279146998,
+   "dir": "lower",
+   "trustedDisagree": 0
+  },
+  "ecArgmaxGap": {
+   "trustedFrac": 0.0004017677782241864,
+   "trustedN": 5,
+   "marginFloor": 0.8699872985046017,
+   "sigThr": 0.019394041533468354,
+   "dir": "lower",
+   "trustedDisagree": 0
+  },
+  "bootMargin": {
+   "trustedFrac": 0.0015267175572519084,
+   "trustedN": 19,
+   "marginFloor": 0,
+   "sigThr": 0.6207035885210419,
+   "dir": "higher",
+   "trustedDisagree": 0
+  },
+  "scoreVsBoot": {
+   "trustedFrac": 0.00024106066693451185,
+   "trustedN": 3,
+   "marginFloor": 0.236150970448755,
+   "sigThr": 4.63429473359138,
+   "dir": "higher",
+   "trustedDisagree": 0
+  }
+ },
+ "altsig_floorInHiBand": {
+  "winSoftmaxProb_higher": {
+   "thr": 0.5642017526093829,
+   "dir": "higher",
+   "trustedN_inBand": 11,
+   "trustedFrac_ofAll": 0.0008838891120932102,
+   "disagreeInGate": 0
+  },
+  "winEntropy_lower": {
+   "thr": 1.205618012990204,
+   "dir": "lower",
+   "trustedN_inBand": 13,
+   "trustedFrac_ofAll": 0.0010445962233828847,
+   "disagreeInGate": 0
+  },
+  "ecArgmaxGap_lower": {
+   "thr": 0.019394041533468354,
+   "dir": "lower",
+   "trustedN_inBand": 5,
+   "trustedFrac_ofAll": 0.0004017677782241864,
+   "disagreeInGate": 0
+  },
+  "bootMargin_higher": {
+   "thr": 0.43346458350273065,
+   "dir": "higher",
+   "trustedN_inBand": 37,
+   "trustedFrac_ofAll": 0.0029730815588589793,
+   "disagreeInGate": 0
+  },
+  "scoreVsBoot_higher": {
+   "thr": 3.905653841912351,
+   "dir": "higher",
+   "trustedN_inBand": 2,
+   "trustedFrac_ofAll": 0.00016070711128967456,
+   "disagreeInGate": 0
+  }
+ },
+ "bestExactNNshare": 0.0020891924467657695
+}

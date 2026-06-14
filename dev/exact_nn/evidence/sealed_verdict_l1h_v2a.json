@@ -1,0 +1,15 @@
+{
+ "student": "v2a l1rs2",
+ "tau": 2.4471233815938493,
+ "NNshare": 0.000326,
+ "sealedSlice": "offset20",
+ "cells": 6,
+ "games": 60,
+ "plans": 47031,
+ "frames": 807935,
+ "forceMismatches": 1,
+ "planDisagreements": 2,
+ "S_dec": 0.9999575,
+ "S_frame": 0.9999988,
+ "note": "At the NN-share-max τ (frozen 0-disagree on calib), the HELD-OUT sealed set shows 2 trusted plan disagreements / 1 force mismatches => NOT bitwise-exact at this τ. Exactness forces τ→∞ (NN-share→0)."
+}

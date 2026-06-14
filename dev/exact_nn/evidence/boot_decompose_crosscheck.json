@@ -1,0 +1,33 @@
+{
+ "spec": "side-b independent cross-check of side-a #5 \"boot is the decisive variable\"",
+ "plans": 10795,
+ "zeroCatchAll_pct": 58.8,
+ "decisiveCategory_pct": {
+  "boot_sameRolled": 68.7,
+  "vprior_top": 12.2,
+  "diffCatch_rolled": 12.5,
+  "rolledVsVprior": 6.5,
+  "other": 0
+ },
+ "bootMargin_sameRolled": {
+  "median": 0.029078895986569098,
+  "n": 7421,
+  "below_0p01": 33,
+  "below_0p001": 9.2
+ },
+ "boot_stats": {
+  "min": -0.06966781205577419,
+  "max": 3.348419441647065,
+  "median": 0.6542028460039552,
+  "mean": 0.7672
+ },
+ "sideA_claim": {
+  "zeroCatchAll": "59%",
+  "boot_sameRolled": "69.3%",
+  "vprior_top": "12.5%",
+  "diffCatch_rolled": "11.8%",
+  "rolledVsVprior": "6.4%",
+  "bootMargin_median": 0.019,
+  "boot_mean": 0.78
+ }
+}

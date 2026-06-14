@@ -1,0 +1,139 @@
+{
+ "commitsInspected": 7198,
+ "disagreementsFound": 6,
+ "minMargin": 40,
+ "examples": [
+  {
+   "cell": "2560x1440",
+   "seed": 270003,
+   "frame": 1260,
+   "n": 3,
+   "margin": 46.35,
+   "nnPick": 2,
+   "prodPick": 1,
+   "nnScanT": [
+    345.7,
+    337.1,
+    290.7
+   ],
+   "prodScanT": [
+    308,
+    289,
+    290
+   ],
+   "nearestFallback": false,
+   "predErr_onNNpick": 0.7,
+   "predErr_onProdPick": 48.1
+  },
+  {
+   "cell": "2560x1440",
+   "seed": 270003,
+   "frame": 1263,
+   "n": 3,
+   "margin": 45.44,
+   "nnPick": 2,
+   "prodPick": 1,
+   "nnScanT": [
+    346.3,
+    336.4,
+    291
+   ],
+   "prodScanT": [
+    307,
+    287,
+    290
+   ],
+   "nearestFallback": false,
+   "predErr_onNNpick": 1,
+   "predErr_onProdPick": 49.4
+  },
+  {
+   "cell": "2560x1440",
+   "seed": 270003,
+   "frame": 1265,
+   "n": 3,
+   "margin": 43.91,
+   "nnPick": 2,
+   "prodPick": 1,
+   "nnScanT": [
+    335,
+    336.6,
+    291.1
+   ],
+   "prodScanT": [
+    290,
+    287,
+    290
+   ],
+   "nearestFallback": false,
+   "predErr_onNNpick": 1.1,
+   "predErr_onProdPick": 49.6
+  },
+  {
+   "cell": "2560x1440",
+   "seed": 270003,
+   "frame": 1266,
+   "n": 3,
+   "margin": 46.85,
+   "nnPick": 2,
+   "prodPick": 1,
+   "nnScanT": [
+    338,
+    338.5,
+    291.1
+   ],
+   "prodScanT": [
+    291,
+    290,
+    290
+   ],
+   "nearestFallback": false,
+   "predErr_onNNpick": 1.1,
+   "predErr_onProdPick": 48.5
+  },
+  {
+   "cell": "2560x1440",
+   "seed": 270003,
+   "frame": 1268,
+   "n": 3,
+   "margin": 46.74,
+   "nnPick": 2,
+   "prodPick": 1,
+   "nnScanT": [
+    337.9,
+    339.2,
+    291.1
+   ],
+   "prodScanT": [
+    291,
+    290,
+    290
+   ],
+   "nearestFallback": false,
+   "predErr_onNNpick": 1.1,
+   "predErr_onProdPick": 49.2
+  },
+  {
+   "cell": "2560x1440",
+   "seed": 270003,
+   "frame": 1269,
+   "n": 3,
+   "margin": 44.29,
+   "nnPick": 2,
+   "prodPick": 1,
+   "nnScanT": [
+    335.4,
+    337.6,
+    291.1
+   ],
+   "prodScanT": [
+    288,
+    286,
+    290
+   ],
+   "nearestFallback": false,
+   "predErr_onNNpick": 1.1,
+   "predErr_onProdPick": 51.6
+  }
+ ]
+}
