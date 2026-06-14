@@ -66,6 +66,7 @@ module.exports.create = async function (game, helpers) {
     const perturbFrac = process.env.EXACTNN_EGNN_PERTURB != null ? +process.env.EXACTNN_EGNN_PERTURB : 0.1;
     const egScan = require(path.join(__dirname, '..', 'endgame', 'eg_scan.js'));
     const egFeat = require(path.join(__dirname, '..', 'endgame', 'eg_features.js'));
+    const stats = { commits: 0, nnVsProd: 0, flips: 0, malformed: 0, soleN1: 0, ablate: null };
 
     let endgamePolicy = null;
     if (mode === 'nn') {
@@ -75,9 +76,23 @@ module.exports.create = async function (game, helpers) {
         const weightsFp = process.env.EXACTNN_EGNN_WEIGHTS
             ? path.resolve(process.env.EXACTNN_EGNN_WEIGHTS)
             : path.join(__dirname, '..', 'endgame', 'eg_weights.json');
+        // HONESTY-GATE ablation: zero scan-t-proxy feature(s) in the SAME eg_features
+        // module the student loads (require-cache shared by path), BEFORE loading the
+        // student. Tests whether the NN still decides from RAW kinematics or just
+        // relays the analytic reach estimate. EXACTNN_EGNN_ABLATE = wa0 | analytic | reach
+        //   wa0(12)=wrap-aware analytic≈scan-t; analytic=[10,12,13,14]; reach=[10,11,12,13,14,15]
+        const ablate = process.env.EXACTNN_EGNN_ABLATE;
+        if (ablate) {
+            const ZERO = { wa0: [12], analytic: [10, 12, 13, 14], reach: [10, 11, 12, 13, 14, 15] }[ablate];
+            if (!ZERO) throw new Error('egnn: unknown EXACTNN_EGNN_ABLATE ' + ablate);
+            const egfPath = path.join(path.dirname(studentMod), 'eg_features.js');
+            const egf = require(egfPath);
+            const orig = egf.egBoidFeatures;
+            egf.egBoidFeatures = function () { const f = orig.apply(this, arguments); for (const i of ZERO) f[i] = 0; return f; };
+            stats.ablate = ablate;
+        }
         endgamePolicy = resolveEndgamePolicy(studentMod, weightsFp);
     }
-    const stats = { commits: 0, nnVsProd: 0, flips: 0, malformed: 0, soleN1: 0 };
 
     // the gate: prod passes (px,py,boids,W,Hc,pred) at the endgame commit. Returns a
     // boid index (NO fallback — the NN's argmax IS the decision) or -1 (test escape).
