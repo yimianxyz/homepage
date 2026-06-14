@@ -1,0 +1,9 @@
+{
+ "instrument": "verifier/eg_cert_verify.js (independent; egPick ground truth, exact 1400-step scan)",
+ "target": "endgame/eg_bound.js FINAL (U<=TMAX guard)",
+ "totalCommits": 2000000,
+ "falseCertifications": 0,
+ "certifiedFraction_broadRandom": 0.26617,
+ "verdict": "SOUND — 0 false certifications over 2000000 commits",
+ "perSeed": [  {"seed":3,"commits":500000,"falseCerts":0,"certified":133154}, {"seed":17,"commits":500000,"falseCerts":0,"certified":132950}, {"seed":101,"commits":500000,"falseCerts":0,"certified":132710}, {"seed":9973,"commits":500000,"falseCerts":0,"certified":133533} ]
+}
