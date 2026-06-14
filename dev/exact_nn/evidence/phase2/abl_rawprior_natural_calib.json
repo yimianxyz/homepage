@@ -1,0 +1,134 @@
+{
+ "phase": 2,
+ "candidate": "moe.js",
+ "mode": "raw_prior",
+ "weights": null,
+ "weights_sha256": null,
+ "seedSet": "calibration[270000,280000)",
+ "seedCount": 3,
+ "sealOffset": null,
+ "commitment_sha256_salt": null,
+ "distribution": "natural(full-game, all-N)",
+ "cells": 3,
+ "devicematrix": [
+  "390x844",
+  "1024x768",
+  "1680x1050"
+ ],
+ "games": 9,
+ "maxFrames": 40000,
+ "S_dec_pooled": 0.25601312,
+ "S_dec_planner": 0.2506882,
+ "S_dec_endgame": 1,
+ "plans_total": 5449,
+ "planDisagree_total": 4083,
+ "egCommits_total": 39,
+ "egDisagree_total": 0,
+ "decisions_total": 5488,
+ "disagree_total": 4083,
+ "gateMalformed_total": 0,
+ "gateFlips_total": 0,
+ "S_force_lockstep": {
+  "planner_cos": 0.974931089,
+  "planner_rel": 0.998844398,
+  "endgame_cos": 1,
+  "endgame_rel": 1
+ },
+ "S_force_fork": {
+  "planner_cos": 0.547057431,
+  "planner_rel": 0.923532981,
+  "endgame_cos": 0.909368492,
+  "endgame_rel": 0.991382079
+ },
+ "S_traj_identical_frac": 0,
+ "S_traj_median_first_div": 16,
+ "forkClearedFrac": 1,
+ "lockstepClearedFrac": 1,
+ "gate": {
+  "threshold": 0.95,
+  "pooled_pass": false,
+  "planner_pass": false,
+  "endgame_pass": true,
+  "PASS": false
+ },
+ "perCell": [
+  {
+   "cell": "390x844",
+   "games": 3,
+   "S_dec_pooled": 0.239625167,
+   "S_dec_planner": 0.227210884,
+   "S_dec_endgame": 1,
+   "plans": 735,
+   "planDisagree": 568,
+   "egCommits": 12,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 0.98293385,
+    "planner_rel": 0.999178664,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 0.678399974,
+    "planner_rel": 0.962816017,
+    "endgame_cos": 0.958559227,
+    "endgame_rel": 0.991211741
+   },
+   "S_traj_identical_frac": 0,
+   "S_traj_median_first_div": 80,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "1024x768",
+   "games": 3,
+   "S_dec_pooled": 0.273764259,
+   "S_dec_planner": 0.268199234,
+   "S_dec_endgame": 1,
+   "plans": 1827,
+   "planDisagree": 1337,
+   "egCommits": 14,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 0.977302711,
+    "planner_rel": 0.999079279,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 0.582773756,
+    "planner_rel": 0.938049296,
+    "endgame_cos": 0.839720446,
+    "endgame_rel": 0.986576209
+   },
+   "S_traj_identical_frac": 0,
+   "S_traj_median_first_div": 0,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "1680x1050",
+   "games": 3,
+   "S_dec_pooled": 0.248965517,
+   "S_dec_planner": 0.245583651,
+   "S_dec_endgame": 1,
+   "plans": 2887,
+   "planDisagree": 2178,
+   "egCommits": 13,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 0.971397458,
+    "planner_rel": 0.998610851,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 0.497070263,
+    "planner_rel": 0.906557868,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 0,
+   "S_traj_median_first_div": 16,
+   "forkClearedFrac": 1
+  }
+ ]
+}

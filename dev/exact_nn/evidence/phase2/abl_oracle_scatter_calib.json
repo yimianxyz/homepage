@@ -1,0 +1,215 @@
+{
+ "phase": 2,
+ "candidate": "moe.js",
+ "mode": "oracle",
+ "weights": null,
+ "weights_sha256": null,
+ "seedSet": "calibration[270000,280000)",
+ "seedCount": 300,
+ "sealOffset": null,
+ "commitment_sha256_salt": null,
+ "distribution": "scatter(endgame, startBoids 2..5)",
+ "cells": 6,
+ "devicematrix": [
+  "390x844",
+  "820x1180",
+  "1024x768",
+  "1512x982",
+  "1680x1050",
+  "2560x1440"
+ ],
+ "games": 1800,
+ "maxFrames": 4000,
+ "S_dec_pooled": 1,
+ "S_dec_planner": null,
+ "S_dec_endgame": 1,
+ "plans_total": 0,
+ "planDisagree_total": 0,
+ "egCommits_total": 5661,
+ "egDisagree_total": 0,
+ "decisions_total": 5661,
+ "disagree_total": 0,
+ "gateMalformed_total": 0,
+ "gateFlips_total": 0,
+ "S_force_lockstep": {
+  "planner_cos": null,
+  "planner_rel": null,
+  "endgame_cos": 1,
+  "endgame_rel": 1
+ },
+ "S_force_fork": {
+  "planner_cos": null,
+  "planner_rel": null,
+  "endgame_cos": 1,
+  "endgame_rel": 1
+ },
+ "S_traj_identical_frac": 1,
+ "S_traj_median_first_div": null,
+ "forkClearedFrac": 0.996111111,
+ "lockstepClearedFrac": 0.996111111,
+ "gate": {
+  "threshold": 0.95,
+  "pooled_pass": true,
+  "planner_pass": true,
+  "endgame_pass": true,
+  "PASS": true
+ },
+ "perCell": [
+  {
+   "cell": "390x844",
+   "games": 300,
+   "S_dec_pooled": 1,
+   "S_dec_planner": null,
+   "S_dec_endgame": 1,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 892,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "820x1180",
+   "games": 300,
+   "S_dec_pooled": 1,
+   "S_dec_planner": null,
+   "S_dec_endgame": 1,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 939,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "1024x768",
+   "games": 300,
+   "S_dec_pooled": 1,
+   "S_dec_planner": null,
+   "S_dec_endgame": 1,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 926,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "1512x982",
+   "games": 300,
+   "S_dec_pooled": 1,
+   "S_dec_planner": null,
+   "S_dec_endgame": 1,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 969,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "1680x1050",
+   "games": 300,
+   "S_dec_pooled": 1,
+   "S_dec_planner": null,
+   "S_dec_endgame": 1,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 962,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1
+  },
+  {
+   "cell": "2560x1440",
+   "games": 300,
+   "S_dec_pooled": 1,
+   "S_dec_planner": null,
+   "S_dec_endgame": 1,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 973,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 0.976666667
+  }
+ ]
+}
