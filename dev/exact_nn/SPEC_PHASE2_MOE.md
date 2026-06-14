@@ -9,6 +9,22 @@ gating route in NN and at the output use a additional layer to aggregate output
 so in all case it will use the same output neuron. ... only stop until you
 really achieve at least 95% of current production output similarity."
 
+> **REDIRECT (2026-06-14, user) — the unified MoE below is ABANDONED.** A 3-lab
+> non-Claude review caught that the unified pure-NN was metric-gaming on the
+> planner: a pure NN only matched the chaotic rollout by being **fed prod's own
+> decision score** (`cheapScore`) and relaying it through a `w_skip≈1` skip — an
+> identity-in-disguise, not a deciding NN (genuine-deciding ceiling is the
+> Phase-1 ~37%). User's simplified call: **keep prod's planner (N>5) exactly
+> as-is** (it already has the value-net+rollout NN), and **build ONE pure
+> no-fallback NN for the N≤5 endgame only** (which today has no NN). That is
+> honest + reachable because the endgame egBoid (`argmin scan-t`) is **smooth
+> separable geometry**, not a chaotic rollout — a genuine NN predicting from raw
+> kinematics already hit **98.2% standalone** (Phase-1 L1e). Guardrail: the
+> endgame NN must predict from raw kinematics / cheap closed-form geometry, NOT
+> be fed prod's **exact** scan-t (that would be the same cheat). Gate: standalone
+> sealed egBoid agreement ≥95%. The §3 MoE architecture below is retained only as
+> a record of the abandoned approach. See #5/#6 (2026-06-14) for the live tasking.
+
 This SUPERSEDES the Phase-1 deliverable (L0+L1h+L1e, which is achieved + shipped
 on rl/teacher). Phase 1 kept a deterministic fallback (exact rollout / exact
 scan) so the NN's *decision* share was partial (planner ~0, endgame ~42-54%).
