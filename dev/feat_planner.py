@@ -269,6 +269,71 @@ def run_value_lookahead(seeds, frames, device, model, K, D, Hs, bias0=0.0):
     return sim.catches.cpu().numpy()
 
 
+def _planner_held(sim, roll, model, K, Hs, roll_M, bias0=0.0,
+                  K_roll=0, prune_by='v', no_value=False):
+    """ONE planner decision (the f%D==0 block of run_value_lookahead_cheap, extracted
+    verbatim so the GPU gate-sweep reuses the *validated* planner). Returns held (B,2):
+    the chosen E3D candidate target for each env. `roll` is a reusable B*K rollout Sim.
+    The caller owns the f%D cadence and the per-step pp._step_with_target(sim, held)."""
+    B = sim.B
+    rows = torch.arange(B, device=sim.pred_pos.device)
+    cand = pp._candidate_targets(sim, K)
+    base = pp._save_state(sim)
+    pp._load_state(roll, pp._tile_state(base, K))
+    roll_tgt = cand.reshape(B * K, 2).contiguous()
+    # M nearest boids to each env's predator (at rollout start) = active
+    dx = roll.boid_pos[..., 0] - roll.pred_pos[:, None, 0]
+    dy = roll.boid_pos[..., 1] - roll.pred_pos[:, None, 1]
+    d2 = dx * dx + dy * dy
+    d2 = torch.where(roll.boid_alive, d2, torch.full_like(d2, float('inf')))
+    order = torch.argsort(d2, dim=1)
+    active = torch.zeros_like(roll.boid_alive)
+    active.scatter_(1, order[:, :roll_M], torch.ones_like(order[:, :roll_M], dtype=active.dtype))
+    frozen = ~active
+    c0 = roll.catches.clone()
+    for _ in range(Hs):
+        sp = roll.boid_pos.clone(); sv = roll.boid_vel.clone()
+        roll._step_boids()
+        roll.boid_pos[frozen] = sp[frozen]
+        roll.boid_vel[frozen] = sv[frozen]
+        pp._analytic_steer(roll, roll_tgt)
+        roll._check_catches()
+        roll._decay_size(); roll.frame += 1; roll._frame_ms += st.FRAME_MS
+    c_near = (roll.catches - c0).reshape(B, K).float()
+    if no_value:
+        roll_score = c_near
+    else:
+        tcand = pp._candidate_targets(roll, K)
+        tfeat, tctx = candidate_features(roll, tcand)
+        with torch.no_grad():
+            tv = model(tfeat.to(sim.pred_pos.device), tctx.to(sim.pred_pos.device))
+        roll_score = c_near + tv.max(dim=1).values.reshape(B, K)
+    if 0 < K_roll < K:
+        f0, x0 = candidate_features(sim, cand)
+        with torch.no_grad():
+            vprior = model(f0.to(sim.pred_pos.device), x0.to(sim.pred_pos.device))
+        if prune_by == 'ball':
+            pscore = (f0[:, :, 18] - f0[:, :, 16]).to(sim.pred_pos.device)
+        elif prune_by == 'mindist':
+            pscore = (-f0[:, :, 17]).to(sim.pred_pos.device)
+        elif prune_by == 'ballmin':
+            pscore = (f0[:, :, 18] - f0[:, :, 16] - 0.01 * f0[:, :, 17]).to(sim.pred_pos.device)
+        elif prune_by == 'vmin':
+            pscore = vprior - 0.001 * f0[:, :, 17].to(sim.pred_pos.device)
+        else:
+            pscore = vprior
+        order = torch.argsort(pscore, dim=1, descending=True, stable=True)
+        is_top = torch.zeros_like(pscore, dtype=torch.bool)
+        is_top.scatter_(1, order[:, :K_roll], torch.ones_like(order[:, :K_roll], dtype=torch.bool))
+        nonroll = torch.zeros_like(roll_score) if no_value else vprior
+        score = torch.where(is_top, roll_score, nonroll)
+    else:
+        score = roll_score
+    if bias0 != 0.0:
+        score = score.clone(); score[:, 0] = score[:, 0] + bias0
+    return cand[rows, score.argmax(dim=1)]
+
+
 def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bias0=0.0,
                               K_roll=0, prune_by='v', no_value=False):
     """Browser-affordable lookahead: the rollout only simulates the M nearest boids
@@ -292,81 +357,12 @@ def run_value_lookahead_cheap(seeds, frames, device, model, K, D, Hs, roll_M, bi
     # deploy. Force fresh recompute on both sims to match the browser exactly.
     sim.always_recompute_target = True
     roll.always_recompute_target = True
-    rows = torch.arange(B, device=device)
     held = None
     f = 0
     while f < frames:
         if f % D == 0:
-            cand = pp._candidate_targets(sim, K)
-            base = pp._save_state(sim)
-            pp._load_state(roll, pp._tile_state(base, K))
-            roll_tgt = cand.reshape(B * K, 2).contiguous()
-            # M nearest boids to each env's predator (at rollout start) = active
-            dx = roll.boid_pos[..., 0] - roll.pred_pos[:, None, 0]
-            dy = roll.boid_pos[..., 1] - roll.pred_pos[:, None, 1]
-            d2 = dx * dx + dy * dy
-            d2 = torch.where(roll.boid_alive, d2, torch.full_like(d2, float('inf')))
-            order = torch.argsort(d2, dim=1)
-            active = torch.zeros_like(roll.boid_alive)
-            active.scatter_(1, order[:, :roll_M], torch.ones_like(order[:, :roll_M], dtype=active.dtype))
-            frozen = ~active
-            c0 = roll.catches.clone()
-            for _ in range(Hs):
-                sp = roll.boid_pos.clone(); sv = roll.boid_vel.clone()
-                roll._step_boids()
-                roll.boid_pos[frozen] = sp[frozen]
-                roll.boid_vel[frozen] = sv[frozen]
-                pp._analytic_steer(roll, roll_tgt)
-                roll._check_catches()
-                # FIDELITY FIX: the planner's rollout (_step_with_target) also decays
-                # predator size + advances frame/time each step; omitting these made
-                # the rollout over-count catches (predator never shrinks) and mis-rank
-                # candidates -> cheap(K16,Hs120,no_value) was 0.55x the planner, not 1x.
-                roll._decay_size(); roll.frame += 1; roll._frame_ms += st.FRAME_MS
-            c_near = (roll.catches - c0).reshape(B, K).float()
-            if no_value:
-                roll_score = c_near                                   # no terminal bootstrap
-            else:
-                tcand = pp._candidate_targets(roll, K)
-                tfeat, tctx = candidate_features(roll, tcand)
-                with torch.no_grad():
-                    tv = model(tfeat.to(device), tctx.to(device))
-                roll_score = c_near + tv.max(dim=1).values.reshape(B, K)
-            if 0 < K_roll < K:
-                f0, x0 = candidate_features(sim, cand)
-                with torch.no_grad():
-                    vprior = model(f0.to(device), x0.to(device))      # (B,K) prior V
-                if prune_by == 'ball':
-                    # ballistic catchability: caught (feat18) - tCatchNorm (feat16).
-                    # NOTE: for a slow predator this TIES at -1 across all candidates
-                    # most frames (no ballistic catch within Hb) -> degenerate prune.
-                    pscore = (f0[:, :, 18] - f0[:, :, 16]).to(device)
-                elif prune_by == 'mindist':
-                    # closest ballistic approach (feat17, normalized) -- non-tying,
-                    # informative even when no catch. Lower dist = better -> negate.
-                    pscore = (-f0[:, :, 17]).to(device)
-                elif prune_by == 'ballmin':
-                    # ballistic primary, break the -1 ties by closest approach.
-                    pscore = (f0[:, :, 18] - f0[:, :, 16] - 0.01 * f0[:, :, 17]).to(device)
-                elif prune_by == 'vmin':
-                    # value prior primary, closeness tiebreak (mostly non-tying anyway).
-                    pscore = vprior - 0.001 * f0[:, :, 17].to(device)
-                else:  # 'v'
-                    pscore = vprior
-                # deterministic top-K_roll: stable descending sort breaks ties by
-                # lowest index -> matches the browser's first-argmax cp_top1. (The old
-                # `pscore >= topk` selected ALL tied candidates -> secretly the full
-                # 16-roll planner whenever the ballistic prune tied. THE 2x-gap bug.)
-                order = torch.argsort(pscore, dim=1, descending=True, stable=True)
-                is_top = torch.zeros_like(pscore, dtype=torch.bool)
-                is_top.scatter_(1, order[:, :K_roll], torch.ones_like(order[:, :K_roll], dtype=torch.bool))
-                nonroll = torch.zeros_like(roll_score) if no_value else vprior
-                score = torch.where(is_top, roll_score, nonroll)
-            else:
-                score = roll_score
-            if bias0 != 0.0:
-                score = score.clone(); score[:, 0] = score[:, 0] + bias0
-            held = cand[rows, score.argmax(dim=1)]
+            held = _planner_held(sim, roll, model, K, Hs, roll_M, bias0=bias0,
+                                 K_roll=K_roll, prune_by=prune_by, no_value=no_value)
         pp._step_with_target(sim, held)
         f += 1
     return sim.catches.cpu().numpy()
