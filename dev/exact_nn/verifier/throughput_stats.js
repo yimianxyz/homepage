@@ -40,7 +40,7 @@ function main() {
     const bi = process.argv.indexOf('--baseline');
     const baseline = bi >= 0 ? process.argv[bi + 1] : 'count:T=5';
     const rep = JSON.parse(fs.readFileSync(fp, 'utf8'));
-    const configs = rep.configs, cells = rep.cells;
+    const configs = rep.configs.map(l => (typeof l === 'string' ? { label: l } : l)), cells = rep.cells;
     console.log('# Throughput paired-stats — ' + rep.seedSet + ', baseline ' + baseline + ', n=' + rep.seeds);
     const perScreenBest = {}; const beatsBaseline = {};
     for (const cell of cells) {

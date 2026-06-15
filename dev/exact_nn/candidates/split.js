@@ -46,6 +46,7 @@ module.exports.create = async function (game, helpers) {
     const rule = process.env.EXACTNN_SPLIT_RULE || 'count';
     const T = process.env.EXACTNN_SPLIT_T != null ? +process.env.EXACTNN_SPLIT_T : 5;
     const Tref = process.env.EXACTNN_SPLIT_TREF != null ? +process.env.EXACTNN_SPLIT_TREF : 5;
+    const P = process.env.EXACTNN_SPLIT_P != null ? +process.env.EXACTNN_SPLIT_P : 1.0;   // density exponent (T*~A^p, p~0.3 sub-linear)
     const H = process.env.EXACTNN_SPLIT_H != null ? +process.env.EXACTNN_SPLIT_H : 90;
 
     let inEndgame = false;   // hysteresis state (per game; reset() clears)
@@ -68,7 +69,7 @@ module.exports.create = async function (game, helpers) {
         if (rule === 'count') { enter = N <= T; exit = N >= T + 2; }
         else if (rule === 'density') {
             const A = (cfg.W + 20) * (cfg.Hc + 20);
-            const Td = Math.max(1, Math.round(Tref * A / AREF));
+            const Td = Math.max(1, Math.round(Tref * Math.pow(A / AREF, P)));   // sub-linear area scaling
             enter = N <= Td; exit = N >= Td + 2;
         } else if (rule === 'horizon') {
             const m = minWa0(pred, boids, cfg);
