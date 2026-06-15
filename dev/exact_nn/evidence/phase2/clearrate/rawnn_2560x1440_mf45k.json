@@ -1,0 +1,27 @@
+{
+ "policy": "rawnn",
+ "candidate": "egnn.js",
+ "seedSet": "SEALED@off0",
+ "seedCount": 18,
+ "sealOffset": 0,
+ "distribution": "natural(full-game)",
+ "maxFrames": 45000,
+ "commitment_sha256_salt": "bac52d5149038958bf39748a602fe64edf74be462256951e95bff31a57b9fd8e",
+ "games": 18,
+ "cleared": 18,
+ "clearRate": 1,
+ "medTimeToCatch": 25423,
+ "p90TimeToCatch": 29264,
+ "stuck_total": 0,
+ "perCell": [
+  {
+   "cell": "2560x1440",
+   "games": 18,
+   "cleared": 18,
+   "clearRate": 1,
+   "stuck": 0,
+   "stuckSeeds": [],
+   "medTimeToCatch": 25423
+  }
+ ]
+}

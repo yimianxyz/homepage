@@ -1,0 +1,3 @@
+[prod 1512x982] clear 8/8 (100.0%) stuck=0 medCatch=15413
+
+=== prod: clear-rate 100.0% (stuck 0) — gate(≥95% clear) PASS ===
