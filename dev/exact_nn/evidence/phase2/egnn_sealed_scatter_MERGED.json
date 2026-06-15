@@ -30,6 +30,10 @@
  "disagree_total": 56,
  "gateMalformed_total": 0,
  "gateFlips_total": 0,
+ "soleN1_total": 2754,
+ "soleN1_frac": 0.286427457,
+ "nonTrivial_egCommits": 6861,
+ "S_dec_endgame_nonTrivial": 0.991837925,
  "S_force_lockstep": {
   "planner_cos": null,
   "planner_rel": null,
@@ -81,6 +85,8 @@
    "forkClearedFrac": 1,
    "gateFlips": 0,
    "gateMalformed": 0,
+   "soleN1": 460,
+   "S_dec_endgame_nonTrivial": 0.992882562,
    "_raw": {
     "plans": 0,
     "planDisagree": 0,
@@ -102,6 +108,7 @@
     ],
     "gateFlips": 0,
     "gateMalformed": 0,
+    "soleN1": 460,
     "fsLockP": {
      "cos": 0,
      "rel": 0,
@@ -151,6 +158,8 @@
    "forkClearedFrac": 1,
    "gateFlips": 0,
    "gateMalformed": 0,
+   "soleN1": 466,
+   "S_dec_endgame_nonTrivial": 0.99742268,
    "_raw": {
     "plans": 0,
     "planDisagree": 0,
@@ -167,6 +176,7 @@
     ],
     "gateFlips": 0,
     "gateMalformed": 0,
+    "soleN1": 466,
     "fsLockP": {
      "cos": 0,
      "rel": 0,
@@ -216,6 +226,8 @@
    "forkClearedFrac": 1,
    "gateFlips": 0,
    "gateMalformed": 0,
+   "soleN1": 470,
+   "S_dec_endgame_nonTrivial": 0.988023952,
    "_raw": {
     "plans": 0,
     "planDisagree": 0,
@@ -242,6 +254,7 @@
     ],
     "gateFlips": 0,
     "gateMalformed": 0,
+    "soleN1": 470,
     "fsLockP": {
      "cos": 0,
      "rel": 0,
@@ -291,6 +304,8 @@
    "forkClearedFrac": 0.9921875,
    "gateFlips": 0,
    "gateMalformed": 0,
+   "soleN1": 474,
+   "S_dec_endgame_nonTrivial": 0.994932432,
    "_raw": {
     "plans": 0,
     "planDisagree": 0,
@@ -310,6 +325,7 @@
     ],
     "gateFlips": 0,
     "gateMalformed": 0,
+    "soleN1": 474,
     "fsLockP": {
      "cos": 0,
      "rel": 0,
@@ -359,6 +375,8 @@
    "forkClearedFrac": 1,
    "gateFlips": 0,
    "gateMalformed": 0,
+   "soleN1": 426,
+   "S_dec_endgame_nonTrivial": 0.985018727,
    "_raw": {
     "plans": 0,
     "planDisagree": 0,
@@ -388,6 +406,7 @@
     ],
     "gateFlips": 0,
     "gateMalformed": 0,
+    "soleN1": 426,
     "fsLockP": {
      "cos": 0,
      "rel": 0,
@@ -437,6 +456,8 @@
    "forkClearedFrac": 1,
    "gateFlips": 0,
    "gateMalformed": 0,
+   "soleN1": 458,
+   "S_dec_endgame_nonTrivial": 0.9921875,
    "_raw": {
     "plans": 0,
     "planDisagree": 0,
@@ -459,6 +480,7 @@
     ],
     "gateFlips": 0,
     "gateMalformed": 0,
+    "soleN1": 458,
     "fsLockP": {
      "cos": 0,
      "rel": 0,
