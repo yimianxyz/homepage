@@ -1,0 +1,72 @@
+{
+ "metric": "S_dec(N≤5) = un-gated planCheap committed-boid == prod intercept egBoid",
+ "seedSet": "SEALED@off0",
+ "seedCount": 512,
+ "sealOffset": 0,
+ "commitment_sha256_salt": "bac52d5149038958bf39748a602fe64edf74be462256951e95bff31a57b9fd8e",
+ "distribution": "scatter(startBoids 2..5)",
+ "cells": 6,
+ "commits_total": 9615,
+ "S_dec": 0.249506,
+ "S_dec_nonTrivial": 0.318029,
+ "agree_total": 2399,
+ "disagree_total": 7216,
+ "soleN1_total": 2754,
+ "soleN1_frac": 0.286427,
+ "gate_pass": false,
+ "e3dPatrolPick_total": 4220,
+ "e3dPatrolPick_frac": 0.438898,
+ "rolled_share": 0.889236,
+ "valueNetOnly_share": 0.110764,
+ "rolledWithPositiveCatch_share": 0.040562,
+ "perCell": [
+  {
+   "cell": "390x844",
+   "commits": 1494,
+   "S_dec": 0.239625,
+   "S_dec_nonTrivial": 0.299625,
+   "e3dPickFrac": 0.456493,
+   "vnetOnlyFrac": 0.188086
+  },
+  {
+   "cell": "820x1180",
+   "commits": 1610,
+   "S_dec": 0.249068,
+   "S_dec_nonTrivial": 0.311632,
+   "e3dPickFrac": 0.431677,
+   "vnetOnlyFrac": 0.12795
+  },
+  {
+   "cell": "1024x768",
+   "commits": 1584,
+   "S_dec": 0.234217,
+   "S_dec_nonTrivial": 0.300712,
+   "e3dPickFrac": 0.433081,
+   "vnetOnlyFrac": 0.106692
+  },
+  {
+   "cell": "1512x982",
+   "commits": 1630,
+   "S_dec": 0.258282,
+   "S_dec_nonTrivial": 0.32646,
+   "e3dPickFrac": 0.440491,
+   "vnetOnlyFrac": 0.095706
+  },
+  {
+   "cell": "1680x1050",
+   "commits": 1639,
+   "S_dec": 0.248322,
+   "S_dec_nonTrivial": 0.319076,
+   "e3dPickFrac": 0.439902,
+   "vnetOnlyFrac": 0.090299
+  },
+  {
+   "cell": "2560x1440",
+   "commits": 1658,
+   "S_dec": 0.265983,
+   "S_dec_nonTrivial": 0.347973,
+   "e3dPickFrac": 0.433052,
+   "vnetOnlyFrac": 0.063329
+  }
+ ]
+}
