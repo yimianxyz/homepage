@@ -344,6 +344,47 @@
     // Validated 4 ways: JS lab, real eval harness, an independent audit, and a
     // 4096-env GPU sweep.)
     var egBoid = null;
+
+    // ---- endgame egBoid NN (genuine raw-kinematics) -----------------------------
+    // Predicts each boid's torus scan-t from CURRENT state {rel-pos, vel, pred
+    // kinematics, cell dims} — NO analytic-reach-time feature, NO fallback. argmin
+    // over the present boids = the committed egBoid. cp_gelu is the same A-S erf
+    // GELU the net trained with. Verified: as the egBoid selector (prod's torus aim
+    // unchanged) it clears endgames Δ=0 vs the scan over sealed-natural full games
+    // (the ~12% selection-disagreements are outcome-equivalent near-ties).
+    var EG_NET = null;
+    function egLin(Wm, b, x) {
+        var o = new Array(Wm.length);
+        for (var r = 0; r < Wm.length; r++) { var a = b[r], wr = Wm[r]; for (var i = 0; i < x.length; i++) a += wr[i] * x[i]; o[r] = a; }
+        return o;
+    }
+    function egFeatures(px, py, pvx, pvy, psize, bx, by, bvx, bvy, W, Hc) {
+        var PX = W + 2 * BORDER_OFFSET, PY = Hc + 2 * BORDER_OFFSET;
+        var rwx = bx - px - PX * Math.round((bx - px) / PX), rwy = by - py - PY * Math.round((by - py) / PY);
+        var rawx = bx - px, rawy = by - py;
+        var d0 = Math.sqrt(rwx * rwx + rwy * rwy), ds = d0 < 1e-6 ? 1e-6 : d0;
+        var radial = (rwx * bvx + rwy * bvy) / ds, tangent = (rwx * bvy - rwy * bvx) / ds;
+        var bspeed = Math.sqrt(bvx * bvx + bvy * bvy);
+        return [rwx / 200, rwy / 200, d0 / 200, rawx / 200, rawy / 200,
+            bvx / 6, bvy / 6, bspeed / 6, radial / 6, tangent / 6,
+            W / 2560, Hc / 1440, pvx / 6, pvy / 6, (psize || 0) / 20];
+    }
+    function egScanT(fr) {
+        var EW = EG_NET.weights, i;
+        var h = egLin(EW['net.0.weight'], EW['net.0.bias'], fr); for (i = 0; i < h.length; i++) h[i] = cp_gelu(h[i]);
+        var h2 = egLin(EW['net.2.weight'], EW['net.2.bias'], h); for (i = 0; i < h2.length; i++) h2[i] = cp_gelu(h2[i]);
+        return egLin(EW['net.4.weight'], EW['net.4.bias'], h2)[0] * 100;
+    }
+    function egNNpick(pred, boids) {
+        var px = pred.position.x, py = pred.position.y, pvx = pred.velocity.x, pvy = pred.velocity.y, psize = pred.currentSize;
+        var best = Infinity, bi = 0;
+        for (var i = 0; i < boids.length; i++) {
+            var t = egScanT(egFeatures(px, py, pvx, pvy, psize, boids[i].position.x, boids[i].position.y, boids[i].velocity.x, boids[i].velocity.y, cfg.W, cfg.Hc));
+            if (t < best) { best = t; bi = i; }
+        }
+        return bi;
+    }
+
     function intercept(pred, boids) {
         var px = pred.position.x, py = pred.position.y, sM = PREDATOR_MAX_SPEED;
         var PX = cfg.W + 2 * BORDER_OFFSET, PY = cfg.Hc + 2 * BORDER_OFFSET, TMAX = 1400;
@@ -358,16 +399,19 @@
             }
             return null;
         }
-        // commit to one target until it is caught (don't dither among the last few);
-        // pick the soonest-reachable boid, falling back to the nearest if none qualify.
+        // commit to one target until it is caught (don't dither among the last few).
         if (egBoid && boids.indexOf(egBoid) < 0) egBoid = null;
-        if (!egBoid) {
-            var bestT = Infinity, i;
-            for (i = 0; i < boids.length; i++) { var c = scan(boids[i]); if (c && c.t < bestT) { bestT = c.t; egBoid = boids[i]; } }
-            if (!egBoid) {
-                var nd2 = Infinity;
-                for (i = 0; i < boids.length; i++) { var dx = wx(boids[i].position.x - px), dy = wy(boids[i].position.y - py); var d2 = dx * dx + dy * dy; if (d2 < nd2) { nd2 = d2; egBoid = boids[i]; } }
-            }
+        // egBoid SELECTION: the genuine raw-kinematics NN (argmin predicted scan-t).
+        // Commit-and-hold (re-pick only once the held egBoid is caught/gone); NO
+        // fallback/watchdog/reset — just keep running the NN.
+        if (!egBoid) egBoid = boids[egNNpick(pred, boids)];
+        // Keep the VALUE-NET "predator's brain" viz alive every endgame frame — same
+        // model, never swap/freeze: a cheap value-net forward (1 candidate, no rollout)
+        // on the committed egBoid's features, so the brain keeps flaring through N<=5.
+        if (vizModel && NET && egBoid) {
+            var vst = snapshot(pred, boids); vst.nAlive = boids.length;
+            var vfr = cp_features(vst, [{ x: egBoid.position.x, y: egBoid.position.y }], PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
+            cp_value_viz(NET, vfr.feat[0], vfr.ctx, vizModel);
         }
         // aim at the earliest-reachable point (perpendicular cut-off onto its line if none)
         var s = scan(egBoid), aimX, aimY;
@@ -385,11 +429,17 @@
         return st;
     }
 
+    // Hysteresis on the endgame gate: ENTER at N<=5, EXIT only at N>=7, so a
+    // tap-spawn bouncing N across 5<->6 doesn't thrash planner<->endgame. (A stale
+    // inEndgame from a prior game self-clears on the next N>=7 frame.)
+    var inEndgame = false;
     window.__cheap = {
         force: function (pred, boids) {
             if (boids.length === 0) return new Vector(0, 0);
             if (!configured && pred.simulation) configure(pred.simulation);
-            if (boids.length <= 5) return intercept(pred, boids);   // ENDGAME: torus head-on intercept
+            if (!inEndgame && boids.length <= 5) inEndgame = true;
+            else if (inEndgame && boids.length >= 7) inEndgame = false;
+            if (inEndgame) return intercept(pred, boids);   // ENDGAME: NN-selected egBoid + torus aim
             if (frame === 0 || frame >= cfg.D) { target = planCheap(snapshot(pred, boids)); frame = 0; }
             frame++;
             return steer(pred, boids);
@@ -399,8 +449,14 @@
     // Own the page boot gate: boids.js waits on window.__predatorReady before
     // starting the sim, so the value net is loaded before frame 1.
     if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
-        window.__predatorReady = fetch('js/value_net.json', { cache: 'no-cache' })
-            .then(function (r) { if (!r.ok) throw new Error('value_net fetch failed: ' + r.status); return r.json(); })
-            .then(function (net) { NET = net; vizModel = cp_viz_model(net); window.__predatorModel = vizModel; });
+        window.__predatorReady = Promise.all([
+            fetch('js/value_net.json', { cache: 'no-cache' })
+                .then(function (r) { if (!r.ok) throw new Error('value_net fetch failed: ' + r.status); return r.json(); }),
+            fetch('js/eg_weights_raw.json', { cache: 'no-cache' })
+                .then(function (r) { if (!r.ok) throw new Error('eg_weights_raw fetch failed: ' + r.status); return r.json(); })
+        ]).then(function (arr) {
+            NET = arr[0]; vizModel = cp_viz_model(NET); window.__predatorModel = vizModel;
+            EG_NET = arr[1];
+        });
     }
 })();
