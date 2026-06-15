@@ -1,0 +1,260 @@
+{
+ "phase": 2,
+ "candidate": "moe.js",
+ "mode": "raw_prior",
+ "weights": "moe_weights.json",
+ "weights_sha256": "096660ed5eb4a8025e7cbee32bf422685c89e71e7c4aff68f621c68c991f2068",
+ "seedSet": "calibration[270000,280000)",
+ "seedCount": 6,
+ "sealOffset": null,
+ "commitment_sha256_salt": null,
+ "distribution": "natural(full-game, all-N)",
+ "cells": 3,
+ "devicematrix": [
+  "390x844",
+  "1024x768",
+  "1680x1050"
+ ],
+ "games": 18,
+ "maxFrames": 40000,
+ "S_dec_pooled": 0.258930224,
+ "S_dec_planner": 0.253889872,
+ "S_dec_endgame": 1,
+ "plans_total": 10733,
+ "planDisagree_total": 8008,
+ "egCommits_total": 73,
+ "egDisagree_total": 0,
+ "decisions_total": 10806,
+ "disagree_total": 8008,
+ "gateMalformed_total": 0,
+ "gateFlips_total": 0,
+ "S_force_lockstep": {
+  "planner_cos": 0.975331786,
+  "planner_rel": 0.998847817,
+  "endgame_cos": 1,
+  "endgame_rel": 1
+ },
+ "S_force_fork": {
+  "planner_cos": 0.552563891,
+  "planner_rel": 0.923196448,
+  "endgame_cos": 0.958750575,
+  "endgame_rel": 0.996077697
+ },
+ "S_traj_identical_frac": 0,
+ "S_traj_median_first_div": 48,
+ "forkClearedFrac": 1,
+ "lockstepClearedFrac": 1,
+ "gate": {
+  "threshold": 0.95,
+  "pooled_pass": false,
+  "planner_pass": false,
+  "endgame_pass": true,
+  "PASS": false
+ },
+ "perCell": [
+  {
+   "cell": "390x844",
+   "games": 6,
+   "S_dec_pooled": 0.24385511,
+   "S_dec_planner": 0.233442623,
+   "S_dec_endgame": 1,
+   "plans": 1525,
+   "planDisagree": 1169,
+   "egCommits": 21,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 0.982039686,
+    "planner_rel": 0.99924226,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 0.667735373,
+    "planner_rel": 0.958655406,
+    "endgame_cos": 0.981503392,
+    "endgame_rel": 0.996077463
+   },
+   "S_traj_identical_frac": 0,
+   "S_traj_median_first_div": 64,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 1525,
+    "planDisagree": 1169,
+    "egCommits": 21,
+    "egDisagree": 0,
+    "games": 6,
+    "lockstepCleared": 6,
+    "forkCleared": 6,
+    "trajIdentical": 0,
+    "firstDiv": [
+     221,
+     0,
+     80,
+     64,
+     0,
+     37
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 23913.64840397606,
+     "rel": 24332.54827910174,
+     "n": 24351
+    },
+    "fsLockE": {
+     "cos": 3549,
+     "rel": 3549,
+     "n": 3549
+    },
+    "fsForkP": {
+     "cos": 28040.87925983829,
+     "rel": 40257.775128526235,
+     "n": 41994
+    },
+    "fsForkE": {
+     "cos": 3109.4027463555612,
+     "rel": 3155.573401848465,
+     "n": 3168
+    }
+   }
+  },
+  {
+   "cell": "1024x768",
+   "games": 6,
+   "S_dec_pooled": 0.271348315,
+   "S_dec_planner": 0.265571914,
+   "S_dec_endgame": 1,
+   "plans": 3532,
+   "planDisagree": 2594,
+   "egCommits": 28,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 0.97742704,
+    "planner_rel": 0.999077376,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 0.589356626,
+    "planner_rel": 0.939994614,
+    "endgame_cos": 0.919647255,
+    "endgame_rel": 0.993270268
+   },
+   "S_traj_identical_frac": 0,
+   "S_traj_median_first_div": 22,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 3532,
+    "planDisagree": 2594,
+    "egCommits": 28,
+    "egDisagree": 0,
+    "games": 6,
+    "lockstepCleared": 6,
+    "forkCleared": 6,
+    "trajIdentical": 0,
+    "firstDiv": [
+     0,
+     0,
+     22,
+     64,
+     0,
+     64
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 55206.05665020924,
+     "rel": 56428.889296323876,
+     "n": 56481
+    },
+    "fsLockE": {
+     "cos": 4003,
+     "rel": 4003,
+     "n": 4003
+    },
+    "fsForkP": {
+     "cos": 49653.885090339616,
+     "rel": 79195.48619292736,
+     "n": 84251
+    },
+    "fsForkE": {
+     "cos": 6921.265243093663,
+     "rel": 7475.352038006812,
+     "n": 7526
+    }
+   }
+  },
+  {
+   "cell": "1680x1050",
+   "games": 6,
+   "S_dec_pooled": 0.255263158,
+   "S_dec_planner": 0.252114165,
+   "S_dec_endgame": 1,
+   "plans": 5676,
+   "planDisagree": 4245,
+   "egCommits": 24,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 0.972228696,
+    "planner_rel": 0.998599174,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 0.5014682,
+    "planner_rel": 0.904497829,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 0,
+   "S_traj_median_first_div": 48,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 5676,
+    "planDisagree": 4245,
+    "egCommits": 24,
+    "egDisagree": 0,
+    "games": 6,
+    "lockstepCleared": 6,
+    "forkCleared": 6,
+    "trajIdentical": 0,
+    "firstDiv": [
+     16,
+     16,
+     80,
+     48,
+     48,
+     80
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 88255.03210486384,
+     "rel": 90648.83859261664,
+     "n": 90776
+    },
+    "fsLockE": {
+     "cos": 6140,
+     "rel": 6140,
+     "n": 6140
+    },
+    "fsForkP": {
+     "cos": 77889.54526401885,
+     "rel": 140489.3162263337,
+     "n": 155323
+    },
+    "fsForkE": {
+     "cos": 5387,
+     "rel": 5387,
+     "n": 5387
+    }
+   }
+  }
+ ]
+}

@@ -79,15 +79,17 @@ function plannerInject(code) {
     // (2) capture each rollout's actual outputs (catch-count + bootstrap) as a feature
     code = code.replace(ROLL_CAPTURE_ANCHOR, ROLL_CAPTURE_ANCHOR
         + '\n            window.__moeRolled.push({ ci: ci, catches: rr.catches, boot: boot });');
-    // (3) consult the unified NN BEFORE prod's argmax; a committed target skips it
+    // (3) consult the unified NN BEFORE prod's argmax; a committed target skips it.
+    // pass pidx (prod's roll order) so the gate can supply side-a's exact planRecord.
     code = code.replace(PLANNER_ARGMAX_ANCHOR,
-        '        if (window.__moeGatePlanner) { var __mt = window.__moeGatePlanner(s, cands, fr, vprior, score, window.__moeRolled); if (__mt) return __mt; }\n'
+        '        if (window.__moeGatePlanner) { var __mt = window.__moeGatePlanner(s, cands, fr, vprior, score, window.__moeRolled, pidx); if (__mt) return __mt; }\n'
         + PLANNER_ARGMAX_ANCHOR);
     return code;
 }
 function endgameInject(code) {
+    // pass pred.currentSize so the endgame gate feeds side-a's gateFeat the real psize
     return code.replace(ENDGAME_COMMIT_ANCHOR,
-        '        if (!egBoid && window.__moeGateEndgame) { var __egi = window.__moeGateEndgame(px, py, boids, cfg.W, cfg.Hc); if (__egi >= 0) egBoid = boids[__egi]; }\n'
+        '        if (!egBoid && window.__moeGateEndgame) { var __egi = window.__moeGateEndgame(px, py, boids, cfg.W, cfg.Hc, pred.currentSize); if (__egi >= 0) egBoid = boids[__egi]; }\n'
         + ENDGAME_COMMIT_ANCHOR);
 }
 
@@ -117,12 +119,14 @@ module.exports.create = async function (game, helpers) {
     const egScan = require(path.join(__dirname, '..', 'endgame', 'eg_scan.js'));
     const egFeat = require(path.join(__dirname, '..', 'endgame', 'eg_features.js'));
 
-    // the unified model (nn mode only). Contract (confirmable at handoff; the
-    // harness/metrics are agnostic to it):
-    //   loadMoePolicy(weights) -> moe(state, cfg) -> { slot }   (committed slot)
-    //   planner state: {regime:'planner', n, cands:[[x,y]..16], feat, ctx, vprior, score, rolled, W, Hc}; slot∈0..15
-    //   endgame state: {regime:'endgame', n, px, py, bx,by,bvx,bvy, egfeat:[n][18], W, Hc}; slot∈0..n-1
-    let moe = null;
+    // the unified model (nn mode only). side-a's CONFIRMED contract (moePolicy.js):
+    //   const P = loadMoePolicy(weights);   // -> { chooseTarget, chooseEgBoid, decide }
+    //   PLANNER: P.chooseTarget({s, cands:[[x,y]..16], feat:[16][19], vprior:[16],
+    //            pidx:[16], rolled:[4][ci,catches,boot], nAlive}, {W,Hc}) -> {tx,ty,slot}
+    //   ENDGAME: P.chooseEgBoid({px,py,bx,by,bvx,bvy,psize}, {W,Hc}) -> {egIdx, margin}
+    // Single forward pass internally (learned gate + 2 experts + shared head). The
+    // harness feeds prod's exact live structure; side-a's code owns featurization.
+    let P = null;
     if (mode === 'nn') {
         const studentMod = process.env.EXACTNN_MOE_STUDENT
             ? path.resolve(process.env.EXACTNN_MOE_STUDENT)
@@ -131,23 +135,25 @@ module.exports.create = async function (game, helpers) {
             ? path.resolve(process.env.EXACTNN_MOE_WEIGHTS)
             : path.join(__dirname, '..', 'student', 'moe_weights.json');
         const { loadMoePolicy } = require(studentMod);
-        moe = loadMoePolicy(weightsFp);
+        P = loadMoePolicy(weightsFp);
     }
 
     const stats = { plannerCommits: 0, endgameCommits: 0,
         plannerVsProd: 0, endgameVsProd: 0,   // live NN-vs-prod disagreements (diagnostic)
         flips: 0, malformed: 0 };
 
+    const cfgWH = { W: game.sim.canvasWidth, Hc: game.sim.canvasHeight };
     // ---- PLANNER gate: NO fallback (always returns a committed target) --------
-    game.win.__moeGatePlanner = function (s, cands, fr, vprior, score, rolled) {
+    game.win.__moeGatePlanner = function (s, cands, fr, vprior, score, rolled, pidx) {
         stats.plannerCommits++;
         const prodBi = argmaxScore(score);          // prod's exact pick (for oracle / diagnostics)
         let slot;
         if (mode === 'nn') {
-            const r = moe({ regime: 'planner', n: s.bx.length, cands: cands.map(c => [c.x, c.y]),
-                feat: fr.feat, ctx: fr.ctx, vprior: vprior, score: score, rolled: rolled,
-                W: s.W != null ? s.W : game.sim.canvasWidth, Hc: s.Hc != null ? s.Hc : game.sim.canvasHeight });
-            slot = (r && typeof r.slot === 'number') ? r.slot : (r && typeof r.egIdx === 'number' ? r.egIdx : -1);
+            // side-a's exact planRecord: rolled as [ci,catches,boot] triples (not objects)
+            const r = P.chooseTarget({ s: s, cands: cands.map(c => [c.x, c.y]), feat: fr.feat,
+                vprior: vprior, pidx: pidx, rolled: rolled.map(o => [o.ci, o.catches, o.boot]),
+                nAlive: s.bx.length }, cfgWH);
+            slot = (r && typeof r.slot === 'number') ? r.slot : -1;
             // a malformed NN slot is NOT silently corrected to prod (that would hide
             // a model defect / inflate S_dec) — it's PENALIZED as a disagreement.
             if (!(slot >= 0 && slot < cands.length)) { stats.malformed++; slot = altSlotByCoords(cands, prodBi); }
@@ -164,7 +170,7 @@ module.exports.create = async function (game, helpers) {
     };
 
     // ---- ENDGAME gate: NO fallback (always returns a committed boid index) ----
-    game.win.__moeGateEndgame = function (px, py, boids, W, Hc) {
+    game.win.__moeGateEndgame = function (px, py, boids, W, Hc, psize) {
         stats.endgameCommits++;
         const n = boids.length;
         // flat {x,y,vx,vy} — the shape eg_scan.egPick / eg_features expect
@@ -174,12 +180,10 @@ module.exports.create = async function (game, helpers) {
         const prodIdx = egScan.egPick(px, py, bs, W, Hc).egIdx;   // prod's exact egBoid
         let idx;
         if (mode === 'nn') {
-            const egfeat = new Array(n);
-            for (let i = 0; i < n; i++) egfeat[i] = egFeat.egBoidFeatures(px, py, bs[i].x, bs[i].y, bs[i].vx, bs[i].vy, W, Hc);
-            const r = moe({ regime: 'endgame', n: n, px: px, py: py,
-                bx: bs.map(b => b.x), by: bs.map(b => b.y), bvx: bs.map(b => b.vx), bvy: bs.map(b => b.vy),
-                egfeat: egfeat, W: W, Hc: Hc });
-            idx = (r && typeof r.slot === 'number') ? r.slot : (r && typeof r.egIdx === 'number' ? r.egIdx : -1);
+            // side-a's chooseEgBoid takes the raw snapshot + computes scan-t itself
+            const r = P.chooseEgBoid({ px: px, py: py, bx: bs.map(b => b.x), by: bs.map(b => b.y),
+                bvx: bs.map(b => b.vx), bvy: bs.map(b => b.vy), psize: psize }, { W: W, Hc: Hc });
+            idx = (r && typeof r.egIdx === 'number') ? r.egIdx : -1;
             // malformed/padded-slot pick (≥n) is PENALIZED as a disagreement, never
             // silently mapped to prod (no hidden fallback; surfaces a real NN failure).
             if (!(idx >= 0 && idx < n)) { stats.malformed++; idx = n >= 2 ? (prodIdx + 1) % n : prodIdx; }

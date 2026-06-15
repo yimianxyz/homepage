@@ -1,0 +1,239 @@
+{
+ "phase": 2,
+ "candidate": "moe.js",
+ "mode": "oracle",
+ "weights": "moe_weights.json",
+ "weights_sha256": "096660ed5eb4a8025e7cbee32bf422685c89e71e7c4aff68f621c68c991f2068",
+ "seedSet": "calibration[270000,280000)",
+ "seedCount": 6,
+ "sealOffset": null,
+ "commitment_sha256_salt": null,
+ "distribution": "natural(full-game, all-N)",
+ "cells": 3,
+ "devicematrix": [
+  "390x844",
+  "1024x768",
+  "1680x1050"
+ ],
+ "games": 18,
+ "maxFrames": 40000,
+ "S_dec_pooled": 1,
+ "S_dec_planner": 1,
+ "S_dec_endgame": 1,
+ "plans_total": 10733,
+ "planDisagree_total": 0,
+ "egCommits_total": 73,
+ "egDisagree_total": 0,
+ "decisions_total": 10806,
+ "disagree_total": 0,
+ "gateMalformed_total": 0,
+ "gateFlips_total": 0,
+ "S_force_lockstep": {
+  "planner_cos": 1,
+  "planner_rel": 1,
+  "endgame_cos": 1,
+  "endgame_rel": 1
+ },
+ "S_force_fork": {
+  "planner_cos": 1,
+  "planner_rel": 1,
+  "endgame_cos": 1,
+  "endgame_rel": 1
+ },
+ "S_traj_identical_frac": 1,
+ "S_traj_median_first_div": null,
+ "forkClearedFrac": 1,
+ "lockstepClearedFrac": 1,
+ "gate": {
+  "threshold": 0.95,
+  "pooled_pass": true,
+  "planner_pass": true,
+  "endgame_pass": true,
+  "PASS": true
+ },
+ "perCell": [
+  {
+   "cell": "390x844",
+   "games": 6,
+   "S_dec_pooled": 1,
+   "S_dec_planner": 1,
+   "S_dec_endgame": 1,
+   "plans": 1525,
+   "planDisagree": 0,
+   "egCommits": 21,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 1,
+    "planner_rel": 1,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 1,
+    "planner_rel": 1,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 1525,
+    "planDisagree": 0,
+    "egCommits": 21,
+    "egDisagree": 0,
+    "games": 6,
+    "lockstepCleared": 6,
+    "forkCleared": 6,
+    "trajIdentical": 6,
+    "firstDiv": [],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 24351,
+     "rel": 24351,
+     "n": 24351
+    },
+    "fsLockE": {
+     "cos": 3549,
+     "rel": 3549,
+     "n": 3549
+    },
+    "fsForkP": {
+     "cos": 24351,
+     "rel": 24351,
+     "n": 24351
+    },
+    "fsForkE": {
+     "cos": 3549,
+     "rel": 3549,
+     "n": 3549
+    }
+   }
+  },
+  {
+   "cell": "1024x768",
+   "games": 6,
+   "S_dec_pooled": 1,
+   "S_dec_planner": 1,
+   "S_dec_endgame": 1,
+   "plans": 3532,
+   "planDisagree": 0,
+   "egCommits": 28,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 1,
+    "planner_rel": 1,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 1,
+    "planner_rel": 1,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 3532,
+    "planDisagree": 0,
+    "egCommits": 28,
+    "egDisagree": 0,
+    "games": 6,
+    "lockstepCleared": 6,
+    "forkCleared": 6,
+    "trajIdentical": 6,
+    "firstDiv": [],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 56481,
+     "rel": 56481,
+     "n": 56481
+    },
+    "fsLockE": {
+     "cos": 4003,
+     "rel": 4003,
+     "n": 4003
+    },
+    "fsForkP": {
+     "cos": 56481,
+     "rel": 56481,
+     "n": 56481
+    },
+    "fsForkE": {
+     "cos": 4003,
+     "rel": 4003,
+     "n": 4003
+    }
+   }
+  },
+  {
+   "cell": "1680x1050",
+   "games": 6,
+   "S_dec_pooled": 1,
+   "S_dec_planner": 1,
+   "S_dec_endgame": 1,
+   "plans": 5676,
+   "planDisagree": 0,
+   "egCommits": 24,
+   "egDisagree": 0,
+   "S_force_lockstep": {
+    "planner_cos": 1,
+    "planner_rel": 1,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_force_fork": {
+    "planner_cos": 1,
+    "planner_rel": 1,
+    "endgame_cos": 1,
+    "endgame_rel": 1
+   },
+   "S_traj_identical_frac": 1,
+   "S_traj_median_first_div": null,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "_raw": {
+    "plans": 5676,
+    "planDisagree": 0,
+    "egCommits": 24,
+    "egDisagree": 0,
+    "games": 6,
+    "lockstepCleared": 6,
+    "forkCleared": 6,
+    "trajIdentical": 6,
+    "firstDiv": [],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "fsLockP": {
+     "cos": 90776,
+     "rel": 90776,
+     "n": 90776
+    },
+    "fsLockE": {
+     "cos": 6140,
+     "rel": 6140,
+     "n": 6140
+    },
+    "fsForkP": {
+     "cos": 90776,
+     "rel": 90776,
+     "n": 90776
+    },
+    "fsForkE": {
+     "cos": 6140,
+     "rel": 6140,
+     "n": 6140
+    }
+   }
+  }
+ ]
+}

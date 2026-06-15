@@ -1,0 +1,490 @@
+{
+ "phase": 2,
+ "candidate": "egnn.js",
+ "mode": "nn",
+ "weights": "eg_weights.json",
+ "weights_sha256": "f84abae26a9f75d328c07bbad526226d81830946752cf7ee64bf21c4be81f608",
+ "seedSet": "calibration[270000,280000)",
+ "seedCount": 300,
+ "sealOffset": null,
+ "commitment_sha256_salt": null,
+ "distribution": "scatter(endgame, startBoids 2..5)",
+ "cells": 6,
+ "devicematrix": [
+  "390x844",
+  "820x1180",
+  "1024x768",
+  "1512x982",
+  "1680x1050",
+  "2560x1440"
+ ],
+ "games": 1800,
+ "maxFrames": 4000,
+ "S_dec_pooled": 0.993464052,
+ "S_dec_planner": null,
+ "S_dec_endgame": 0.993464052,
+ "plans_total": 0,
+ "planDisagree_total": 0,
+ "egCommits_total": 5661,
+ "egDisagree_total": 37,
+ "decisions_total": 5661,
+ "disagree_total": 37,
+ "gateMalformed_total": 0,
+ "gateFlips_total": 0,
+ "soleN1_total": 1617,
+ "soleN1_frac": 0.28563858,
+ "nonTrivial_egCommits": 4044,
+ "S_dec_endgame_nonTrivial": 0.990850643,
+ "S_force_lockstep": {
+  "planner_cos": null,
+  "planner_rel": null,
+  "endgame_cos": 0.999993823,
+  "endgame_rel": 0.999999441
+ },
+ "S_force_fork": {
+  "planner_cos": null,
+  "planner_rel": null,
+  "endgame_cos": 0.995086954,
+  "endgame_rel": 0.997882633
+ },
+ "S_traj_identical_frac": 0.979444444,
+ "S_traj_median_first_div": 462,
+ "forkClearedFrac": 0.996111111,
+ "lockstepClearedFrac": 0.996111111,
+ "gate": {
+  "threshold": 0.95,
+  "pooled_pass": true,
+  "planner_pass": true,
+  "endgame_pass": true,
+  "PASS": true
+ },
+ "perCell": [
+  {
+   "cell": "390x844",
+   "games": 300,
+   "S_dec_pooled": 0.987668161,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.987668161,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 892,
+   "egDisagree": 11,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999987913,
+    "endgame_rel": 0.99999936
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.991456784,
+    "endgame_rel": 0.998376867
+   },
+   "S_traj_identical_frac": 0.963333333,
+   "S_traj_median_first_div": 462,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "soleN1": 252,
+   "S_dec_endgame_nonTrivial": 0.9828125,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 892,
+    "egDisagree": 11,
+    "games": 300,
+    "lockstepCleared": 300,
+    "forkCleared": 300,
+    "trajIdentical": 289,
+    "firstDiv": [
+     706,
+     462,
+     1347,
+     405,
+     368,
+     0,
+     1487,
+     555,
+     885,
+     406,
+     209
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "soleN1": 252,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 251000.96612262347,
+     "rel": 251003.83932767046,
+     "n": 251004
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 248825.9091289447,
+     "rel": 250562.64224840768,
+     "n": 250970
+    }
+   }
+  },
+  {
+   "cell": "820x1180",
+   "games": 300,
+   "S_dec_pooled": 0.992545261,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.992545261,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 939,
+   "egDisagree": 7,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999981634,
+    "endgame_rel": 0.999999599
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.991793634,
+    "endgame_rel": 0.996659538
+   },
+   "S_traj_identical_frac": 0.976666667,
+   "S_traj_median_first_div": 373,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "soleN1": 270,
+   "S_dec_endgame_nonTrivial": 0.989536622,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 939,
+    "egDisagree": 7,
+    "games": 300,
+    "lockstepCleared": 300,
+    "forkCleared": 300,
+    "trajIdentical": 293,
+    "firstDiv": [
+     216,
+     221,
+     931,
+     337,
+     463,
+     540,
+     373
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "soleN1": 270,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 356222.4575967698,
+     "rel": 356228.85713386163,
+     "n": 356229
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 353684.5196604931,
+     "rel": 355419.7545930546,
+     "n": 356611
+    }
+   }
+  },
+  {
+   "cell": "1024x768",
+   "games": 300,
+   "S_dec_pooled": 0.994600432,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.994600432,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 926,
+   "egDisagree": 5,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999992163,
+    "endgame_rel": 0.999997218
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.99620445,
+    "endgame_rel": 0.997915624
+   },
+   "S_traj_identical_frac": 0.983333333,
+   "S_traj_median_first_div": 365,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "soleN1": 268,
+   "S_dec_endgame_nonTrivial": 0.992401216,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 926,
+    "egDisagree": 5,
+    "games": 300,
+    "lockstepCleared": 300,
+    "forkCleared": 300,
+    "trajIdentical": 295,
+    "firstDiv": [
+     0,
+     260,
+     619,
+     712,
+     365
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "soleN1": 268,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 325997.44500693254,
+     "rel": 325999.0931376727,
+     "n": 326000
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 323736.56002390286,
+     "rel": 324292.6401854691,
+     "n": 324970
+    }
+   }
+  },
+  {
+   "cell": "1512x982",
+   "games": 300,
+   "S_dec_pooled": 0.996904025,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.996904025,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 969,
+   "egDisagree": 3,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999999956,
+    "endgame_rel": 0.999999901
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.998505989,
+    "endgame_rel": 0.999360719
+   },
+   "S_traj_identical_frac": 0.99,
+   "S_traj_median_first_div": 319,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "soleN1": 277,
+   "S_dec_endgame_nonTrivial": 0.99566474,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 969,
+    "egDisagree": 3,
+    "games": 300,
+    "lockstepCleared": 300,
+    "forkCleared": 300,
+    "trajIdentical": 297,
+    "firstDiv": [
+     216,
+     319,
+     762
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "soleN1": 277,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 435369.9810529696,
+     "rel": 435369.956866745,
+     "n": 435370
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 434512.8618669702,
+     "rel": 434884.80836187664,
+     "n": 435163
+    }
+   }
+  },
+  {
+   "cell": "1680x1050",
+   "games": 300,
+   "S_dec_pooled": 0.992723493,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.992723493,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 962,
+   "egDisagree": 7,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999993787,
+    "endgame_rel": 0.99999975
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.993124154,
+    "endgame_rel": 0.996166901
+   },
+   "S_traj_identical_frac": 0.976666667,
+   "S_traj_median_first_div": 727,
+   "forkClearedFrac": 1,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "soleN1": 273,
+   "S_dec_endgame_nonTrivial": 0.989840348,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 962,
+    "egDisagree": 7,
+    "games": 300,
+    "lockstepCleared": 300,
+    "forkCleared": 300,
+    "trajIdentical": 293,
+    "firstDiv": [
+     848,
+     727,
+     395,
+     878,
+     901,
+     327,
+     0
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "soleN1": 273,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 474717.05057863327,
+     "rel": 474719.8811488359,
+     "n": 474720
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 469958.2672910076,
+     "rel": 471398.13178896945,
+     "n": 473212
+    }
+   }
+  },
+  {
+   "cell": "2560x1440",
+   "games": 300,
+   "S_dec_pooled": 0.995889003,
+   "S_dec_planner": null,
+   "S_dec_endgame": 0.995889003,
+   "plans": 0,
+   "planDisagree": 0,
+   "egCommits": 973,
+   "egDisagree": 4,
+   "S_force_lockstep": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.999999361,
+    "endgame_rel": 0.999999951
+   },
+   "S_force_fork": {
+    "planner_cos": null,
+    "planner_rel": null,
+    "endgame_cos": 0.996821655,
+    "endgame_rel": 0.998583635
+   },
+   "S_traj_identical_frac": 0.986666667,
+   "S_traj_median_first_div": 1592,
+   "forkClearedFrac": 0.976666667,
+   "gateFlips": 0,
+   "gateMalformed": 0,
+   "soleN1": 277,
+   "S_dec_endgame_nonTrivial": 0.994252874,
+   "_raw": {
+    "plans": 0,
+    "planDisagree": 0,
+    "egCommits": 973,
+    "egDisagree": 4,
+    "games": 300,
+    "lockstepCleared": 293,
+    "forkCleared": 293,
+    "trajIdentical": 296,
+    "firstDiv": [
+     1852,
+     1334,
+     1592,
+     0
+    ],
+    "gateFlips": 0,
+    "gateMalformed": 0,
+    "soleN1": 277,
+    "fsLockP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsLockE": {
+     "cos": 670365.5713450406,
+     "rel": 670365.9673476145,
+     "n": 670366
+    },
+    "fsForkP": {
+     "cos": 0,
+     "rel": 0,
+     "n": 0
+    },
+    "fsForkE": {
+     "cos": 668489.535194867,
+     "rel": 669671.1558049677,
+     "n": 670621
+    }
+   }
+  }
+ ]
+}
