@@ -301,6 +301,7 @@ async function runGame(opt, seed, candidateSpec) {
     const frames = game.frame();
     return {
         seed, frames, cleared: clearedAt >= 0,
+        eaten: typeof game.eaten === 'function' ? game.eaten() : null,   // total catches (throughput farm)
         clearedAt: clearedAt >= 0 ? clearedAt : null,
         mismatchCount: mmCount, firstMismatchFrame: firstMM,
         decisions: decisions ? dec : null, resyncs,
