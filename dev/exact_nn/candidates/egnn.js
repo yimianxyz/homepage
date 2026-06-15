@@ -51,7 +51,7 @@ function uhash(x, y) {   // deterministic state→[0,1) for the perturb calibrat
 // resolve side-a's endgame policy from a module with an unknown-but-likely export.
 function resolveEndgamePolicy(mod, weightsFp) {
     const m = require(mod);
-    const loader = m.loadEndgamePolicy || m.loadEgStudent || m.load || (typeof m === 'function' ? m : null);
+    const loader = m.loadEndgamePolicy || m.loadEgStudent || m.loadEgStudentRaw || m.load || (typeof m === 'function' ? m : null);
     if (typeof loader === 'function') {
         const fn = loader(weightsFp);
         if (typeof fn === 'function') return fn;
