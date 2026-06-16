@@ -10,13 +10,15 @@ CONFIGS="${CONFIGS:-count:T=3 count:T=5 count:T=8 density:Tref=5 horizon:H=40 ho
 SEEDS="${SEEDS:-80}"; SB="${SB:-28}"; BASE="${BASE:-270000}"; MF="${MF:-50000}"; NPAR="${NPAR:-4}"
 TAG="${TAG:-search}"; EV=evidence/phase2/throughput; mkdir -p "$EV/shards"
 CELLS="${CELLS:-390x844 820x1180 1024x768 1512x982 1680x1050 2560x1440}"
+# SEALED=1 → confirm on the sealed (p2) block instead of the held-out search block
+SEEDFLAG="--seedBase $BASE"; [ "${SEALED:-0}" = "1" ] && { SEEDFLAG="--sealed --sealOffset ${SOFF:-0}"; export EXACTNN_SALT_PATH="${EXACTNN_SALT_PATH:-$HOME/.exactnn_seal_salt_p2}" EXACTNN_COMMIT_PATH="${EXACTNN_COMMIT_PATH:-verifier/seal_commitment_p2.json}"; }
 echo "=== throughput search ($TAG): {$CONFIGS} x {$CELLS}, $SEEDS paired seeds, scatter-$SB, base $BASE $(date -u +%H:%M:%S) ==="
 # launch (screen,config) jobs, big screens first (longest), 4-parallel
 for cell in 2560x1440 1680x1050 1512x982 1024x768 820x1180 390x844; do
   case " $CELLS " in *" $cell "*) ;; *) continue;; esac
   for cfg in $CONFIGS; do
     lab=$(echo "$cfg" | tr ':,=' '___')
-    ( node verifier/throughput_farm.js --configs "$cfg" --cells "$cell" --seeds "$SEEDS" --seedBase "$BASE" \
+    ( node verifier/throughput_farm.js --configs "$cfg" --cells "$cell" --seeds "$SEEDS" $SEEDFLAG \
         --scatter --startBoids "$SB" --maxFrames "$MF" --out "$EV/shards/${TAG}_${cell}_${lab}.json" >/dev/null 2>"$EV/shards/${TAG}_${cell}_${lab}.err"
       echo "  [done $cell $cfg] $(date -u +%H:%M:%S)" ) &
     while [ "$(jobs -r | wc -l)" -ge "$NPAR" ]; do wait -n 2>/dev/null || sleep 1; done
