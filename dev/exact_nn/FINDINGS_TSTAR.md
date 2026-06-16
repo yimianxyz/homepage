@@ -42,7 +42,50 @@ diverges at N≤T) give a Wilcoxon/​bootstrap signal with the shared planner p
 5. **COMPLEXITY BAR**: if the combined formula beats fixed-8 by **<2% on 1920 AND mobile**,
    ship a **3–4 row device-class step / lookup**, not a continuous formula.
 
-## RESULTS (held-out, n=200 paired seeds/cell)
+## FINAL RESULTS (complete 21-cell grid: 14 deploy + 7 cross, n=200 paired seeds/cell)
+
+### Per-screen verdict (held-out, deploy boid counts). T=8 BEATS T=5 on every
+### desktop/laptop screen and TIES mobile; per-screen best-T is a TIE with T=8 EVERYWHERE.
+| deploy screen | N0 | T=8 vs T=5 | per-screen best-T vs T=8 (the dynamic gain) |
+|---|---|---|---|
+| 360×800 | 60 | −0.9% tie (p=.37) | T9: +1.3% **tie** (p=.11) |
+| 390×844 | 60 | +0.7% tie (p=.52) | T9: +1.2% **tie** (p=.18) |
+| 393×852 | 60 | +1.5% tie (p=.14) | T8 is best |
+| 412×915 | 60 | +0.9% tie (p=.50) | T6: +0.3% **tie** (p=.76) |
+| 414×896 | 60 | +0.2% tie (p=.83) | T6: +0.6% **tie** (p=.48) |
+| 1280×720 | 120 | +1.7% **beats** (p=.005) | T8 is best |
+| 1366×768 | 120 | +1.4% **beats** (p=.005) | T8 is best |
+| 1440×900 | 120 | +1.4% **beats** (p=.0003) | T9: +0.3% **tie** (p=.81) |
+| 1536×864 | 120 | +1.6% **beats** (p=.002) | T7: +0.2% **tie** (p=.68) |
+| 1512×982 | 120 | +1.9% **beats** (p=.0001) | T9: +0.3% **tie** (p=.37) |
+| 1600×900 | 120 | +1.2% **beats** (p=.02) | T12: +0.2% **tie** (p=.63) |
+| 1680×1050 | 120 | +1.2% **beats** (p=.02) | T9: +0.7% **tie** (p=.19) |
+| **1920×1080** | 120 | **+2.9% beats (p<1e-4)** | **T11: +0.6% tie (p=.54)** |
+| 2560×1440 | 120 | +3.1% **beats** (p<1e-4) | T10: +0.4% **tie** (p=.39) |
+
+**No deployment screen has a per-screen optimum that significantly beats T=8** (all p>0.10).
+The throughput-vs-T curve is a broad flat plateau (T≈7–12) on every common screen.
+
+### Decomposition `log T* = log c + α·log N0 + q·log A` (complete grid):
+- **α (N0) = 0.02 ± 0.04, t=0.50 → NOT significant** (linear: ΔT/+60 boids = 0.10, t=0.42).
+  **θ·N0 REFUTED** — boid count does not drive T*.
+- **q (area) = 0.062 ± 0.017, t=3.63 → significant** (linear: ΔT/×2 area = 0.40, t=3.70).
+  **side-a vindicated: the area effect is real at fixed N0** — but tiny: across the full 10×
+  area range the optimum drifts only ~8→10, entirely inside the flat plateau.
+
+### Formula fit (prevalence-weighted throughput, N0=deploy):
+best continuous `c·N0^α·A^q` (c=3.5, α≈0, q≈0.06–0.2) = **+0.47%** vs fixed-8; device-step
+(mobile 9 / desktop 8) = +0.42%; **on 1920×1080: +0.35–0.42%; on mobile ~0%.** **All ≪ 2%.**
+
+## ✅ FINAL VERDICT: ship **fixed T=8**. The deep dynamic-formula search is conclusive —
+no `T(screen,N0)` clears the 2% complexity bar; the per-screen optimum is a statistical tie
+with T=8 on every common screen (mobile→4K). The optimum's only real driver is screen AREA
+(q≈0.06, t=3.6) and the drift is throughput-negligible; boid count has no effect (θ·N0 refuted).
+T=8 also confirms the prior T=5→8 move deployment-faithfully (+1–3% on every desktop, p<0.03;
+mobile tie). Agrees with side-a's GPU surface + the adversarial check (lead). _One char, done._
+
+---
+### (earlier interim section, superseded by the table above)
 
 ### Headline: the throughput-vs-T curve is a BROAD FLAT PLATEAU (T≈7–12); fixed T=8 is
 ### statistically indistinguishable from the per-screen optimum on EVERY common screen.
