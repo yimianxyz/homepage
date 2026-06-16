@@ -407,7 +407,7 @@
         if (!egBoid) egBoid = boids[egNNpick(pred, boids)];
         // Keep the VALUE-NET "predator's brain" viz alive every endgame frame — same
         // model, never swap/freeze: a cheap value-net forward (1 candidate, no rollout)
-        // on the committed egBoid's features, so the brain keeps flaring through N<=5.
+        // on the committed egBoid's features, so the brain keeps flaring through N<=8.
         if (vizModel && NET && egBoid) {
             var vst = snapshot(pred, boids); vst.nAlive = boids.length;
             var vfr = cp_features(vst, [{ x: egBoid.position.x, y: egBoid.position.y }], PREDATOR_MAX_SPEED, PREDATOR_MAX_FORCE);
@@ -429,16 +429,20 @@
         return st;
     }
 
-    // Hysteresis on the endgame gate: ENTER at N<=5, EXIT only at N>=7, so a
-    // tap-spawn bouncing N across 5<->6 doesn't thrash planner<->endgame. (A stale
-    // inEndgame from a prior game self-clears on the next N>=7 frame.)
+    // Hysteresis on the endgame gate: ENTER at N<=8, EXIT only at N>=10, so a
+    // tap-spawn bouncing N across 8<->9 doesn't thrash planner<->endgame. (A stale
+    // inEndgame from a prior game self-clears on the next N>=10 frame.)
+    // T=8 was chosen by a paired-seed throughput search across 14 device screens:
+    // it ties the per-screen optimum on every common mobile/desktop size and beats
+    // the old T=5 by +1-3% on desktops (tie on mobile). No dynamic T(screen,N0)
+    // beat the constant (area exponent q~0.06 negligible; boid-count effect ~0).
     var inEndgame = false;
     window.__cheap = {
         force: function (pred, boids) {
             if (boids.length === 0) return new Vector(0, 0);
             if (!configured && pred.simulation) configure(pred.simulation);
-            if (!inEndgame && boids.length <= 5) inEndgame = true;
-            else if (inEndgame && boids.length >= 7) inEndgame = false;
+            if (!inEndgame && boids.length <= 8) inEndgame = true;
+            else if (inEndgame && boids.length >= 10) inEndgame = false;
             if (inEndgame) return intercept(pred, boids);   // ENDGAME: NN-selected egBoid + torus aim
             if (frame === 0 || frame >= cfg.D) { target = planCheap(snapshot(pred, boids)); frame = 0; }
             frame++;
