@@ -84,6 +84,18 @@ with T=8 on every common screen (mobile→4K). The optimum's only real driver is
 T=8 also confirms the prior T=5→8 move deployment-faithfully (+1–3% on every desktop, p<0.03;
 mobile tie). Agrees with side-a's GPU surface + the adversarial check (lead). _One char, done._
 
+### SEALED p2 confirmation (out-of-sample, fresh HMAC block, n=200) — REPLICATES exactly:
+| KEY screen | N0 | T=8 vs T=5 | best-T vs T=8 | T=8 in plateau? |
+|---|---|---|---|---|
+| 360×800 | 60 | +1.4% tie (p=.09) | T10 +1.5% tie (p=.12) | yes |
+| 390×844 | 60 | +0.4% tie (p=.75) | T7 +0.4% tie (p=.61) | yes |
+| 414×896 | 60 | +0.1% tie (p=.90) | T9 +0.6% tie (p=.31) | yes |
+| 1366×768 | 120 | +1.8% **beats** (p=.001) | **T8 IS the peak** | yes |
+| 1920×1080 | 120 | +2.2% **beats** (p<1e-4) | T9 +0.2% tie (p=.74) | yes |
+On the sealed block T=8 sits in the plateau on every key screen (the peak on 1366); no
+per-screen optimum significantly beats T=8 (all p≥0.12). Identical conclusion to held-out
+→ no overfit. **LOCKED: ship fixed T=8.**
+
 ---
 ### (earlier interim section, superseded by the table above)
 
