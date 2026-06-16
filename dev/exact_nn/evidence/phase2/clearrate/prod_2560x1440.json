@@ -1,0 +1,29 @@
+{
+ "policy": "prod",
+ "candidate": "identity",
+ "seedSet": "SEALED@off0",
+ "seedCount": 8,
+ "sealOffset": 0,
+ "distribution": "natural(full-game)",
+ "maxFrames": 30000,
+ "commitment_sha256_salt": "bac52d5149038958bf39748a602fe64edf74be462256951e95bff31a57b9fd8e",
+ "games": 8,
+ "cleared": 7,
+ "clearRate": 0.875,
+ "medTimeToCatch": 24654,
+ "p90TimeToCatch": 28872,
+ "stuck_total": 1,
+ "perCell": [
+  {
+   "cell": "2560x1440",
+   "games": 8,
+   "cleared": 7,
+   "clearRate": 0.875,
+   "stuck": 1,
+   "stuckSeeds": [
+    306610410
+   ],
+   "medTimeToCatch": 24654
+  }
+ ]
+}

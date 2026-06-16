@@ -1,0 +1,3 @@
+[prod 2560x1440] clear 7/8 (87.5%) stuck=1 medCatch=24654
+
+=== prod: clear-rate 87.5% (stuck 1) — gate(≥95% clear) FAIL ===

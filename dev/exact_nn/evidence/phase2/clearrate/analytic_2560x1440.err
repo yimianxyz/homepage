@@ -1,0 +1,3 @@
+[analytic 2560x1440] clear 17/18 (94.4%) stuck=1 medCatch=25406
+
+=== analytic: clear-rate 94.4% (stuck 1) — gate(≥95% clear) FAIL ===

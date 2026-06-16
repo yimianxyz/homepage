@@ -1,0 +1,12 @@
+[cell 390x844] S_dec pooled=98.767% planner=n/a endgame=98.767% | plans=0 egC=892 Sforce(fork)pl=n/a eg=99.146%
+[cell 820x1180] S_dec pooled=99.255% planner=n/a endgame=99.255% | plans=0 egC=939 Sforce(fork)pl=n/a eg=99.179%
+[cell 1024x768] S_dec pooled=99.460% planner=n/a endgame=99.460% | plans=0 egC=926 Sforce(fork)pl=n/a eg=99.620%
+[cell 1512x982] S_dec pooled=99.690% planner=n/a endgame=99.690% | plans=0 egC=969 Sforce(fork)pl=n/a eg=99.851%
+[cell 1680x1050] S_dec pooled=99.272% planner=n/a endgame=99.272% | plans=0 egC=962 Sforce(fork)pl=n/a eg=99.312%
+[cell 2560x1440] S_dec pooled=99.589% planner=n/a endgame=99.589% | plans=0 egC=973 Sforce(fork)pl=n/a eg=99.682%
+
+=== S_dec VERDICT (nn, scatter(endgame, startBoids 2..5), calibration[270000,280000)) ===
+  POOLED   S_dec = 99.346%  (gate PASS)
+  PLANNER  S_dec = n/a  (gate PASS)
+  ENDGAME  S_dec = 99.346%  (gate PASS)
+  GATE (≥95% pooled+per-regime): ✅ PASS
