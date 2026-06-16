@@ -48,31 +48,44 @@ function fitFormulas(fitCells, Ts) {
     const cand = [];
     // fixed baselines + best fixed
     for (const T of Ts) cand.push({ name: 'fixed:T=' + T, kind: 'fixed', T: () => T, params: { T } });
+    // helper: grid-search params maximising weighted throughput; SNAPSHOT params into
+    // the pushed closure (avoid the shared-`best` aliasing trap).
+    let best;
     // theta*N0  (≈ device step since N0∈{60,120})
-    let best = null;
+    best = null;
     for (let th = 0.02; th <= 0.22; th += 0.001) { const f = c => th * c.N0;
         const v = wThru(fitCells, w, Ts, f); if (!best || v > best.v) best = { v, th }; }
-    cand.push({ name: 'theta*N0', kind: 'theta', T: c => best.th * c.N0, params: { theta: +best.th.toFixed(3) } });
+    { const th = best.th; cand.push({ name: 'theta*N0', kind: 'theta', T: c => th * c.N0, params: { theta: +th.toFixed(3) } }); }
     // lindim: a + b*sqrtArea
     best = null;
     for (let a = -12; a <= 12; a += 0.5) for (let b = 0; b <= 0.02; b += 0.0002) { const f = c => a + b * c.sqrtArea;
         const v = wThru(fitCells, w, Ts, f); if (!best || v > best.v) best = { v, a, b }; }
-    cand.push({ name: 'a+b*sqrtA', kind: 'lindim', T: c => best.a + best.b * c.sqrtArea, params: { a: +best.a.toFixed(2), b: +best.b.toFixed(5) } });
+    { const a = best.a, b = best.b; cand.push({ name: 'a+b*sqrtA', kind: 'lindim', T: c => a + b * c.sqrtArea, params: { a: +a.toFixed(2), b: +b.toFixed(5) } }); }
     // power: a*area^p
     best = null;
     for (let p = 0.1; p <= 1.0; p += 0.02) for (let a = 0.0005; a <= 0.5; a *= 1.1) { const f = c => a * Math.pow(c.area, p);
         const v = wThru(fitCells, w, Ts, f); if (!best || v > best.v) best = { v, a, p }; }
-    cand.push({ name: 'a*A^p', kind: 'power', T: c => best.a * Math.pow(c.area, best.p), params: { a: +best.a.toPrecision(3), p: +best.p.toFixed(2) } });
+    { const a = best.a, p = best.p; cand.push({ name: 'a*A^p', kind: 'power', T: c => a * Math.pow(c.area, p), params: { a: +a.toPrecision(3), p: +p.toFixed(2) } }); }
     // density: a + b*(N0/area*1e6)
     best = null;
     for (let a = -4; a <= 18; a += 0.5) for (let b = -200; b <= 200; b += 2) { const f = c => a + b * (c.N0 / c.area * 1e6);
         const v = wThru(fitCells, w, Ts, f); if (!best || v > best.v) best = { v, a, b }; }
-    cand.push({ name: 'a+b*dens', kind: 'density', T: c => best.a + best.b * (c.N0 / c.area * 1e6), params: { a: +best.a.toFixed(2), b: +best.b.toFixed(2) } });
+    { const a = best.a, b = best.b; cand.push({ name: 'a+b*dens', kind: 'density', T: c => a + b * (c.N0 / c.area * 1e6), params: { a: +a.toFixed(2), b: +b.toFixed(2) } }); }
     // mindim: a + b*min(W,H)
     best = null;
     for (let a = -8; a <= 12; a += 0.5) for (let b = 0; b <= 0.02; b += 0.0002) { const f = c => a + b * c.minDim;
         const v = wThru(fitCells, w, Ts, f); if (!best || v > best.v) best = { v, a, b }; }
-    cand.push({ name: 'a+b*minDim', kind: 'mindim', T: c => best.a + best.b * c.minDim, params: { a: +best.a.toFixed(2), b: +best.b.toFixed(5) } });
+    { const a = best.a, b = best.b; cand.push({ name: 'a+b*minDim', kind: 'mindim', T: c => a + b * c.minDim, params: { a: +a.toFixed(2), b: +b.toFixed(5) } }); }
+    // COMBINED  T=round(c·N0^α·A^q)  — the lead/side-a decomposition. Grid-search
+    // (α,q,c) to maximise weighted throughput (surface objective), N0=deploy count.
+    best = null;
+    for (let al = -0.4; al <= 1.4; al += 0.05) for (let q = 0.0; q <= 0.8; q += 0.02)
+        for (let lc = -10; lc <= 2; lc += 0.25) { const c = Math.exp(lc);
+            const f = cc => c * Math.pow(cc.N0, al) * Math.pow(cc.area, q);
+            const v = wThru(fitCells, w, Ts, f); if (!best || v > best.v) best = { v, al, q, c }; }
+    { const c = best.c, al = best.al, q = best.q;
+      cand.push({ name: 'c*N0^a*A^q', kind: 'combined', T: cc => c * Math.pow(cc.N0, al) * Math.pow(cc.area, q),
+        params: { c: +c.toPrecision(3), alpha: +al.toFixed(2), q: +q.toFixed(2) } }); }
     // device-class step (explicit lookup): per-class throughput-weighted-optimal T
     const cls = { mob: fitCells.filter(c => c.N0 === 60), des: fitCells.filter(c => c.N0 !== 60) };
     const bestClassT = grp => { const wl = weights(grp, 'prev'); let bb = null;
@@ -117,6 +130,29 @@ function inv3(A) { const I = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(r => r.slice(
 // plateau center = mean of plateau T's (robust optimal-T proxy for regression)
 function plateauCenter(c) { return c.plateau && c.plateau.length ? avg(c.plateau) : c.Tstar; }
 
+// DECOMPOSITION: log(T*) ~ log c + α·log(N0) + q·log(area)  → α (N0 exp), q (area exp)
+// directly, each controlling for the other (breaks the N0↔area confound).
+function decompose(cells) {
+    const usable = cells.filter(c => plateauCenter(c) > 0);
+    if (usable.length < 4) return null;
+    const lN0 = usable.map(c => Math.log(c.N0)), lA = usable.map(c => Math.log(c.area)), y = usable.map(c => Math.log(plateauCenter(c)));
+    const mN0 = avg(lN0), mA = avg(lA), mY = avg(y);
+    const X = usable.map((c, i) => [1, lN0[i] - mN0, lA[i] - mA]);
+    const XtX = mat3(), Xty = [0, 0, 0];
+    for (let i = 0; i < usable.length; i++) for (let a = 0; a < 3; a++) { Xty[a] += X[i][a] * y[i];
+        for (let b = 0; b < 3; b++) XtX[a][b] += X[i][a] * X[i][b]; }
+    const beta = solve3(XtX, Xty); if (!beta) return null;
+    let rss = 0; for (let i = 0; i < usable.length; i++) { const yh = beta[0] + beta[1] * X[i][1] + beta[2] * X[i][2]; rss += (y[i] - yh) ** 2; }
+    const s2 = rss / Math.max(1, usable.length - 3), inv = inv3(XtX);
+    const se = inv ? [0, 1, 2].map(k => Math.sqrt(s2 * inv[k][k])) : [null, null, null];
+    // intercept on centered design: logc = beta0 - α·mN0 - q·mA  (back out raw intercept)
+    const logc = beta[0] - beta[1] * mN0 - beta[2] * mA;
+    return { c: Math.exp(logc), alpha: beta[1], q: beta[2],
+             seAlpha: se[1], seQ: se[2], tAlpha: se[1] ? beta[1] / se[1] : null, tQ: se[2] ? beta[2] / se[2] : null,
+             n: usable.length, r2: 1 - rss / sumSq(y.map(v => v - mY)) };
+}
+function sumSq(a) { return a.reduce((s, x) => s + x * x, 0); }
+
 function main() {
     const fit = loadSurface(process.argv[2]);
     const ev = process.argv[3] ? loadSurface(process.argv[3]) : fit;
@@ -143,8 +179,15 @@ function main() {
         console.log('# 1920×1080 complexity-bar check (vs fixed-8):');
         for (const r of rows.slice(0, 6)) { const T = clampT(cands.find(c => c.name === r.name).T(c1080), Ts);
             const m = meanAtT(c1080, T); console.log(`   ${pad(r.name, 13)} →T=${T}  thru=${(m * 1e4).toFixed(3)} vs T8 ${(m8 * 1e4).toFixed(3)}  = ${sgn((m - m8) / m8 * 100)}%`); } }
+    // DECOMPOSITION: log T* ~ log c + α·log N0 + q·log A  (the deployed formula's exponents)
+    console.log('\n# DECOMPOSITION  log T* = log c + α·log(N0) + q·log(area)   [N0=deploy]');
+    for (const [lab, cells] of [['all-cells', ev.cells], ['cross+deploy(N0-varied areas)', ev.cells.filter(c => [390, 820, 1366, 1920, 2560].includes(c.W))]]) {
+        const d = decompose(cells); if (!d) { console.log(`  ${lab}: too few`); continue; }
+        console.log(`  ${lab} (n=${d.n}, R²=${d.r2.toFixed(3)}):  α(N0)=${d.alpha.toFixed(3)}±${fmt(d.seAlpha)} (t=${fmt(d.tAlpha)})   q(area)=${d.q.toFixed(3)}±${fmt(d.seQ)} (t=${fmt(d.tQ)})   c=${d.c.toPrecision(3)}`);
+        console.log(`     → T=round(${d.c.toPrecision(3)}·N0^${d.alpha.toFixed(2)}·A^${d.q.toFixed(2)});  ×2 area→ΔlnT=${(d.q*Math.log(2)).toFixed(2)} (T×${Math.pow(2,d.q).toFixed(2)});  60→120→T×${Math.pow(2,d.alpha).toFixed(2)}`);
+    }
     // confound regression on cross cells (+ all cells)
-    console.log('\n# CONFOUND REGRESSION  optimalT ~ a + b·ln(area) + c·N0');
+    console.log('\n# CONFOUND REGRESSION (linear)  optimalT ~ a + b·ln(area) + c·N0');
     for (const [lab, cells] of [['cross-only', ev.cross], ['all-cells', ev.cells]]) {
         if (cells.length < 4) { console.log(`  ${lab}: n=${cells.length} (too few)`); continue; }
         const reg = regress(cells, plateauCenter);
