@@ -42,7 +42,41 @@ diverges at N≤T) give a Wilcoxon/​bootstrap signal with the shared planner p
 5. **COMPLEXITY BAR**: if the combined formula beats fixed-8 by **<2% on 1920 AND mobile**,
    ship a **3–4 row device-class step / lookup**, not a continuous formula.
 
-## RESULTS
-_(held-out farm running on local 4 cores + VM3 g2-standard-4, bitwise-identical; pending)_
+## RESULTS (held-out, n=200 paired seeds/cell)
 
-<!-- to fill: surface table, α/q decomposition, winning formula, sealed per-screen CIs -->
+### Headline: the throughput-vs-T curve is a BROAD FLAT PLATEAU (T≈7–12); fixed T=8 is
+### statistically indistinguishable from the per-screen optimum on EVERY common screen.
+
+**T=8 vs per-screen peak** (deploy cells): T=8 is within 0.0%…−1.0% of the per-screen
+argmax everywhere (390 −1.0%, 1920 −0.5%, 2560 −0.3%). Every per-screen best-T vs T=8 is a
+statistical TIE (paired bootstrap CI includes 0, Wilcoxon p>0.18):
+| screen | N0 | T* (argmax) | plateau | bestT vs T8 |
+|---|---|---|---|---|
+| 390×844 | 60 | 9 | [5–12] | +0.4% tie (p=0.18) |
+| 414×896 | 60 | 6 | [5–12] | +0.7% tie (p=0.48) |
+| 1366×768 | 120 | _(round-2)_ | | |
+| 1600×900 | 120 | 12 | [5–12] | +0.2% tie (p=0.63) |
+| 1680×1050 | 120 | 9 | [7–12] | +0.5% tie (p=0.19) |
+| 1920×1080 | 120 | 11 | [8–12] | +0.4% tie (p=0.54) |
+| 2560×1440 | 120 | 10 | [8–12] | +0.2% tie (p=0.39) |
+
+**T=8 vs T=5** (confirms the prior T=5→8 move, deployment-faithfully): BEATS on big screens
+— 1920 +1.93e-4 (+2.9%, p<1e-4), 2560 +1.62 (+3.1%, p<1e-4), 1600 (p=0.023), 1680 (p=0.017);
+TIE on mobile (390 p=0.52, 414 p=0.83). So T=8 ≥ T=5 everywhere, significantly on big screens.
+
+### Decomposition — `log T* = log c + α·log N0 + q·log area` (n=15, R²=0.74):
+- **α (N0 exponent) = −0.005 ± 0.04, t=−0.14 → NOT significant.** Boid count does NOT drive
+  T*. **θ·N0 REFUTED** (the panel's leading hypothesis is wrong).
+- **q (area exponent) = 0.085 ± 0.017, t=5.06 → significant but TINY.** side-a was right that
+  area matters at fixed N0 — but ×2 area → T×1.06; across the full 10× area range T drifts
+  only ~8→10, all inside the flat plateau (<0.5% throughput).
+
+### Formula fit — nothing beats fixed-8 meaningfully (prevalence-weighted throughput):
+best continuous (`a+b·√A` ≈ `c·N0^α·A^q`, c=3.49 α=−0.15 q=0.12) = **+0.22%** vs fixed-8;
+device-step (mobile 9 / desktop 9) = +0.20%; on **1920×1080** the best formula gains **+0.42%**;
+on mobile ~0%. **All ≪ the 2% complexity bar.**
+
+## VERDICT: ship **fixed T=8** (one-char change, already deployed). The deep dynamic-formula
+search confirms it — no T(screen,N0) clears the complexity bar; the per-screen optimum is a
+statistical tie with T=8 everywhere. The mild real area-drift (q≈0.085) is throughput-negligible
+and N0 has no effect (α≈0). _(Sealed p2 confirmation + complete confound cross: in progress.)_
