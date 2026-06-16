@@ -26,7 +26,9 @@ SCREENS = [
 COUNT_T = [3, 4, 5, 6, 7, 8, 10, 12]      # per-screen T* locator (defs match JS+side-b)
 DENS_TREF = [3, 5, 7, 10]                 # area-scaled count refs (the auto-capture candidate)
 HORIZON_H = [40, 90, 140]                 # reach-time thresholds (side-b sweeps 40,90)
-SEEDS = 64
+SEEDS = 32   # keep count group (8 params) at 8*32=256 envs = the L4 fp64 latency-bound
+             # sweet spot (~36fps); 512 envs saturates -> ~5fps -> 10x slower. 32 paired
+             # seeds is ample for a coarse RELATIVE map (side-b's decisive farm + JS does CIs).
 SEED0 = 270000
 
 def cfgs_for(cell, frames):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Analyze the GPU throughput surface -> per-screen T* (count rule) + whether ONE
-horizon_scaled setting auto-captures the per-screen optimum.
+horizon setting auto-captures the per-screen optimum.
 
   python3 analyze_surface.py cfgs_vm1.out cfgs_vm2.out
 """
@@ -42,7 +42,7 @@ for cell in screens:
 
 print('\n=== HORIZON_SCALED: throughput vs h, per screen (h* = argmax) ===')
 for cell in screens:
-    pts = sorted(by.get((cell, 'horizon_scaled'), []))
+    pts = sorted(by.get((cell, 'horizon'), []))
     if not pts: continue
     best = max(pts, key=lambda x: x[1])
     curve = '  '.join(f'h{int(p[0])}:{p[1]*1000:.3f}' for p in pts)
@@ -52,12 +52,12 @@ for cell in screens:
     print(f'             {curve}')
 
 print('\n=== HORIZON AUTO-CAPTURE TEST: for each fixed h, worst-screen gap vs per-screen count-T* ===')
-hvals = sorted(set(p[0] for cell in screens for p in by.get((cell, 'horizon_scaled'), [])))
+hvals = sorted(set(p[0] for cell in screens for p in by.get((cell, 'horizon'), [])))
 for h in hvals:
     gaps = []
     for cell in screens:
         cs = count_star.get(cell)
-        hp = [p for p in by.get((cell, 'horizon_scaled'), []) if p[0] == h]
+        hp = [p for p in by.get((cell, 'horizon'), []) if p[0] == h]
         if cs and hp:
             gaps.append((cell, (cs[1] - hp[0][1]) / cs[1] * 100))
     if gaps:

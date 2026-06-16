@@ -227,7 +227,10 @@ def _simulate(sim, roll, model, egw, rule, param_vec, frames, W, H, dev):
         f += 1
         just = (clear_frame < 0) & (sim.boid_alive.sum(1) == 0)
         clear_frame = torch.where(just, torch.full_like(clear_frame, f), clear_frame)
-        if f % 64 == 0 and bool((clear_frame >= 0).all()):   # all envs extinct -> done
+        # early-exit when ~all envs extinct: the last few stragglers are the slowest-
+        # clearing (worst-throughput) envs whose eff is capped at `frames` either way, so
+        # stopping at 92% barely shifts the aggregate but skips the long tail-chase tail.
+        if f % 64 == 0 and f >= 800 and float((clear_frame >= 0).float().mean()) >= 0.92:
             break
     return sim.catches.cpu().numpy().astype(float), clear_frame.cpu().numpy()
 
