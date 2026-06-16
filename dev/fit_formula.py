@@ -105,6 +105,18 @@ def main():
         pr, ach, mean, worst = best
         prs = '(' + ','.join(f'{x:.3f}' if isinstance(x, float) else str(x) for x in pr) + ')'
         print(f"{name:>11} {prs:>22} {ach*1e3:>12.4f} {mean:>9.2f} {worst:>10.2f}")
+    # best non-fixed form: per-screen gain vs fixed-8 (the complexity-bar table)
+    best_name = min((n for n in FORMS if not n.startswith('fixed')), key=lambda n: results[n][2])
+    bpr = results[best_name][0]; bTfn = FORMS[best_name][1]
+    print(f"\n=== per-screen: BEST form '{best_name}' {bpr} vs fixed-8 (gain = formula/fixed8 -1) ===")
+    print(f"{'screen':>11} {'N0':>4} {'area(M)':>7} {'wt':>4} {'Tf':>3} {'fThru':>7} {'T8thru':>7} {'gain%':>7} {'optThru':>7} {'fGap%':>6}")
+    tw = sum(weights.values()); wgain = 0.0
+    for c in sorted(cs, key=lambda c: -weights[c]):
+        Tf = bTfn(c, bpr); ff = thru(tab, c, Tf); t8 = thru(tab, c, 8)
+        opt = max(thru(tab, c, T) for T in Ts_for(tab, c))
+        g = (ff - t8) / t8 * 100; wgain += weights[c] * (ff - t8) / t8
+        print(f"{c[0]}x{c[1]:>4} {c[2]:>4} {area(c[0],c[1])/1e6:>7.2f} {weights[c]:>4} {Tf:>3} {ff*1e3:>7.3f} {t8*1e3:>7.3f} {g:>+7.2f} {opt*1e3:>7.3f} {(opt-ff)/opt*100:>6.2f}")
+    print(f"  prevalence-weighted gain of '{best_name}' vs fixed-8: {wgain/tw*100:+.2f}%")
     # per-cell T* table
     print(f"\n{'screen':>11} {'N0':>4} {'area(M)':>8} {'T*':>4}  throughput-by-T (T*=max)")
     for c in cs:
