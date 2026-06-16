@@ -1,0 +1,7 @@
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 4, "seeds": 48, "frames": 14000, "throughput": 0.011749459336813746, "clearRate": 0.9166666666666666, "medCatches": 60.0, "medClearFrames": 4293.5, "sec": 302.7}
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 5, "seeds": 48, "frames": 14000, "throughput": 0.012713305680347385, "clearRate": 0.9583333333333334, "medCatches": 60.0, "medClearFrames": 4391.0, "sec": 302.7}
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 6, "seeds": 48, "frames": 14000, "throughput": 0.01335207634529824, "clearRate": 0.9791666666666666, "medCatches": 60.0, "medClearFrames": 4318.0, "sec": 302.7}
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 7, "seeds": 48, "frames": 14000, "throughput": 0.011676803627366138, "clearRate": 0.9166666666666666, "medCatches": 60.0, "medClearFrames": 4282.0, "sec": 302.7}
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 8, "seeds": 48, "frames": 14000, "throughput": 0.012199779343121445, "clearRate": 0.9375, "medCatches": 60.0, "medClearFrames": 4358.0, "sec": 302.7}
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 9, "seeds": 48, "frames": 14000, "throughput": 0.011693718895358293, "clearRate": 0.9166666666666666, "medCatches": 60.0, "medClearFrames": 4398.5, "sec": 302.7}
+{"cell": "414x896", "boids": 60, "rule": "count", "param": 10, "seeds": 48, "frames": 14000, "throughput": 0.01264068426008219, "clearRate": 0.9583333333333334, "medCatches": 60.0, "medClearFrames": 4361.0, "sec": 302.7}
